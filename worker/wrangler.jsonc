@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "falai-notificacoes",
+  "account_id": "b627a8fcdf28cea1025d5fdbe175ef1e",
+  "main": "src/index.js",
+  "compatibility_date": "2025-11-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "keep_vars": true,
+  "vars": {"FIREBASE_PROJECT_ID": "falai-4d04c"},
+  "triggers": {"crons": ["* * * * *"]},
+  "observability": {"enabled": false}
+}

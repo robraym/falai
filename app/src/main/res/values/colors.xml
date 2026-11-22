@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="check_pending">#8696A0</color>
+    <color name="check_read">#53BDEB</color>
+    <!-- Same fixed dark palette as Alertou values-night. -->
+    <color name="background">#090A0C</color>
+    <color name="card">#17191D</color>
+    <color name="action_green">#45C98A</color>
+    <color name="action_green_soft">#142D22</color>
+    <color name="text_primary">#F4F4F5</color>
+    <color name="text_secondary">#A6A8AD</color>
+    <color name="input_background">#111317</color>
+    <color name="divider">#34353A</color>
+    <color name="icon_surface">#22262E</color>
+</resources>
