@@ -63,6 +63,7 @@ public final class ChatActivity extends AppCompatActivity {
         header.addView(title, new LinearLayout.LayoutParams(0, -2, 1)); root.addView(header);
         older = Ui.button(this, R.string.older_messages, v -> loadOlder()); older.setVisibility(View.GONE); root.addView(older);
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
+        messages.setBackground(new ChatWallpaper(this));
         messages.setLayoutManager(layoutManager); adapter = new MessageAdapter(Backend.uid()); messages.setAdapter(adapter);
         messages.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override public void onScrolled(@NonNull RecyclerView view, int dx, int dy) { acknowledgeVisible(); }

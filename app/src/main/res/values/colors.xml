@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="chat_wallpaper">#EFEAE2</color>
+    <color name="chat_wallpaper_ink">#D3CEC6</color>
     <color name="check_pending">#8696A0</color>
     <color name="check_read">#53BDEB</color>
     <!-- Light palette from Alertou; Android selects values-night for dark mode. -->

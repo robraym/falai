@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="chat_wallpaper">#0B141A</color>
+    <color name="chat_wallpaper_ink">#1D2A31</color>
     <color name="background">#090A0C</color>
     <color name="card">#17191D</color>
     <color name="action_green">#45C98A</color>

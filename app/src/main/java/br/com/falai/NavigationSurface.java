@@ -24,8 +24,6 @@ final class NavigationSurface extends Drawable {
         int left = root.getPaddingLeft(), top = root.getPaddingTop(), right = root.getPaddingRight(), bottom = root.getPaddingBottom();
         root.setBackground(new LayerDrawable(new Drawable[]{new android.graphics.drawable.ColorDrawable(root.getContext().getColor(R.color.background)), surface}));
         root.setPadding(left, top, right, bottom);
-        View content = root.getChildAt(1);
-        content.setPadding(content.getPaddingLeft(), content.getPaddingTop() + Ui.dp(root.getContext(), 8), content.getPaddingRight(), content.getPaddingBottom());
         navigation.setBackgroundColor(android.graphics.Color.TRANSPARENT);
         root.getViewTreeObserver().addOnPreDrawListener(() -> {
             boolean changed = surface.alignNavigation();

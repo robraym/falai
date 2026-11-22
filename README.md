@@ -4,6 +4,8 @@ Aplicativo Android nativo em **Java**, com texto e emojis, login Google, descobe
 
 A aparência acompanha automaticamente o tema claro/escuro do aparelho, com as paletas correspondentes do Alertou. O cabeçalho respeita a barra de status, inclusive ao trocar de aba, e a lista de conversas mostra a data e a hora da última mensagem.
 
+O histórico de cada conversa usa papel de parede com desenhos vetoriais discretos, fundo bege no modo claro e azul-escuro no modo escuro. Na lista, a prévia e a data/hora ficam na mesma linha; o espaço abaixo do título foi reduzido em 8dp.
+
 ## Arquitetura gratuita
 
 - **Firebase Authentication / Google**: identifica a conta sem SMS.

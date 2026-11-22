@@ -107,11 +107,14 @@ final class Ui {
         TextView title = text(c, name, 16, true); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         headline.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
         labels.addView(headline, new LinearLayout.LayoutParams(-1, -2));
-        TextView sub = text(c, detail, 13, false); sub.setMaxLines(2); sub.setEllipsize(android.text.TextUtils.TruncateAt.END); labels.addView(sub);
+        TextView sub = text(c, detail, 13, false); sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
         if (!dateTime.isEmpty()) {
+            LinearLayout preview = row(c); preview.setBaselineAligned(true);
+            sub.setSingleLine(true); preview.addView(sub, new LinearLayout.LayoutParams(0, -2, 1));
             TextView when = text(c, dateTime, 11, false); when.setSingleLine(true); when.setGravity(Gravity.END);
-            when.setPadding(0, dp(c, 3), 0, 0); labels.addView(when, new LinearLayout.LayoutParams(-1, -2));
-        }
+            when.setPadding(dp(c, 8), 0, 0, 0); preview.addView(when, new LinearLayout.LayoutParams(-2, -2));
+            labels.addView(preview, new LinearLayout.LayoutParams(-1, -2));
+        } else { sub.setMaxLines(2); labels.addView(sub); }
         row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1)); return row;
     }
     static void enable(View v, boolean enabled) {
