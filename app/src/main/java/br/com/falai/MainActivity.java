@@ -15,6 +15,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ImageButton;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -41,6 +43,7 @@ public final class MainActivity extends AppCompatActivity {
     private String email = "", profileName = "";
     private int tab, generation;
     private boolean home, profileLoaded, contactsBusy, loadingProfile;
+    private boolean selectingContact;
     private ContactsRepository.Result contacts;
     private long contactsAt;
     private android.os.CancellationSignal googleCancellation;
@@ -56,6 +59,7 @@ public final class MainActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        selectingContact = getIntent().getBooleanExtra("selectContact", false);
         if (state != null) tab = state.getInt("tab");
         if (!Backend.ready()) { page(getString(R.string.app_name)); info(R.string.not_ready_title, R.string.not_ready_body); return; }
         if (Backend.uid().isEmpty()) showLogin(); else loadProfile();
@@ -142,7 +146,15 @@ public final class MainActivity extends AppCompatActivity {
     }
     private void showHome(int selected) {
         if (Backend.uid().isEmpty()) { showLogin(); return; }
-        home = true; tab = selected; page(getString(R.string.app_name));
+        home = true; tab = selectingContact ? 1 : selected;
+        page(getString(selectingContact ? R.string.select_contact : R.string.app_name));
+        if (selectingContact) {
+            View heading = root.getChildAt(0); root.removeViewAt(0);
+            LinearLayout header = Ui.row(this);
+            header.addView(Ui.icon(this, R.drawable.ic_back, R.string.back, v -> finish()));
+            header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1)); root.addView(header, 0);
+            showContacts(); return;
+        }
         LinearLayout nav = Ui.row(this); nav.setBaselineAligned(false); View selectedView = null;
         int[] titles = {R.string.conversations, R.string.contacts, R.string.settings}; int[] icons = {R.drawable.ic_chat, R.drawable.ic_contacts, R.drawable.ic_settings};
         for (int i = 0; i < 3; i++) {
@@ -165,8 +177,20 @@ public final class MainActivity extends AppCompatActivity {
         list.setClipToPadding(false); list.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 9)); parent.addView(list, new LinearLayout.LayoutParams(-1, 0, 1)); return list;
     }
     private void showChats() {
-        int current = generation; TextView state = Ui.text(this, getString(R.string.loading), 14, false); state.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), 0, Ui.dp(this, 12)); body.addView(state);
-        RowsAdapter adapter = new RowsAdapter(); list(body, adapter);
+        FrameLayout area = new FrameLayout(this); body.addView(area, new LinearLayout.LayoutParams(-1, -1));
+        LinearLayout content = Ui.column(this); area.addView(content, new FrameLayout.LayoutParams(-1, -1));
+        int current = generation; TextView state = Ui.text(this, getString(R.string.loading), 14, false); state.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), 0, Ui.dp(this, 12)); content.addView(state);
+        RowsAdapter adapter = new RowsAdapter(); RecyclerView conversations = list(content, adapter);
+        conversations.setPadding(conversations.getPaddingLeft(), conversations.getPaddingTop(), conversations.getPaddingRight(), Ui.dp(this, 88));
+        ImageButton start = new ImageButton(this); start.setImageResource(R.drawable.ic_new_chat);
+        start.setContentDescription(getString(R.string.start_conversation)); start.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        start.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.background)));
+        start.setPadding(Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 16));
+        start.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33000000), Ui.shape(this, R.color.action_green, 16), null));
+        start.setElevation(Ui.dp(this, 6));
+        FrameLayout.LayoutParams floating = new FrameLayout.LayoutParams(Ui.dp(this, 56), Ui.dp(this, 56), Gravity.BOTTOM | Gravity.END);
+        floating.setMargins(Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 16)); area.addView(start, floating);
+        start.setOnClickListener(v -> startActivity(new Intent(this, MainActivity.class).putExtra("selectContact", true)));
         chatsListener = Backend.db().collection("chats").whereArrayContains("members", Backend.uid()).orderBy("updatedAt", Query.Direction.DESCENDING).limit(100)
                 .addSnapshotListener(this, (snap, error) -> {
                     if (generation != current) return;
@@ -179,15 +203,35 @@ public final class MainActivity extends AppCompatActivity {
                         if (members == null || names == null) continue;
                         String other = members.get(0).equals(Backend.uid()) ? members.get(1) : members.get(0); String name = contactName(other, names.get(other));
                         String preview = chat.getString("lastText");
-                        rows.add(new RowsAdapter.Row(chat.getId(), name, preview == null || preview.isEmpty() ? getString(R.string.new_conversation) : preview, () -> ChatActivity.open(this, chat.getId(), name)));
+                        com.google.firebase.Timestamp updated = chat.getTimestamp("updatedAt");
+                        String dateTime = updated == null || preview == null || preview.isEmpty() ? "" : lastMessageDateTime(updated.toDate());
+                        rows.add(new RowsAdapter.Row(chat.getId(), name, preview == null || preview.isEmpty() ? getString(R.string.new_conversation) : preview, dateTime, () -> ChatActivity.open(this, chat.getId(), name)));
                     }
                     adapter.submit(rows); state.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE); state.setText(R.string.empty_chats_body);
                 });
-        body.addView(Ui.button(this, R.string.find_contacts, v -> showHome(1)));
     }
     private String contactName(String uid, String fallback) {
         if (contacts != null) for (ContactsRepository.Contact contact : contacts.contacts) if (contact.uid.equals(uid)) return contact.name;
         return fallback == null ? getString(R.string.app_name) : fallback;
+    }
+    private String lastMessageDateTime(java.util.Date value) {
+        java.util.Calendar day = java.util.Calendar.getInstance(), today = java.util.Calendar.getInstance(); day.setTime(value);
+        java.util.Calendar yesterday = (java.util.Calendar) today.clone(); yesterday.add(java.util.Calendar.DAY_OF_YEAR, -1);
+        java.util.Calendar week = (java.util.Calendar) today.clone(); week.add(java.util.Calendar.DAY_OF_YEAR, -6);
+        week.set(java.util.Calendar.HOUR_OF_DAY, 0); week.set(java.util.Calendar.MINUTE, 0); week.set(java.util.Calendar.SECOND, 0); week.set(java.util.Calendar.MILLISECOND, 0);
+        java.util.Locale locale = getResources().getConfiguration().getLocales().get(0);
+        String label;
+        if (sameDate(day, today)) label = getString(R.string.day_today);
+        else if (sameDate(day, yesterday)) label = getString(R.string.day_yesterday);
+        else if (day.after(week) && day.before(today)) label = new java.text.SimpleDateFormat("EEEE", locale).format(value);
+        else {
+            String skeleton = day.get(java.util.Calendar.YEAR) == today.get(java.util.Calendar.YEAR) ? "ddMM" : "ddMMyyyy";
+            label = new java.text.SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(value);
+        }
+        return label + " · " + android.text.format.DateFormat.getTimeFormat(this).format(value);
+    }
+    private static boolean sameDate(java.util.Calendar a, java.util.Calendar b) {
+        return a.get(java.util.Calendar.YEAR) == b.get(java.util.Calendar.YEAR) && a.get(java.util.Calendar.DAY_OF_YEAR) == b.get(java.util.Calendar.DAY_OF_YEAR);
     }
     private void showContactsPermission(boolean denied) {
         body.removeAllViews(); body.addView(Ui.button(this, R.string.find_by_email, v -> findByEmail())); LinearLayout card = info(R.string.contacts_title, denied ? R.string.contacts_denied : R.string.contacts_consent);
@@ -243,7 +287,10 @@ public final class MainActivity extends AppCompatActivity {
         Ui.enable(body, false); int current = generation;
         Backend.call("openChat", Backend.data("uid", contact.uid)).addOnCompleteListener(this, task -> {
             if (generation != current) return; Ui.enable(body, true);
-            if (task.isSuccessful()) ChatActivity.open(this, (String) task.getResult().get("chatId"), contact.name);
+            if (task.isSuccessful()) {
+                ChatActivity.open(this, (String) task.getResult().get("chatId"), contact.name);
+                if (selectingContact) finish();
+            }
             else toast(Backend.error(this, task.getException()));
         });
     }

@@ -2,6 +2,8 @@
 
 Aplicativo Android nativo em **Java**, com texto e emojis, login Google, descoberta de contatos por e-mail e o visual do Alertou.
 
+A aparência acompanha automaticamente o tema claro/escuro do aparelho, com as paletas correspondentes do Alertou. O cabeçalho respeita a barra de status, inclusive ao trocar de aba, e a lista de conversas mostra a data e a hora da última mensagem.
+
 ## Arquitetura gratuita
 
 - **Firebase Authentication / Google**: identifica a conta sem SMS.
@@ -27,6 +29,8 @@ Google Authentication, SHA-1 do debug e o JSON com o cliente OAuth Web foram con
 ## Fluxo do aplicativo
 
 Quem instala apenas entra com Google, confirma o nome e escolhe se autoriza agenda e notificações. Não há configuração técnica para o usuário final.
+
+Em Conversas, o botão flutuante verde abre a tela de seleção de contato; escolher alguém inicia ou reabre a conversa e volta diretamente à lista ao sair do chat. Não há botão textual “Encontrar contatos”. O cabeçalho e o contorno integrado às três abas seguem as medidas do Alertou. Emoji, campo de texto e envio ficam na mesma linha, com o campo crescendo até cinco linhas.
 
 **A agenda agora é cruzada pelos e-mails, não pelos números de telefone.** O e-mail salvo no contato precisa corresponder à conta Google usada no Falai. Quem tiver somente telefone pode usar a busca manual pelo e-mail. Apenas e-mails são enviados na descoberta; nomes da agenda permanecem no aparelho. A leitura é opcional e a busca manual continua disponível sem permissão para a agenda.
 

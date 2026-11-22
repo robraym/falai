@@ -30,23 +30,42 @@ final class Ui {
         WindowCompat.setDecorFitsSystemWindows(activity.getWindow(), false);
         LinearLayout root = column(activity); root.setBackgroundColor(activity.getColor(R.color.background));
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
-            androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-            int bottom = Math.max(bars.bottom, insets.getInsets(WindowInsetsCompat.Type.ime()).bottom);
-            int side = activity.getResources().getDimensionPixelSize(R.dimen.navigation_side_padding);
-            view.setPadding(side + bars.left, bars.top, side + bars.right, bottom); return insets;
+            applySystemInsets(view, insets); return insets;
         });
+        // Replacing setContentView during navigation needs a new inset dispatch.
+        root.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override public void onViewAttachedToWindow(View view) { ViewCompat.requestApplyInsets(view); }
+            @Override public void onViewDetachedFromWindow(View view) { }
+        });
+        WindowInsetsCompat existing = ViewCompat.getRootWindowInsets(activity.getWindow().getDecorView());
+        if (existing != null) applySystemInsets(root, existing);
         activity.setContentView(root);
+        ViewCompat.requestApplyInsets(root);
         // Newer Android versions require the window decor to exist first.
-        WindowCompat.getInsetsController(activity.getWindow(), root).setAppearanceLightNavigationBars(false);
+        androidx.core.view.WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(activity.getWindow(), root);
+        boolean light = activity.getResources().getBoolean(R.bool.light_system_bars);
+        controller.setAppearanceLightNavigationBars(light); controller.setAppearanceLightStatusBars(light);
         return root;
+    }
+    private static void applySystemInsets(View view, WindowInsetsCompat insets) {
+        int types = WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout();
+        androidx.core.graphics.Insets bars = insets.getInsetsIgnoringVisibility(types);
+        WindowInsetsCompat window = ViewCompat.getRootWindowInsets(view);
+        if (window != null) bars = androidx.core.graphics.Insets.max(bars, window.getInsetsIgnoringVisibility(types));
+        int bottom = Math.max(bars.bottom, insets.getInsets(WindowInsetsCompat.Type.ime()).bottom);
+        int side = view.getResources().getDimensionPixelSize(R.dimen.navigation_side_padding);
+        int left = side + bars.left, right = side + bars.right;
+        if (view.getPaddingLeft() != left || view.getPaddingTop() != bars.top || view.getPaddingRight() != right || view.getPaddingBottom() != bottom)
+            view.setPadding(left, bars.top, right, bottom);
     }
     static TextView text(Context c, CharSequence value, int size, boolean bold) {
         TextView t = new TextView(c); t.setText(value); t.setTextSize(size);
         t.setTextColor(c.getColor(bold ? R.color.text_primary : R.color.text_secondary));
         if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD); t.setLineSpacing(dp(c, 2), 1); return t;
     }
-    static TextView heading(Context c, CharSequence title) {
-        TextView v = text(c, title, 27, true); v.setPadding(dp(c, 12), dp(c, 12), dp(c, 12), dp(c, 6)); return v;
+    static LinearLayout heading(Context c, CharSequence title) {
+        LinearLayout header = (LinearLayout) android.view.LayoutInflater.from(c).inflate(R.layout.view_page_header, new LinearLayout(c), false);
+        ((TextView) header.findViewById(R.id.page_title)).setText(title); return header;
     }
     static LinearLayout card(Context c) {
         LinearLayout v = column(c); v.setPadding(dp(c, 16), dp(c, 18), dp(c, 16), dp(c, 18)); v.setBackground(shape(c, R.color.card, 20));
@@ -75,14 +94,24 @@ final class Ui {
     }
     static View divider(Context c) { View v = new View(c); v.setBackgroundColor(c.getColor(R.color.divider)); v.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(c, 1))); return v; }
     static LinearLayout contactRow(Context c, String name, String detail) {
+        return contactRow(c, name, detail, "");
+    }
+    static LinearLayout contactRow(Context c, String name, String detail, String dateTime) {
         LinearLayout row = row(c); row.setPadding(dp(c, 12), dp(c, 14), dp(c, 12), dp(c, 14)); row.setMinimumHeight(dp(c, 80));
         row.setBackground(new RippleDrawable(ColorStateList.valueOf(0x3345C98A), shape(c, R.color.card, 18), null));
         TextView circle = text(c, name.isEmpty() ? "?" : name.substring(0, name.offsetByCodePoints(0, 1)).toUpperCase(java.util.Locale.ROOT), 19, true);
         circle.setGravity(Gravity.CENTER); circle.setTextColor(c.getColor(R.color.action_green)); circle.setBackground(shape(c, R.color.action_green_soft, 24));
         row.addView(circle, new LinearLayout.LayoutParams(dp(c, 46), dp(c, 46)));
         LinearLayout labels = column(c); labels.setPadding(dp(c, 14), 0, dp(c, 6), 0);
-        TextView title = text(c, name, 16, true); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END); labels.addView(title);
+        LinearLayout headline = row(c);
+        TextView title = text(c, name, 16, true); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        headline.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        labels.addView(headline, new LinearLayout.LayoutParams(-1, -2));
         TextView sub = text(c, detail, 13, false); sub.setMaxLines(2); sub.setEllipsize(android.text.TextUtils.TruncateAt.END); labels.addView(sub);
+        if (!dateTime.isEmpty()) {
+            TextView when = text(c, dateTime, 11, false); when.setSingleLine(true); when.setGravity(Gravity.END);
+            when.setPadding(0, dp(c, 3), 0, 0); labels.addView(when, new LinearLayout.LayoutParams(-1, -2));
+        }
         row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1)); return row;
     }
     static void enable(View v, boolean enabled) {

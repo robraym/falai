@@ -12,7 +12,7 @@ public final class FalaiApplication extends Application {
     @Override public void onCreate() {
         super.onCreate();
         instance = this;
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         if (FirebaseApp.initializeApp(this) != null) {
             AppCheckInstaller.install();
             FirebaseFirestore.getInstance().setFirestoreSettings(new FirebaseFirestoreSettings.Builder()

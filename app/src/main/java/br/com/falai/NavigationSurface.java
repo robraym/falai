@@ -21,7 +21,17 @@ final class NavigationSurface extends Drawable {
     private final Rect selectedBounds = new Rect();
     static void attach(ViewGroup root, View navigation, View selected) {
         NavigationSurface surface = new NavigationSurface(root, navigation, selected);
+        int left = root.getPaddingLeft(), top = root.getPaddingTop(), right = root.getPaddingRight(), bottom = root.getPaddingBottom();
         root.setBackground(new LayerDrawable(new Drawable[]{new android.graphics.drawable.ColorDrawable(root.getContext().getColor(R.color.background)), surface}));
+        root.setPadding(left, top, right, bottom);
+        View content = root.getChildAt(1);
+        content.setPadding(content.getPaddingLeft(), content.getPaddingTop() + Ui.dp(root.getContext(), 8), content.getPaddingRight(), content.getPaddingBottom());
+        navigation.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        root.getViewTreeObserver().addOnPreDrawListener(() -> {
+            boolean changed = surface.alignNavigation();
+            if (changed) surface.invalidateSelf();
+            return !changed;
+        });
         root.addOnLayoutChangeListener((view, l, t, r, b, ol, ot, or, ob) -> surface.invalidateSelf());
     }
     private NavigationSurface(ViewGroup root, View navigation, View selected) {
@@ -29,15 +39,22 @@ final class NavigationSurface extends Drawable {
         fill.setColor(ColorUtils.blendARGB(root.getContext().getColor(R.color.background), root.getContext().getColor(R.color.icon_surface), .28f));
         outline.setStyle(Paint.Style.STROKE); outline.setStrokeWidth(dp(1)); outline.setColor(ColorUtils.setAlphaComponent(root.getContext().getColor(R.color.action_green), 80));
     }
-    private float dp(float value) { return Ui.dp(root.getContext(), value); }
+    private float dp(float value) { return value * root.getResources().getDisplayMetrics().density; }
+    private int sideInset() { return Math.round(dp(10) + outline.getStrokeWidth() / 2); }
+    private boolean alignNavigation() {
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) navigation.getLayoutParams();
+        int left = sideInset() - root.getPaddingLeft(), right = sideInset() - root.getPaddingRight();
+        if (params.leftMargin == left && params.rightMargin == right) return false;
+        params.leftMargin = left; params.rightMargin = right; navigation.setLayoutParams(params); return true;
+    }
     @Override public void draw(Canvas canvas) {
         if (selected.getWidth() == 0 || root.getChildCount() < 3) return;
         selected.getDrawingRect(selectedBounds); root.offsetDescendantRectToMyCoords(selected, selectedBounds);
-        float left = root.getPaddingLeft() - dp(2), right = root.getWidth() - root.getPaddingRight() + dp(2);
-        float top = root.getChildAt(0).getTop() + dp(4), bottom = navigation.getTop() + dp(4);
+        float left = sideInset(), right = root.getWidth() - sideInset();
+        float top = Math.max(root.getPaddingTop(), root.getChildAt(0).getTop()) + dp(4), bottom = navigation.getTop() + dp(4);
         float tabLeft = Math.max(left, selectedBounds.left), tabRight = Math.min(right, selectedBounds.right), tabBottom = selectedBounds.bottom - dp(8);
         float radius = dp(20), tabRadius = Math.min(dp(16), (tabRight - tabLeft) / 2);
-        boolean flushLeft = tabLeft <= left + dp(2), flushRight = tabRight >= right - dp(2);
+        boolean flushLeft = tabLeft <= left, flushRight = tabRight >= right;
         if (flushLeft) tabLeft = left; if (flushRight) tabRight = right;
         float shoulderL = Math.max(0, Math.min(dp(10), (tabLeft - left) / 2));
         float shoulderR = Math.max(0, Math.min(dp(10), (right - tabRight) / 2));

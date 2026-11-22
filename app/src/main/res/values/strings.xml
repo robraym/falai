@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="day_today">Hoje</string>
+    <string name="day_yesterday">Ontem</string>
     <string name="message_sent">Enviada</string>
     <string name="message_delivered">Entregue</string>
     <string name="message_read">Lida</string>
@@ -33,8 +35,9 @@
     <string name="error_send">Não foi possível enviar. Sua mensagem foi preservada para tentar novamente.</string>
     <string name="not_ready_title">Até já!</string>
     <string name="not_ready_body">O Falai ainda não foi ativado. Aguarde a versão liberada pelo responsável pelo aplicativo.</string>
-    <string name="empty_chats_body">Encontre nos seus contatos quem também está no Falai.</string>
-    <string name="find_contacts">Encontrar contatos</string>
+    <string name="empty_chats_body">Toque no botão de nova conversa para escolher um contato.</string>
+    <string name="select_contact">Selecionar contato</string>
+    <string name="start_conversation">Nova conversa</string>
     <string name="contacts_title">Quem está no Falai</string>
     <string name="contacts_consent">Encontre quem também usa o Falai pelos e-mails salvos na sua agenda. Os e-mails serão consultados no serviço do aplicativo; nomes e telefones da agenda ficam neste celular. Contatos que tenham somente telefone podem ser encontrados pelo e-mail da conta Google.</string>
     <string name="allow_contacts">Permitir acesso aos contatos</string>

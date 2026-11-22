@@ -73,20 +73,30 @@ public final class ChatActivity extends AppCompatActivity {
         retryRow.addView(Ui.button(this, R.string.retry, v -> model.retry()), new LinearLayout.LayoutParams(0, -2, 1));
         retryRow.addView(Ui.button(this, R.string.discard, v -> model.discard()), new LinearLayout.LayoutParams(0, -2, 1));
         retryRow.setVisibility(View.GONE); root.addView(retryRow);
-        composerRow = Ui.column(this); composerRow.setPadding(Ui.dp(this, 4), 0, Ui.dp(this, 4), Ui.dp(this, 8)); composerRow.setBackground(Ui.shape(this, R.color.card, 20));
+        composerRow = Ui.row(this); composerRow.setGravity(Gravity.BOTTOM); composerRow.setBaselineAligned(false);
+        composerRow.setPadding(Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 8));
+        LinearLayout inputBar = Ui.row(this); inputBar.setGravity(Gravity.BOTTOM); inputBar.setBaselineAligned(false);
+        inputBar.setBackground(Ui.shape(this, R.color.card, 24));
+        composerRow.addView(inputBar, new LinearLayout.LayoutParams(0, -2, 1));
+        android.widget.ImageButton emojiButton = Ui.icon(this, R.drawable.ic_emoji, R.string.emoji, v -> emoji());
+        emojiButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.text_secondary)));
+        emojiButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3345C98A), Ui.shape(this, R.color.card, 24), null));
+        inputBar.addView(emojiButton);
         composer = Ui.input(this, R.string.message_hint); composer.setSingleLine(false); composer.setMaxLines(5);
         composer.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        composer.setText(model.draft); composerRow.addView(composer);
-        LinearLayout actions = Ui.row(this); actions.setPadding(0, Ui.dp(this, 6), 0, 0);
-        actions.addView(Ui.icon(this, R.drawable.ic_emoji, R.string.emoji, v -> emoji()));
-        actions.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
-        actions.addView(Ui.icon(this, R.drawable.ic_send, R.string.send, v -> {
+        composer.setBackgroundColor(android.graphics.Color.TRANSPARENT); composer.setMinHeight(Ui.dp(this, 48));
+        composer.setGravity(Gravity.TOP | Gravity.START); composer.setPadding(0, Ui.dp(this, 12), Ui.dp(this, 12), Ui.dp(this, 12));
+        composer.setText(model.draft); inputBar.addView(composer, new LinearLayout.LayoutParams(0, -2, 1));
+        android.widget.ImageButton sendButton = Ui.icon(this, R.drawable.ic_send, R.string.send, v -> {
             model.draft = composer.getText().toString();
             if (model.draft.trim().isEmpty()) return;
             if (model.draft.trim().length() > 4000) { composer.setError(getString(R.string.message_too_long)); return; }
             model.sendText();
-        }));
-        composerRow.addView(actions); root.addView(composerRow);
+        });
+        sendButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.background)));
+        sendButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33000000), Ui.shape(this, R.color.action_green, 24), null));
+        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)); sendParams.leftMargin = Ui.dp(this, 8);
+        composerRow.addView(sendButton, sendParams); root.addView(composerRow);
         composer.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             public void onTextChanged(CharSequence s, int start, int before, int count) { model.draft = s.toString(); }

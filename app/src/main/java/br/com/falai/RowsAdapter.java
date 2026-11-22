@@ -10,8 +10,9 @@ import java.util.List;
 
 final class RowsAdapter extends RecyclerView.Adapter<RowsAdapter.Holder> {
     static final class Row {
-        final String key, name, detail; final Runnable click;
-        Row(String key, String name, String detail, Runnable click) { this.key = key; this.name = name; this.detail = detail; this.click = click; }
+        final String key, name, detail, dateTime; final Runnable click;
+        Row(String key, String name, String detail, Runnable click) { this(key, name, detail, "", click); }
+        Row(String key, String name, String detail, String dateTime, Runnable click) { this.key = key; this.name = name; this.detail = detail; this.dateTime = dateTime; this.click = click; }
     }
     private final List<Row> rows = new ArrayList<>();
     void submit(List<Row> values) {
@@ -21,7 +22,7 @@ final class RowsAdapter extends RecyclerView.Adapter<RowsAdapter.Holder> {
             public int getNewListSize() { return values.size(); }
             public boolean areItemsTheSame(int oldPosition, int newPosition) { return before.get(oldPosition).key.equals(values.get(newPosition).key); }
             public boolean areContentsTheSame(int oldPosition, int newPosition) {
-                Row old = before.get(oldPosition), next = values.get(newPosition); return old.name.equals(next.name) && old.detail.equals(next.detail);
+                Row old = before.get(oldPosition), next = values.get(newPosition); return old.name.equals(next.name) && old.detail.equals(next.detail) && old.dateTime.equals(next.dateTime);
             }
         });
         rows.clear(); rows.addAll(values); diff.dispatchUpdatesTo(this);
@@ -32,7 +33,7 @@ final class RowsAdapter extends RecyclerView.Adapter<RowsAdapter.Holder> {
     }
     @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
         LinearLayout root = (LinearLayout) holder.itemView; root.removeAllViews(); Row item = rows.get(position);
-        LinearLayout content = Ui.contactRow(root.getContext(), item.name, item.detail); content.setOnClickListener(v -> item.click.run()); root.addView(content);
+        LinearLayout content = Ui.contactRow(root.getContext(), item.name, item.detail, item.dateTime); content.setOnClickListener(v -> item.click.run()); root.addView(content);
         if (position < rows.size() - 1) root.addView(Ui.divider(root.getContext()));
     }
     @Override public int getItemCount() { return rows.size(); }

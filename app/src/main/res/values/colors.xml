@@ -2,14 +2,14 @@
 <resources>
     <color name="check_pending">#8696A0</color>
     <color name="check_read">#53BDEB</color>
-    <!-- Same fixed dark palette as Alertou values-night. -->
-    <color name="background">#090A0C</color>
-    <color name="card">#17191D</color>
-    <color name="action_green">#45C98A</color>
-    <color name="action_green_soft">#142D22</color>
-    <color name="text_primary">#F4F4F5</color>
-    <color name="text_secondary">#A6A8AD</color>
-    <color name="input_background">#111317</color>
-    <color name="divider">#34353A</color>
-    <color name="icon_surface">#22262E</color>
+    <!-- Light palette from Alertou; Android selects values-night for dark mode. -->
+    <color name="background">#F7F8FA</color>
+    <color name="card">#FFFFFF</color>
+    <color name="action_green">#168A55</color>
+    <color name="action_green_soft">#E1F4E9</color>
+    <color name="text_primary">#1F2329</color>
+    <color name="text_secondary">#6C727C</color>
+    <color name="input_background">#F0F2F5</color>
+    <color name="divider">#D8DCE2</color>
+    <color name="icon_surface">#CDD5DF</color>
 </resources>
