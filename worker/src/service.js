@@ -1,6 +1,7 @@
 import {ApiError, requireValue, hash, normalizeEmail, validUid, validChat, validMessageId, normalizeMessage, chatId} from "./validation.js";
 import {validatePhoto} from "./photo.js";
-import {adjustUnread, isCountedUnread} from "./unread.js";
+import {addUnread, consumeUnread, pruneUnread} from "./unread.js";
+import {expiration} from "./timers.js";
 
 export async function updateProfileAbout(db, user, data) {
   requireValue(typeof data.text === "string");
@@ -65,8 +66,15 @@ export async function openChat(db, user, data) {
   await db.transaction(async tx => {
     const [chat, me, them] = await tx.getAll([`chats/${id}`, `users/${user.uid}`, `users/${data.uid}`]);
     if (!me || !them) throw new ApiError(404, "not-found");
-    if (!chat) tx.set(`chats/${id}`, {members: [user.uid, data.uid].sort(),
-      names: {[user.uid]: me.data.name, [data.uid]: them.data.name}, lastText: "", updatedAt: new Date()}, false);
+    if (!chat) {
+      const [mine, theirs] = await tx.getAll([`messageDefaults/${user.uid}`, `messageDefaults/${data.uid}`]);
+      const hours = mine?.data.hours || theirs?.data.hours || 0, now = new Date();
+      const changedBy = mine?.data.hours ? user.uid : data.uid;
+      tx.set(`chats/${id}`, {members: [user.uid, data.uid].sort(),
+        names: {[user.uid]: me.data.name, [data.uid]: them.data.name}, lastText: "", updatedAt: now,
+        timerHours: hours, ...(hours ? {timerChangedBy: changedBy, timerChangedAt: now, timerFormatSince: now} : {})}, false);
+      if (hours) tx.set(`chats/${id}/timerEvents/default`, {hours, changedBy, createdAt: now}, false);
+    }
     else if (chat.data.names[user.uid] !== me.data.name || chat.data.names[data.uid] !== them.data.name) {
       tx.set(`chats/${id}`, {...chat.data, names: {[user.uid]: me.data.name, [data.uid]: them.data.name}}, true);
     }
@@ -81,17 +89,20 @@ export async function persistMessage(db, uid, data) {
     const [chat, existing] = await tx.getAll([`chats/${data.chatId}`, path]);
     if (!chat || !chat.data.members.includes(uid)) throw new ApiError(403, "permission-denied");
     if (existing) {
+      if (existing.data.expired) throw new ApiError(404, "not-found");
       if (existing.data.senderId !== uid || existing.data.text !== message.text) throw new ApiError(409, "already-exists");
       return false;
     }
     const recipientId = chat.data.members.find(member => member !== uid);
     const now = new Date();
-    adjustUnread(chat.data, recipientId, 1);
-    tx.set(path, {...message, senderId: uid, createdAt: now, unreadTracked: true}, false);
+    const expiresAt = expiration(chat.data, now);
+    addUnread(chat.data, recipientId, expiresAt);
+    tx.set(path, {...message, senderId: uid, createdAt: now, expiresAt, expired: false, unreadTracked: true}, false);
     tx.set(`chats/${data.chatId}`, {...chat.data, lastText: message.text, updatedAt: now, lastMessageId: data.messageId,
-      lastSenderId: uid, lastKind: "message", lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
+      lastSenderId: uid, lastKind: "message", lastExpiresAt: expiresAt, lastExpired: false, lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
     tx.set(`notificationOutbox/${jobId}`, {chatId: data.chatId, messageId: data.messageId, recipientId,
-      createdAt: now, nextAttemptAt: now, status: "pending", attempts: 0, sentDeviceIds: []}, false);
+      createdAt: now, expiresAt, nextAttemptAt: now, status: "pending", attempts: 0, sentDeviceIds: []}, false);
+    if (expiresAt) tx.set(`messageExpiry/${jobId}`, {chatId: data.chatId, messageId: data.messageId, expiresAt}, false);
     return true;
   });
   return {messageId: data.messageId, jobId, created};
@@ -105,6 +116,7 @@ export async function sendNudge(db, user, data) {
     const [chat, existing, limit, usage] = await tx.getAll([`chats/${data.chatId}`, messagePath, limitPath, quotaPath]);
     if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
     if (existing) {
+      if (existing.data.expired) throw new ApiError(404, "not-found");
       if (existing.data.senderId !== user.uid || existing.data.kind !== "nudge") throw new ApiError(409, "already-exists");
       return;
     }
@@ -114,15 +126,17 @@ export async function sendNudge(db, user, data) {
     const count = (sameHour ? usage.data.count : 0) + 1;
     if (count > 20) throw new ApiError(429, "resource-exhausted");
     const createdAt = new Date(now), text = "Chamou sua atenção!";
-    adjustUnread(chat.data, chat.data.members.find(uid => uid !== user.uid), 1);
-    tx.set(messagePath, {senderId: user.uid, kind: "nudge", text, createdAt, unreadTracked: true}, false);
+    const expiresAt = expiration(chat.data, createdAt);
+    addUnread(chat.data, chat.data.members.find(uid => uid !== user.uid), expiresAt);
+    tx.set(messagePath, {senderId: user.uid, kind: "nudge", text, createdAt, expiresAt, expired: false, unreadTracked: true}, false);
     tx.set(`chats/${data.chatId}`, {...chat.data, lastText: text, updatedAt: createdAt, lastMessageId: data.messageId,
-      lastSenderId: user.uid, lastKind: "nudge", lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
+      lastSenderId: user.uid, lastKind: "nudge", lastExpiresAt: expiresAt, lastExpired: false, lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
     tx.set(limitPath, {sentAt: createdAt});
     tx.set(quotaPath, {start: sameHour ? usage.data.start : now, count});
     tx.set(`notificationOutbox/${jobId}`, {chatId: data.chatId, messageId: data.messageId,
-      recipientId: chat.data.members.find(uid => uid !== user.uid), event: "nudge", createdAt,
+      recipientId: chat.data.members.find(uid => uid !== user.uid), event: "nudge", createdAt, expiresAt,
       nextAttemptAt: createdAt, status: "pending", attempts: 0, sentDeviceIds: []}, false);
+    if (expiresAt) tx.set(`messageExpiry/${jobId}`, {chatId: data.chatId, messageId: data.messageId, expiresAt}, false);
   });
   return {messageId: data.messageId, jobId};
 }
@@ -191,14 +205,14 @@ export async function acknowledgeMessages(db, user, data) {
     if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
     const docs = await tx.getAll(ids.map(id => `chats/${data.chatId}/messages/${id}`));
     const now = new Date();
-    const summary = {...chat.data}; let summaryChanged = false;
+    const summary = {...chat.data}; let summaryChanged = pruneUnread(summary);
     for (const doc of docs) {
       if (!doc || doc.data.senderId === user.uid) continue;
       const value = {...doc.data};
       let changed = false;
       if (!value.deliveredAt) { value.deliveredAt = now; changed = true; }
       if (data.state === "read" && !value.readAt) {
-        if (isCountedUnread(summary, value, user.uid)) { adjustUnread(summary, user.uid, -1); summaryChanged = true; }
+        if (consumeUnread(summary, value, user.uid)) summaryChanged = true;
         value.readAt = now; changed = true;
       }
       if (changed) tx.set(doc.path, value, true);

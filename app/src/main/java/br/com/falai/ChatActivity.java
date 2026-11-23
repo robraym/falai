@@ -38,7 +38,7 @@ public final class ChatActivity extends FalaiActivity {
     private String messageQuery = "";
     private ChatPresence presence;
     private AvatarView avatar;
-    private RetentionNoticeView retentionNotice;
+    private RetentionNoticeController retentionNotice;
     private Button older;
     private android.widget.ImageButton nudgeButton;
     private RecyclerView messages;
@@ -53,6 +53,9 @@ public final class ChatActivity extends FalaiActivity {
     private List<DocumentSnapshot> pendingDocs;
     private com.google.firebase.Timestamp clearedBefore;
     private long localHistoryCutoff;
+    private int timerHours;
+    private DocumentSnapshot historyCursor;
+    private com.google.firebase.Timestamp timerFormatSince, listenerFormatSince;
     private final java.util.Set<String> deliveryQueued = new java.util.HashSet<>(), readQueued = new java.util.HashSet<>();
     static void open(Context context, String id, String name) {
         context.startActivity(new Intent(context, ChatActivity.class).putExtra("chatId", id).putExtra("name", name));
@@ -83,11 +86,16 @@ public final class ChatActivity extends FalaiActivity {
             .setTitle(R.string.nudge_action).setMessage(getString(R.string.nudge_question, name)).setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.nudge_action, (dialog, which) -> model.sendNudge()).show());
         header.addView(nudgeButton); root.addView(header);
-        retentionNotice = new RetentionNoticeView(this); root.addView(retentionNotice, new LinearLayout.LayoutParams(-1, -2));
         searchSummary = Ui.text(this, "", 12, false); searchSummary.setVisibility(View.GONE); root.addView(searchSummary);
         older = Ui.button(this, R.string.older_messages, v -> loadOlder()); older.setVisibility(View.GONE); root.addView(older);
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
         messages.setLayoutManager(layoutManager); adapter = new MessageAdapter(Backend.uid(), this::messageActions); messages.setAdapter(adapter);
+        retentionNotice = new RetentionNoticeController(this, notices -> {
+            boolean bottom = layoutManager.findLastVisibleItemPosition() >= adapter.getItemCount() - 3;
+            adapter.setNotices(notices);
+            if (bottom) messages.post(() -> { if (adapter.getItemCount() > 0) messages.scrollToPosition(adapter.getItemCount() - 1); });
+            messages.post(this::acknowledgeVisible);
+        }, this::chooseChatTimer);
         messages.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override public void onScrolled(@NonNull RecyclerView view, int dx, int dy) { acknowledgeVisible(); }
         });
@@ -153,16 +161,19 @@ public final class ChatActivity extends FalaiActivity {
             com.google.firebase.Timestamp previousCutoff = clearedBefore;
             boolean initial = !chatReady;
             clearedBefore = (com.google.firebase.Timestamp) doc.get("clearedBefore." + Backend.uid()); chatReady = true;
+            Long hours = doc.getLong("timerHours"); timerHours = hours == null ? 0 : hours.intValue();
+            timerFormatSince = doc.getTimestamp("timerFormatSince");
+            if (!java.util.Objects.equals(listenerFormatSince, timerFormatSince)) startMessageListener();
             @SuppressWarnings("unchecked") List<String> members = (List<String>) doc.get("members");
             if (members != null) for (String member : members) if (!member.equals(Backend.uid())) { otherUid = member; avatar.load(member, name); presence.listen(member); }
             @SuppressWarnings("unchecked") Map<String, String> names = (Map<String, String>) doc.get("names");
             String fallbackName = names != null && names.get(otherUid) != null ? names.get(otherUid) : name;
-            retentionNotice.bind(otherUid, name);
+            retentionNotice.bind(chatId, name);
             ((ProfileNameView) title).bind(otherUid, fallbackName, resolved -> {
                 name = resolved; avatar.load(otherUid, resolved); retentionNotice.setContactName(resolved);
             });
             if (pendingDocs != null) {
-                merge(pendingDocs); older.setVisibility(!historyExhausted && pendingDocs.size() >= 50 && !loaded.isEmpty() ? View.VISIBLE : View.GONE);
+                merge(pendingDocs); older.setVisibility(!historyExhausted && pendingDocs.size() >= 50 && oldest != null ? View.VISIBLE : View.GONE);
                 if (adapter.getItemCount() > 0) messages.scrollToPosition(adapter.getItemCount() - 1); pendingDocs = null;
                 if (!model.busy && !model.failed) { status.setText(R.string.new_conversation); status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); }
             }
@@ -171,6 +182,10 @@ public final class ChatActivity extends FalaiActivity {
                 if (!model.busy && !model.failed) { status.setText(R.string.new_conversation); status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); }
             }
         });
+        startMessageListener();
+    }
+    private void startMessageListener() {
+        if (listener != null) listener.remove(); listenerFormatSince = timerFormatSince;
         listener = query().limit(50).addSnapshotListener(this, (snapshot, error) -> {
             if (error != null) { status.setVisibility(View.VISIBLE); status.setText(R.string.error_chat_loading); return; }
             if (snapshot == null) return;
@@ -190,15 +205,25 @@ public final class ChatActivity extends FalaiActivity {
         Query query = Backend.db().collection("chats").document(chatId).collection("messages")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .orderBy(com.google.firebase.firestore.FieldPath.documentId(), Query.Direction.DESCENDING);
+        if (timerFormatSince != null) query = query.where(com.google.firebase.firestore.Filter.or(
+            com.google.firebase.firestore.Filter.lessThan("createdAt", timerFormatSince),
+            com.google.firebase.firestore.Filter.equalTo("expired", false)));
         long cutoff = HistoryRetention.cutoff(this);
         return cutoff > 0 ? query.whereGreaterThan("createdAt", new com.google.firebase.Timestamp(new java.util.Date(cutoff))) : query;
     }
     private void contactInfo() {
         if (otherUid.isEmpty()) { toast(R.string.loading); return; }
-        ContactProfileDialog.show(this, otherUid, name);
+        ContactProfileDialog.show(this, otherUid, name, this::chooseChatTimer);
+    }
+    private void chooseChatTimer() {
+        if (!chatReady) { toast(R.string.loading); return; }
+        MessageTimerDialog.show(this, chatId, timerHours, () -> { });
     }
     private void merge(List<DocumentSnapshot> docs) {
         localHistoryCutoff = HistoryRetention.cutoff(this);
+        for (DocumentSnapshot doc : docs) if (doc.getTimestamp("createdAt") != null && (historyCursor == null
+            || doc.getTimestamp("createdAt").compareTo(historyCursor.getTimestamp("createdAt")) < 0
+            || (doc.getTimestamp("createdAt").equals(historyCursor.getTimestamp("createdAt")) && doc.getId().compareTo(historyCursor.getId()) < 0))) historyCursor = doc;
         if (clearedBefore != null) for (DocumentSnapshot doc : docs) if (doc.getTimestamp("createdAt") != null && doc.getTimestamp("createdAt").compareTo(clearedBefore) <= 0) historyExhausted = true;
         List<String> delivered = new ArrayList<>();
         for (DocumentSnapshot doc : docs) if (!Backend.uid().equals(doc.getString("senderId")) && doc.getTimestamp("deliveredAt") == null && deliveryQueued.add(doc.getId())) delivered.add(doc.getId());
@@ -207,15 +232,15 @@ public final class ChatActivity extends FalaiActivity {
         loaded.values().removeIf(doc -> !visible(doc));
         List<DocumentSnapshot> sorted = new ArrayList<>(loaded.values());
         sorted.sort(Comparator.comparing((DocumentSnapshot doc) -> doc.getTimestamp("createdAt")).thenComparing(DocumentSnapshot::getId));
-        oldest = sorted.isEmpty() ? null : sorted.get(0); renderMessages();
+        oldest = historyCursor; renderMessages();
         messages.post(this::acknowledgeVisible);
     }
     private void renderMessages() {
         List<DocumentSnapshot> result = new ArrayList<>(loaded.values());
         String needle = searchable(messageQuery.trim());
-        result.removeIf(doc -> !needle.isEmpty() && (Boolean.TRUE.equals(doc.getBoolean("deletedForAll")) || !searchable(doc.getString("text")).contains(needle)));
+        result.removeIf(doc -> HistoryRetention.expired(doc) || (!needle.isEmpty() && (Boolean.TRUE.equals(doc.getBoolean("deletedForAll")) || !searchable(doc.getString("text")).contains(needle))));
         result.sort(Comparator.comparing((DocumentSnapshot doc) -> doc.getTimestamp("createdAt")).thenComparing(DocumentSnapshot::getId));
-        adapter.submit(result); searchSummary.setVisibility(needle.isEmpty() ? View.GONE : View.VISIBLE);
+        adapter.submit(result, needle.isEmpty()); searchSummary.setVisibility(needle.isEmpty() ? View.GONE : View.VISIBLE);
         searchSummary.setText(getString(R.string.search_loaded_results, result.size()));
         messages.post(this::acknowledgeVisible);
     }
@@ -231,6 +256,7 @@ public final class ChatActivity extends FalaiActivity {
         @SuppressWarnings("unchecked") List<String> hidden = (List<String>) doc.get("hiddenFor");
         com.google.firebase.Timestamp created = doc.getTimestamp("createdAt");
         return (hidden == null || !hidden.contains(Backend.uid()))
+            && !HistoryRetention.expired(doc)
             && (localHistoryCutoff == 0 || (created != null && created.toDate().getTime() > localHistoryCutoff))
             && (clearedBefore == null || (created != null && created.compareTo(clearedBefore) > 0));
     }
@@ -273,7 +299,7 @@ public final class ChatActivity extends FalaiActivity {
         int first = layoutManager.findFirstVisibleItemPosition(), last = layoutManager.findLastVisibleItemPosition();
         for (int position = Math.max(0, first); position <= last; position++) {
             DocumentSnapshot doc = adapter.at(position);
-            if (doc != null && !Backend.uid().equals(doc.getString("senderId")) && doc.getTimestamp("readAt") == null && readQueued.add(doc.getId())) read.add(doc.getId());
+            if (doc != null && !HistoryRetention.expired(doc) && !Backend.uid().equals(doc.getString("senderId")) && doc.getTimestamp("readAt") == null && readQueued.add(doc.getId())) read.add(doc.getId());
         }
         ReceiptWorker.schedule(chatId, read, true);
     }

@@ -2,12 +2,13 @@ import {test, before, after} from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {initializeTestEnvironment, assertSucceeds, assertFails} from "@firebase/rules-unit-testing";
-import {doc, setDoc, getDoc, getDocs, collection, query, where, orderBy, Timestamp, serverTimestamp} from "firebase/firestore";
+import {doc, setDoc, getDoc, getDocs, collection, query, where, orderBy, or, Timestamp, serverTimestamp} from "firebase/firestore";
 import {Firestore} from "../src/firestore.js";
 import {chatId} from "../src/validation.js";
 import {registerProfile, discoverContacts, openChat, persistMessage, quota, registerDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge} from "../src/service.js";
 import {changeMessage, deleteConversation, clearConversation} from "../src/mutations.js";
 import {dispatchJob, drainOutbox} from "../src/push.js";
+import {setDefaultTimer, setChatTimer, expireMessages} from "../src/timers.js";
 
 let env, db, id;
 const user = {uid: "alice", email: "alice@example.com"};
@@ -357,4 +358,90 @@ test("an expired nudge is not delivered late but its history remains", async () 
   let calls = 0; await dispatchJob(db, {}, path, async () => { calls++; return 'sent'; });
   assert.equal(calls, 0); assert.equal(await db.get(path), null);
   assert.equal((await db.get(`chats/${chatId}/messages/${messageId}`)).data.kind, 'nudge');
+});
+
+// Shared timers: isolated participants keep earlier outbox fixtures independent.
+test("a shared timer affects both senders, preserves previous messages and can be changed by either participant", async () => {
+  const a = {uid: "timer_a", email: "timer_a@example.com"}, b = {uid: "timer_b", email: "timer_b@example.com"};
+  await registerProfile(db, a, {name: "A"}); await registerProfile(db, b, {name: "B"});
+  const id = (await openChat(db, a, {uid: b.uid})).chatId;
+  const plain = {chatId: id, messageId: crypto.randomUUID(), text: "Anterior permanente"};
+  await persistMessage(db, a.uid, plain);
+  await setDefaultTimer(db, a, {hours: 24});
+  assert.equal((await db.get(`chats/${id}`)).data.timerHours, 0);
+  const change = {chatId: id, hours: 24, requestId: crypto.randomUUID()};
+  await assert.rejects(setChatTimer(db, {uid: "mallory"}, change), {code: "permission-denied"});
+  await Promise.all([setChatTimer(db, a, change), setChatTimer(db, a, change)]);
+  const sent = [];
+  for (const sender of [a.uid, b.uid]) {
+    const messageId = crypto.randomUUID(); sent.push(messageId);
+    await persistMessage(db, sender, {chatId: id, messageId, text: "Temporaria", expiresAt: null});
+    const data = (await db.get(`chats/${id}/messages/${messageId}`)).data;
+    assert.equal(data.expiresAt.getTime() - data.createdAt.getTime(), 86400000);
+  }
+  const firstExpiry = (await db.get(`chats/${id}/messages/${sent[0]}`)).data.expiresAt;
+  await setChatTimer(db, b, {chatId: id, hours: 168, requestId: crypto.randomUUID()});
+  assert.deepEqual((await db.get(`chats/${id}/messages/${sent[0]}`)).data.expiresAt, firstExpiry);
+  await setChatTimer(db, b, {chatId: id, hours: 0, requestId: crypto.randomUUID()});
+  await setChatTimer(db, a, change); // A delayed retry must not restore the old timer.
+  assert.equal((await db.get(`chats/${id}`)).data.timerHours, 0);
+  const permanent = {chatId: id, messageId: crypto.randomUUID(), text: "Depois de desativar"};
+  await persistMessage(db, b.uid, permanent);
+  assert.equal((await db.get(`chats/${id}/messages/${permanent.messageId}`)).data.expiresAt, null);
+  assert.equal((await db.get(`chats/${id}/messages/${plain.messageId}`)).data.expiresAt, null);
+  const events = await assertSucceeds(getDocs(collection(auth(b.uid), "chats", id, "timerEvents")));
+  assert.equal(events.size, 3);
+  await assertFails(getDocs(collection(auth("mallory"), "chats", id, "timerEvents")));
+  await assertFails(setDoc(doc(auth(a.uid), "chats", id, "timerEvents", "fake"), {hours: 24}));
+  await assertFails(setDoc(doc(auth(a.uid), "chats", id), {timerHours: 24}, {merge: true}));
+  await assertFails(getDoc(doc(auth(b.uid), "messageDefaults", a.uid)));
+  await assertFails(setDoc(doc(auth(a.uid), "messageDefaults", a.uid), {hours: 24}));
+  await assert.rejects(setChatTimer(db, a, {...change, hours: 10, requestId: crypto.randomUUID()}), {code: "invalid-argument"});
+});
+
+test("default timers apply only when creating a new chat and use the recipient default when the initiator has none", async () => {
+  const a = {uid: "default_a", email: "default_a@example.com"}, b = {uid: "default_b", email: "default_b@example.com"}, c = {uid: "default_c", email: "default_c@example.com"};
+  for (const user of [a, b, c]) await registerProfile(db, user, {name: user.uid});
+  await setDefaultTimer(db, a, {hours: 24});
+  const id = (await openChat(db, b, {uid: a.uid})).chatId;
+  assert.equal((await db.get(`chats/${id}`)).data.timerHours, 24);
+  await setDefaultTimer(db, a, {hours: 2160});
+  await openChat(db, a, {uid: b.uid});
+  assert.equal((await db.get(`chats/${id}`)).data.timerHours, 24);
+  const next = (await openChat(db, a, {uid: c.uid})).chatId;
+  assert.equal((await db.get(`chats/${next}`)).data.timerHours, 2160);
+  await assert.rejects(setDefaultTimer(db, a, {hours: "24"}), {code: "invalid-argument"});
+});
+
+test("expiration suppresses late push, scrubs text and preserves legacy messages in the filtered history", async () => {
+  const a = {uid: "expire_a", email: "expire_a@example.com"}, b = {uid: "expire_b", email: "expire_b@example.com"};
+  await registerProfile(db, a, {name: "A"}); await registerProfile(db, b, {name: "B"});
+  const id = (await openChat(db, a, {uid: b.uid})).chatId;
+  const permanentId = crypto.randomUUID();
+  await persistMessage(db, a.uid, {chatId: id, messageId: permanentId, text: "Legado"});
+  const permanent = (await db.get(`chats/${id}/messages/${permanentId}`)).data;
+  delete permanent.expired; delete permanent.expiresAt;
+  await db.commit([db.write(`chats/${id}/messages/${permanentId}`, permanent)]);
+  await setChatTimer(db, a, {chatId: id, hours: 24, requestId: crypto.randomUUID()});
+  const messageId = crypto.randomUUID();
+  const result = await persistMessage(db, a.uid, {chatId: id, messageId, text: "Eliminar conteudo"});
+  const messagePath = `chats/${id}/messages/${messageId}`, outbox = `notificationOutbox/${result.jobId}`;
+  const message = (await db.get(messagePath)).data, job = (await db.get(outbox)).data, past = new Date(Date.now() - 120000);
+  const chat = (await db.get(`chats/${id}`)).data;
+  await db.commit([db.write(messagePath, {...message, expiresAt: past}), db.write(outbox, {...job, expiresAt: past}),
+    db.write(`messageExpiry/${result.jobId}`, {chatId: id, messageId, expiresAt: past}),
+    db.write(`chats/${id}`, {...chat, lastExpiresAt: past, unreadExpiry: {[b.uid]: {[Math.ceil(past.getTime() / 60000) * 60000]: 1}}})]);
+  await dispatchJob(db, {}, outbox, async () => { assert.fail("expired messages must not push"); });
+  assert.equal(await db.get(outbox), null);
+  await assert.rejects(changeMessage(db, a, {chatId: id, messageId, text: "restaurar"}, true), {code: "not-found"});
+  await expireMessages(db);
+  const expired = (await db.get(messagePath)).data;
+  assert.equal(expired.expired, true); assert.equal(expired.text, undefined);
+  assert.equal(await db.get(`messageExpiry/${result.jobId}`), null);
+  await assert.rejects(persistMessage(db, a.uid, {chatId: id, messageId, text: "Eliminar conteudo"}), {code: "not-found"});
+  const visible = await assertSucceeds(getDocs(query(collection(auth(b.uid), "chats", id, "messages"),
+    or(where("createdAt", "<", Timestamp.fromDate(chat.timerFormatSince)), where("expired", "==", false)), orderBy("createdAt", "desc"))));
+  assert.deepEqual(visible.docs.map(doc => doc.id), [permanentId]);
+  assert.equal((await db.get(`chats/${id}`)).data.unreadCounts[b.uid], 1); // The permanent unread survives.
+  await assertFails(getDocs(collection(auth(a.uid), "messageExpiry")));
 });

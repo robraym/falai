@@ -41,6 +41,8 @@ public final class MainActivity extends FalaiActivity {
     private LinearLayout root, body;
     private TextView messageSoundSummary;
     private ListenerRegistration chatsListener;
+    private ListenerRegistration defaultTimerListener;
+    private String defaultTimerOwner = "";
     private String email = "", profileName = "";
     private int tab, generation;
     private boolean home, profileLoaded, contactsBusy, loadingProfile;
@@ -85,11 +87,13 @@ public final class MainActivity extends FalaiActivity {
     @Override protected void onSaveInstanceState(@NonNull Bundle out) { super.onSaveInstanceState(out); out.putInt("tab", tab); out.putString("chatQuery", chatQuery); out.putString("contactQuery", contactQuery); }
     @Override protected void onStart() {
         super.onStart(); if (!Backend.ready()) return;
+        listenDefaultTimer();
         observeContacts();
         if (home && profileLoaded) showHome(tab);
         Backend.auth().addAuthStateListener(authListener);
     }
     @Override protected void onStop() {
+        stopDefaultTimer();
         detach(); contactsBusy = false; loadingProfile = false;
         if (observingContacts) { getContentResolver().unregisterContentObserver(contactsObserver); observingContacts = false; }
         contactsHandler.removeCallbacks(refreshContacts);
@@ -125,6 +129,7 @@ public final class MainActivity extends FalaiActivity {
     }
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
     private void showLogin() {
+        stopDefaultTimer();
         home = false; profileLoaded = false; page(getString(R.string.app_name));
         LinearLayout card = Ui.card(this); scrollBody().addView(card);
         card.addView(Ui.text(this, getString(R.string.welcome), 21, true)); Ui.gap(card, 8);
@@ -151,7 +156,7 @@ public final class MainActivity extends FalaiActivity {
             if (!task.isSuccessful()) { body.removeAllViews(); info(R.string.profile, R.string.error_connection).addView(Ui.button(this, R.string.retry, v -> loadProfile())); return; }
             DocumentSnapshot profile = task.getResult();
             if (!profile.exists()) { showProfileForm(); return; }
-            profileName = profile.getString("name"); email = profile.getString("email"); profileLoaded = true;
+            profileName = profile.getString("name"); email = profile.getString("email"); profileLoaded = true; listenDefaultTimer();
             Backend.registerDevice().addOnFailureListener(this, error -> {
                 DeviceRegistrationWorker.schedule(); toast(getString(R.string.notifications_registration_error));
             }); showHome(tab); openNotificationIntent(getIntent());
@@ -264,13 +269,17 @@ public final class MainActivity extends FalaiActivity {
                 else if ("nudge".equals(chat.getString("lastKind"))) preview = getString(Backend.uid().equals(chat.getString("lastSenderId")) ? R.string.nudge_sent : R.string.nudge_received);
                 String dateTime = updated == null || preview == null || preview.isEmpty() ? "" : lastMessageDateTime(updated.toDate());
                 int checks = Backend.uid().equals(chat.getString("lastSenderId")) ? chat.getTimestamp("lastReadAt") != null ? 3 : chat.getTimestamp("lastDeliveredAt") != null ? 2 : 1 : 0;
-                Number pending = (Number) chat.get("unreadCounts." + Backend.uid());
+                long pending = HistoryRetention.unread(chat, Backend.uid());
                 // Older summaries have no counter: still identify the last unread incoming message.
-                int unread = pending != null ? (int) Math.min(9999, Math.max(0, pending.longValue()))
+                int unread = pending >= 0 ? (int) Math.min(9999, pending)
                     : other.equals(chat.getString("lastSenderId")) && chat.getTimestamp("lastReadAt") == null
                         && !Boolean.TRUE.equals(chat.getBoolean("lastDeleted"))
                         && (previewHidden == null || !previewHidden.contains(Backend.uid())) ? -1 : 0;
                 if (cleared) { preview = getString(R.string.chat_cleared); dateTime = ""; checks = 0; unread = 0; }
+                com.google.firebase.Timestamp lastExpiry = chat.getTimestamp("lastExpiresAt");
+                if (!cleared && lastExpiry != null && lastExpiry.toDate().getTime() <= System.currentTimeMillis()) {
+                    preview = getString(R.string.timer_message_expired); dateTime = ""; checks = 0;
+                }
                 allRows.add(new RowsAdapter.Row(chat.getId(), name, preview == null || preview.isEmpty() ? getString(R.string.new_conversation) : preview, dateTime, other, () -> ChatActivity.open(this, chat.getId(), name), () -> chatActions(chat.getId()), checks, false, unread));
             }
             filter.run();
@@ -411,25 +420,22 @@ public final class MainActivity extends FalaiActivity {
         if (home && profileLoaded && tab == 0 && retentionRefresh != null) retentionRefresh.run();
     }
     private void chooseHistoryDuration() {
-        String[] labels = new String[HistoryRetention.LABELS.length];
-        for (int i = 0; i < labels.length; i++) labels[i] = getString(HistoryRetention.LABELS[i]);
-        int[] chosen = {HistoryRetention.selected(this)};
-        TextView explanation = Ui.text(this, getString(R.string.retention_info), 13, false);
-        explanation.setPadding(Ui.dp(this, 24), Ui.dp(this, 12), Ui.dp(this, 24), Ui.dp(this, 12));
-        new AlertDialog.Builder(this).setTitle(R.string.history_duration).setView(explanation)
-            .setSingleChoiceItems(labels, chosen[0], (dialog, index) -> chosen[0] = index)
-            .setPositiveButton(R.string.retention_apply, (dialog, button) -> {
-                int index = chosen[0]; if (index == HistoryRetention.selected(this)) return;
-                Runnable apply = () -> {
-                    HistoryRetention.select(this, index); showHome(2);
-                    Backend.registerDevice().addOnFailureListener(this, error -> {
-                        DeviceRegistrationWorker.schedule(); toast(getString(R.string.retention_notice_pending));
-                    });
-                };
-                if (index == 0) apply.run();
-                else new AlertDialog.Builder(this).setMessage(getString(R.string.retention_confirm, labels[index]))
-                    .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.retention_apply, (confirmation, ignored) -> apply.run()).show();
-            }).setNegativeButton(R.string.cancel, null).show();
+        MessageTimerDialog.show(this, null, HistoryRetention.HOURS[HistoryRetention.selected(this)], () -> showHome(2));
+    }
+    private void listenDefaultTimer() {
+        if (Backend.uid().isEmpty()) return;
+        if (defaultTimerListener != null && defaultTimerOwner.equals(Backend.uid())) return;
+        stopDefaultTimer(); String owner = Backend.uid(); defaultTimerOwner = owner;
+        defaultTimerListener = Backend.db().collection("messageDefaults").document(owner).addSnapshotListener((doc, error) -> {
+            if (!owner.equals(Backend.uid()) || error != null || doc == null || (!doc.exists() && doc.getMetadata().isFromCache())) return;
+            int before = HistoryRetention.selected(this); Long hours = doc.getLong("hours");
+            HistoryRetention.saveDefault(this, hours == null ? 0 : hours);
+            if (before != HistoryRetention.selected(this) && home && tab == 2) showHome(2);
+        });
+    }
+    private void stopDefaultTimer() {
+        if (defaultTimerListener != null) { defaultTimerListener.remove(); defaultTimerListener = null; }
+        defaultTimerOwner = "";
     }
     private void chooseColor() {
         AppearanceColorPicker.show(this);

@@ -18,10 +18,13 @@ export async function sendPush(env, token, job, validateOnly = false) {
       data: {chatId: job.chatId, messageId: job.messageId, recipientId: job.recipientId,
         senderId: job.senderId || "", senderName: job.senderName || "Falai", text: notificationPreview(job.text || ""), event: job.event || "message",
         ...(job.createdAt instanceof Date ? {createdAt: String(job.createdAt.getTime())} : {}),
+        ...(job.expiresAt instanceof Date ? {messageExpiresAt: String(job.expiresAt.getTime())} : {}),
         ...(job.event === "nudge" ? {expiresAt: String(job.createdAt.getTime() + 60000)} : {})},
       // Data-only invokes the Android service in foreground and background, so
       // the same ICQ alarm-volume player handles both without duplicate sounds.
-      android: {priority: "high", ttl: job.event === "nudge" ? `${Math.max(0, Math.min(60, Math.floor((job.createdAt.getTime() + 60000 - Date.now()) / 1000)))}s` : "2419200s"}};
+      android: {priority: "high", ttl: `${Math.max(0, Math.min(job.event === "nudge" ? 60 : 2419200,
+        job.event === "nudge" ? Math.floor((job.createdAt.getTime() + 60000 - Date.now()) / 1000)
+          : job.expiresAt instanceof Date ? Math.ceil((job.expiresAt.getTime() - Date.now()) / 1000) : 2419200))}s`}};
   const response = await httpFetch(`https://fcm.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/messages:send`, {
     method: "POST", headers: {Authorization: "Bearer " + accessToken, "Content-Type": "application/json"},
     body: JSON.stringify({validateOnly, message})});
@@ -35,6 +38,7 @@ export async function dispatchJob(db, env, path, push = sendPush) {
   const claimed = await db.transaction(async tx => {
     const snapshot = await tx.get(path); const job = snapshot?.data;
     if (!job || job.status !== "pending" || job.nextAttemptAt > new Date()) return null;
+    if (job.event !== "deleted" && job.expiresAt instanceof Date && job.expiresAt <= new Date()) { tx.delete(path); return null; }
     if (job.event === "nudge" && job.createdAt.getTime() + 60000 <= Date.now()) { tx.delete(path); return null; }
     const lease = crypto.randomUUID();
     tx.set(path, {...job, lease, attempts: job.attempts + 1, nextAttemptAt: new Date(Date.now() + 120000)}, true);
@@ -46,6 +50,11 @@ export async function dispatchJob(db, env, path, push = sendPush) {
   try {
     const chat = await db.get(`chats/${claimed.chatId}`);
     const message = await db.get(`chats/${claimed.chatId}/messages/${claimed.messageId}`);
+    if (claimed.event !== "deleted" && message?.data.expiresAt instanceof Date && message.data.expiresAt <= new Date()) {
+      await db.transaction(async tx => { const current = await tx.get(path); if (current?.data.lease === claimed.lease) tx.delete(path); });
+      return;
+    }
+    claimed.expiresAt = message?.data.expiresAt || null;
     claimed.text = message?.data.deletedForAll ? "" : message?.data.text || "";
     if (message?.data.kind === "nudge") claimed.event = "nudge";
     if (message?.data.deletedForAll) claimed.event = "deleted";

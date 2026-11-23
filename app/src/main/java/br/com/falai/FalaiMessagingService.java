@@ -57,6 +57,9 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         try { createdAt = Long.parseLong(message.getData().get("createdAt")); } catch (RuntimeException ignored) { }
         long historyCutoff = HistoryRetention.cutoff(this);
         if (createdAt > 0 && createdAt <= historyCutoff) return;
+        long messageExpiresAt = 0;
+        try { messageExpiresAt = Long.parseLong(message.getData().get("messageExpiresAt")); } catch (RuntimeException ignored) { }
+        if (messageExpiresAt > 0 && messageExpiresAt <= System.currentTimeMillis()) return;
         boolean nudge = "nudge".equals(message.getData().get("event"));
         if (chatId.equals(ChatActivity.visibleChat) && !nudge) return;
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
@@ -82,11 +85,13 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         Person senderPerson = new Person.Builder().setName(sender).setKey(NotificationAvatar.valid(senderId) ? senderId : chatId).setIcon(IconCompat.createWithBitmap(avatar)).build();
         long timestamp = createdAt > 0 ? createdAt : System.currentTimeMillis();
         android.os.Bundle historyMetadata = new android.os.Bundle(); historyMetadata.putLong("falai_createdAt", timestamp);
+        historyMetadata.putLong("falai_expiresAt", messageExpiresAt);
         NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(recipientPerson)
                 .setGroupConversation(false).addMessage(text, timestamp, senderPerson);
         NotificationCompat.Builder notification = new NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_chat).setContentTitle(sender).setContentText(text)
                 .setStyle(style).setLargeIcon(avatar).setWhen(timestamp).setCategory(NotificationCompat.CATEGORY_MESSAGE).addPerson(senderPerson)
                 .addExtras(historyMetadata)
+                .setTimeoutAfter(messageExpiresAt > 0 ? Math.max(1, messageExpiresAt - System.currentTimeMillis()) : 0)
                 .setVibrate(VIBRATION)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true).setVisibility(NotificationCompat.VISIBILITY_PRIVATE);

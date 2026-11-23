@@ -9,6 +9,9 @@ import androidx.appcompat.app.AlertDialog;
 /** Public contact details, without opening or creating a conversation. */
 final class ContactProfileDialog {
     static void show(Context context, String uid, String name) {
+        show(context, uid, name, null);
+    }
+    static void show(Context context, String uid, String name, Runnable timerOptions) {
         LinearLayout content = Ui.column(context); content.setGravity(Gravity.CENTER_HORIZONTAL);
         content.setPadding(Ui.dp(context, 24), Ui.dp(context, 24), Ui.dp(context, 24), Ui.dp(context, 16));
         AvatarView photo = new AvatarView(context); photo.load(uid, name);
@@ -21,7 +24,9 @@ final class ContactProfileDialog {
         AppVersionView version = new AppVersionView(context, uid); version.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(-1, -2);
         versionParams.topMargin = Ui.dp(context, 16); content.addView(version, versionParams);
-        new AlertDialog.Builder(context).setView(content).setPositiveButton(android.R.string.ok, null).show();
+        AlertDialog.Builder dialog = new AlertDialog.Builder(context).setView(content).setPositiveButton(android.R.string.ok, null);
+        if (timerOptions != null) dialog.setNeutralButton(R.string.chat_timer_title, (ignored, button) -> timerOptions.run());
+        dialog.show();
     }
     private ContactProfileDialog() { }
 }

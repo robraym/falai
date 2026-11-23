@@ -12,6 +12,7 @@ service cloud.firestore {
     match /profilePhotos/{uid} { allow get: if signedIn(); }
     match /profileNames/{uid} { allow get: if signedIn(); }
     match /profileRetention/{uid} { allow get: if signedIn(); }
+    match /messageDefaults/{uid} { allow get: if signedIn() && request.auth.uid == uid; }
     match /profileAbout/{uid} { allow get: if signedIn(); }
     match /profileBuild/{uid} { allow get: if signedIn(); }
     match /presence/{uid}/sessions/{sessionId} {
@@ -25,6 +26,7 @@ service cloud.firestore {
     match /chats/{chatId} {
       allow get, list: if signedIn() && request.auth.uid in resource.data.members;
       match /messages/{messageId} { allow get, list: if participant(chatId); }
+      match /timerEvents/{eventId} { allow get, list: if participant(chatId); }
       match /typing/{uid} {
         allow get: if participant(chatId);
         allow create, update: if participant(chatId) && request.auth.uid == uid

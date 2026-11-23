@@ -5,6 +5,9 @@
   ]}, {"collectionGroup": "notificationOutbox", "queryScope": "COLLECTION", "fields": [
     {"fieldPath": "status", "order": "ASCENDING"},
     {"fieldPath": "nextAttemptAt", "order": "ASCENDING"}
+  ]}, {"collectionGroup": "messages", "queryScope": "COLLECTION", "fields": [
+    {"fieldPath": "expired", "order": "ASCENDING"},
+    {"fieldPath": "createdAt", "order": "DESCENDING"}
   ]}],
   "fieldOverrides": [
     {"collectionGroup": "profileAbout", "fieldPath": "text", "indexes": []},

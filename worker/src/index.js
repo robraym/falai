@@ -4,6 +4,7 @@ import {Firestore} from "./firestore.js";
 import {registerProfile, discoverContacts, openChat, persistMessage, quota, registerDevice, unregisterDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge} from "./service.js";
 import {dispatchJob, drainOutbox, sendPush} from "./push.js";
 import {changeMessage, deleteConversation, clearConversation} from "./mutations.js";
+import {setDefaultTimer, setChatTimer, expireMessages} from "./timers.js";
 
 const VERSION = "falai-worker-1";
 let lastHealth;
@@ -40,7 +41,7 @@ export default {
       if (request.method !== "POST" || !url.pathname.startsWith("/v1/")) return response({error: "not-found"}, 404);
       const action = url.pathname.slice(4);
       const handlers = {registerProfile, discoverContacts, openChat, registerDevice, unregisterDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge,
-        editMessage: (db, user, data) => changeMessage(db, user, data, true), deleteMessage: changeMessage, deleteConversation, clearConversation};
+        editMessage: (db, user, data) => changeMessage(db, user, data, true), deleteMessage: changeMessage, deleteConversation, clearConversation, setDefaultTimer, setChatTimer};
       if (!(Object.hasOwn(handlers, action) || action === "sendMessage")) return response({error: "not-found"}, 404);
       const auth = request.headers.get("Authorization") || "";
       if (!auth.startsWith("Bearer ")) throw new ApiError(401, "unauthenticated");
@@ -61,6 +62,10 @@ export default {
     }
   },
   async scheduled(controller, env, context) {
-    context.waitUntil(drainOutbox(new Firestore(env), env).catch(() => console.warn("outbox_retry_failed")));
+    context.waitUntil((async () => {
+      const db = new Firestore(env);
+      await drainOutbox(db, env).catch(() => console.warn("outbox_retry_failed"));
+      await expireMessages(db).catch(() => console.warn("message_expiry_failed"));
+    })());
   }
 };

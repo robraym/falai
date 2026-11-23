@@ -1,6 +1,6 @@
 import {ApiError, requireValue, validChat, validMessageId, normalizeMessage} from "./validation.js";
 import {quota} from "./service.js";
-import {adjustUnread, isCountedUnread} from "./unread.js";
+import {consumeUnread, pruneUnread} from "./unread.js";
 
 export async function changeMessage(db, user, data, editing = false) {
   requireValue(validChat(data.chatId) && validMessageId(data.messageId));
@@ -12,13 +12,14 @@ export async function changeMessage(db, user, data, editing = false) {
     const [chat, message] = await tx.getAll([`chats/${data.chatId}`, path]);
     if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
     if (!message) throw new ApiError(404, "not-found");
+    if (message.data.expiresAt instanceof Date && message.data.expiresAt <= new Date()) throw new ApiError(404, "not-found");
     if ((editing || data.scope === "all") && message.data.senderId !== user.uid) throw new ApiError(403, "permission-denied");
     const last = chat.data.lastMessageId === data.messageId || (!chat.data.lastMessageId && chat.data.updatedAt?.getTime() === message.data.createdAt?.getTime());
-    const summary = {...chat.data}; let jobId, countsChanged = false;
+    const summary = {...chat.data}; let jobId, countsChanged = pruneUnread(summary);
     if (!editing) {
       for (const uid of summary.members) {
-        if ((data.scope === "all" || uid === user.uid) && isCountedUnread(summary, message.data, uid)) {
-          adjustUnread(summary, uid, -1); countsChanged = true;
+        if ((data.scope === "all" || uid === user.uid) && consumeUnread(summary, message.data, uid)) {
+          countsChanged = true;
         }
       }
     }
@@ -53,6 +54,7 @@ export async function deleteConversation(db, user, data, keepVisible = false) {
     const path = `chats/${data.chatId}`, chat = await tx.get(path);
     if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
     tx.set(path, {...chat.data, unreadCounts: {...(chat.data.unreadCounts || {}), [user.uid]: 0},
+      unreadExpiry: {...(chat.data.unreadExpiry || {}), [user.uid]: {}},
       clearedVisible: {...(chat.data.clearedVisible || {}), [user.uid]: keepVisible},
       clearedBefore: {...(chat.data.clearedBefore || {}), [user.uid]: new Date()}}, true);
   });

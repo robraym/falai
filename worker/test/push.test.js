@@ -32,6 +32,10 @@ test("message push wakes the Android sound handler without an automatic system n
   assert.equal(payload.message.notification, undefined);
   assert.equal(payload.message.android.notification, undefined);
   assert.equal(payload.message.token, "device-token");
+  const messageExpiry = new Date(Date.now() + 86400000);
+  await sendPush(env, "device-token", {...job, expiresAt: messageExpiry});
+  assert.equal(payload.message.data.messageExpiresAt, String(messageExpiry.getTime()));
+  assert.ok(parseInt(payload.message.android.ttl) > 86390 && parseInt(payload.message.android.ttl) <= 86400);
   const createdAt = new Date();
   await sendPush(env, "device-token", {...job, event: "nudge", createdAt});
   assert.equal(payload.message.data.event, "nudge");

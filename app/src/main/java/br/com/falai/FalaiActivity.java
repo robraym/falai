@@ -12,7 +12,7 @@ abstract class FalaiActivity extends AppCompatActivity {
     private final android.os.Handler historyHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable historyTick = new Runnable() {
         @Override public void run() {
-            if (Backend.ready() && !Backend.uid().isEmpty() && HistoryRetention.selected(FalaiActivity.this) != 0) {
+            if (Backend.ready() && !Backend.uid().isEmpty()) {
                 HistoryRetention.removeExpiredNotifications(FalaiActivity.this); onHistoryRetentionChanged();
             }
             historyHandler.postDelayed(this, 60000);
