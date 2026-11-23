@@ -331,7 +331,6 @@ public final class MainActivity extends FalaiActivity {
     }
     private void renderContacts() {
         TextView count = root.findViewById(R.id.page_subtitle); count.setText(getResources().getQuantityString(R.plurals.contact_count, contacts.contacts.size(), contacts.contacts.size())); count.setVisibility(View.VISIBLE);
-        View titleBox = root.findViewById(R.id.page_title_box); android.view.ViewGroup.LayoutParams titleParams = titleBox.getLayoutParams(); titleParams.height = Ui.dp(this, 60); titleBox.setLayoutParams(titleParams);
         body.removeAllViews(); RowsAdapter adapter = new RowsAdapter();
         FrameLayout area = new FrameLayout(this); body.addView(area, new LinearLayout.LayoutParams(-1, -1));
         LinearLayout content = Ui.column(this); area.addView(content, new FrameLayout.LayoutParams(-1, -1));
@@ -359,7 +358,7 @@ public final class MainActivity extends FalaiActivity {
     }
     private void showSettings() {
         LinearLayout contents = scrollBody();
-        LinearLayout appearance = Ui.card(this); appearance.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0); contents.addView(appearance);
+        LinearLayout appearance = Ui.column(this); appearance.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0); contents.addView(appearance);
         LinearLayout options = Ui.column(this);
         boolean expanded = Appearance.prefs(this).getBoolean("expanded", true); options.setVisibility(expanded ? View.VISIBLE : View.GONE);
         LinearLayout heading = Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.appearance), getString(R.string.appearance_summary), true, v -> {
@@ -372,7 +371,7 @@ public final class MainActivity extends FalaiActivity {
         options.addView(Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.app_color), getString(Appearance.LABELS[Appearance.selected(this)]), false, v -> chooseColor()));
         options.addView(Ui.divider(this));
         options.addView(Ui.optionRow(this, R.drawable.ic_font, getString(R.string.text_size), getString(R.string.text_size_value, Appearance.percent(this)), false, v -> chooseTextSize()));
-        LinearLayout general = Ui.card(this); general.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0); contents.addView(general);
+        LinearLayout general = Ui.column(this); general.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0); contents.addView(Ui.divider(this)); contents.addView(general);
         general.addView(Ui.optionRow(this, R.drawable.ic_bell, getString(R.string.notifications), getString(R.string.notifications_summary), true, v -> new AlertDialog.Builder(this)
                 .setTitle(R.string.notifications).setMessage(R.string.notifications_body).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.enable_notifications, (dialog, which) -> {
                     if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);

@@ -73,13 +73,21 @@ public final class ProfileActivity extends FalaiActivity {
         displayName.setContentDescription(getString(R.string.edit_name) + ": " + name); displayName.setOnClickListener(v -> editName()); displayName.setFocusable(true); content.addView(displayName, new LinearLayout.LayoutParams(-2, -2));
         TextView mail = Ui.text(this, email, 15, false); mail.setGravity(Gravity.CENTER); mail.setSingleLine(true); mail.setEllipsize(android.text.TextUtils.TruncateAt.END);
         content.addView(mail, new LinearLayout.LayoutParams(-1, -2));
-        TextView aboutTitle = Ui.text(this, getString(R.string.profile_about), 13, false); aboutTitle.setPadding(0, Ui.dp(this, 28), 0, Ui.dp(this, 4)); content.addView(aboutTitle);
-        TextView phrase = Ui.text(this, about.isEmpty() ? getString(R.string.about_hint) : about, 16, false);
-        phrase.setGravity(Gravity.CENTER); phrase.setMaxLines(4); phrase.setPadding(Ui.dp(this, 8), Ui.dp(this, 10), Ui.dp(this, 8), Ui.dp(this, 10));
-        android.graphics.drawable.Drawable pencil = getDrawable(R.drawable.ic_edit).mutate(); pencil.setTint(Appearance.primary(this)); pencil.setBounds(0, 0, Ui.dp(this, 18), Ui.dp(this, 18));
-        phrase.setCompoundDrawables(null, null, pencil, null); phrase.setCompoundDrawablePadding(Ui.dp(this, 8));
-        phrase.setOnClickListener(v -> editAbout()); phrase.setFocusable(true); phrase.setContentDescription(getString(R.string.edit_about) + ": " + about);
-        content.addView(phrase, new LinearLayout.LayoutParams(-2, -2));
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)); dividerParams.topMargin = Ui.dp(this, 24); dividerParams.bottomMargin = Ui.dp(this, 8);
+        content.addView(Ui.divider(this), dividerParams);
+        LinearLayout aboutRow = Ui.row(this); aboutRow.setGravity(Gravity.TOP); aboutRow.setBaselineAligned(false);
+        aboutRow.setPadding(Ui.dp(this, 4), Ui.dp(this, 8), 0, Ui.dp(this, 12));
+        LinearLayout text = Ui.column(this);
+        TextView aboutTitle = Ui.text(this, getString(R.string.profile_about), 13, false); aboutTitle.setPadding(0, 0, 0, Ui.dp(this, 6)); text.addView(aboutTitle);
+        TextView phrase = Ui.text(this, about.isEmpty() ? getString(R.string.about_empty) : about, 16, false);
+        phrase.setTextColor(getColor(about.isEmpty() ? R.color.text_secondary : R.color.text_primary)); text.addView(phrase);
+        aboutRow.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
+        ImageView pencil = new ImageView(this); pencil.setImageResource(R.drawable.ic_edit); pencil.setImageTintList(android.content.res.ColorStateList.valueOf(Appearance.primary(this)));
+        pencil.setPadding(Ui.dp(this, 14), Ui.dp(this, 10), Ui.dp(this, 10), Ui.dp(this, 14)); pencil.setImportantForAccessibility(android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        aboutRow.addView(pencil, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)));
+        aboutRow.setOnClickListener(v -> editAbout()); aboutRow.setFocusable(true); aboutRow.setContentDescription(getString(R.string.edit_about) + ": " + (about.isEmpty() ? getString(R.string.about_empty) : about));
+        aboutRow.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), null, new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
+        content.addView(aboutRow, new LinearLayout.LayoutParams(-1, -2));
     }
     private void editAbout() {
         EditText field = Ui.input(this, R.string.about_hint); field.setSingleLine(false); field.setMaxLines(3); field.setText(about);

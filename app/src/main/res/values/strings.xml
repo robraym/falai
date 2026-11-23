@@ -3,6 +3,7 @@
     <string name="profile_about">Recado</string>
     <string name="edit_about">Editar recado</string>
     <string name="about_hint">Escreva uma frase sobre você</string>
+    <string name="about_empty">Adicione um recado</string>
     <string name="about_count">%1$d/139</string>
     <string name="no_about">Sem recado</string>
     <plurals name="contact_count"><item quantity="one">%d contato</item><item quantity="other">%d contatos</item></plurals>

@@ -73,7 +73,8 @@ final class Ui {
         LinearLayout header = (LinearLayout) android.view.LayoutInflater.from(c).inflate(R.layout.view_page_header, new LinearLayout(c), false);
         TextView label = header.findViewById(R.id.page_title); label.setText(title);
         View box = header.findViewById(R.id.page_title_box); ViewGroup.LayoutParams size = box.getLayoutParams();
-        android.graphics.Paint.FontMetricsInt metrics = label.getPaint().getFontMetricsInt(); size.height = Math.max(dp(c, 40), metrics.bottom - metrics.top + dp(c, 4)); box.setLayoutParams(size);
+        android.graphics.Paint.FontMetricsInt metrics = label.getPaint().getFontMetricsInt();
+        size.height = Math.max(dp(c, 40), metrics.bottom - metrics.top + dp(c, 4)); box.setLayoutParams(size);
         return header;
     }
     static LinearLayout card(Context c) {
@@ -154,7 +155,7 @@ final class Ui {
         if (action != null) {
             ImageView arrow = new ImageView(c); arrow.setImageResource(R.drawable.ic_chevron_right); arrow.setImageTintList(ColorStateList.valueOf(c.getColor(R.color.text_secondary)));
             arrow.setPadding(dp(c, 8), dp(c, 8), dp(c, 8), dp(c, 8)); row.addView(arrow, new LinearLayout.LayoutParams(dp(c, 34), dp(c, 34)));
-            row.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), shape(c, R.color.card, 14), null));
+            row.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
             row.setClickable(true); row.setFocusable(true); row.setOnClickListener(action);
         }
         return row;

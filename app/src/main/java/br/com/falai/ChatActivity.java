@@ -242,13 +242,22 @@ public final class ChatActivity extends FalaiActivity {
         else { status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); status.setText(R.string.new_conversation); }
     }
     private void emoji() {
-        String[] emojis = {"😀", "😂", "🥰", "😍", "😊", "😎", "🤔", "😢", "😭", "❤️", "👍", "👎", "👏", "🙏", "🎉", "🔥", "✅", "👋", "💪", "🤝"};
+        String[] emojis = getResources().getStringArray(R.array.common_emojis);
         LinearLayout grid = Ui.column(this); grid.setPadding(Ui.dp(this, 12), Ui.dp(this, 12), Ui.dp(this, 12), Ui.dp(this, 12));
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(R.string.emoji).setView(grid).setNegativeButton(R.string.cancel, null).create();
-        for (int row = 0; row < 4; row++) {
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this); scroll.addView(grid);
+        LinearLayout container = Ui.column(this);
+        int height = Math.max(96, Math.min(320, Math.round(getResources().getConfiguration().screenHeightDp * .45f)));
+        container.addView(scroll, new LinearLayout.LayoutParams(-1, Ui.dp(this, height)));
+        int cell = Math.max(48, Math.round(36 * getResources().getConfiguration().fontScale));
+        int columns = Math.max(3, Math.min(6, (getResources().getConfiguration().screenWidthDp - 72) / cell));
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(R.string.emoji).setView(container).setNegativeButton(R.string.cancel, null).create();
+        for (int row = 0; row < (emojis.length + columns - 1) / columns; row++) {
             LinearLayout line = Ui.row(this); grid.addView(line);
-            for (int col = 0; col < 5; col++) {
-                String value = emojis[row * 5 + col]; TextView option = Ui.text(this, value, 26, false); option.setGravity(Gravity.CENTER); option.setContentDescription(value);
+            for (int col = 0; col < columns; col++) {
+                int index = row * columns + col;
+                if (index >= emojis.length) { line.addView(new View(this), new LinearLayout.LayoutParams(0, Ui.dp(this, 52), 1)); continue; }
+                String value = emojis[index]; TextView option = Ui.text(this, value, 26, false); option.setGravity(Gravity.CENTER); option.setContentDescription(value); option.setFocusable(true);
+                option.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), null, new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
                 line.addView(option, new LinearLayout.LayoutParams(0, Ui.dp(this, 52), 1));
                 option.setOnClickListener(v -> {
                     int start = Math.max(0, composer.getSelectionStart()), end = Math.max(start, composer.getSelectionEnd());

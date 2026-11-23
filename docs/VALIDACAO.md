@@ -34,6 +34,13 @@ Os erros de permissão exibidos durante os testes são esperados nos casos em qu
 
 ## Limites da conferência
 
+### Refinos de layout e emojis
+
+- Cabeçalho compacto, com a contagem de Contatos ao lado do título para manter as listas na mesma altura. Ícone de perfil fixado no topo.
+- Ajustes em lista com divisores, sem cards por seção. Recado do Perfil alinhado à esquerda, com título discreto e lápis separado à direita.
+- Seletor ampliado de 20 para 120 emojis únicos, preservando os anteriores, com rolagem e colunas adaptáveis. Seleção baseada na tabela pública de frequência do Unicode, sem alegar ranking ao vivo.
+- Compilação debug e revisão do diff passaram antes do envio ao Git. Sem instalação ou teste visual em aparelho.
+
 ### Recado público do perfil
 
 - Campo Recado editável no Perfil com limite de 139 unidades UTF-16 e contador; salvar vazio remove a frase.
