@@ -1,126 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Selection based on https://www.unicode.org/emoji/frequency.html; not a live ranking. -->
-    <string-array name="common_emojis">
-        <item>😂</item>
-        <item>❤️</item>
-        <item>😍</item>
-        <item>🤣</item>
-        <item>😊</item>
-        <item>🙏</item>
-        <item>💕</item>
-        <item>😭</item>
-        <item>😘</item>
-        <item>👍</item>
-        <item>😅</item>
-        <item>👏</item>
-        <item>😁</item>
-        <item>♥️</item>
-        <item>🔥</item>
-        <item>💔</item>
-        <item>💖</item>
-        <item>💙</item>
-        <item>😢</item>
-        <item>🤔</item>
-        <item>😆</item>
-        <item>🙄</item>
-        <item>💪</item>
-        <item>😉</item>
-        <item>☺️</item>
-        <item>👌</item>
-        <item>🤗</item>
-        <item>💜</item>
-        <item>😔</item>
-        <item>😎</item>
-        <item>😇</item>
-        <item>🌹</item>
-        <item>🤦</item>
-        <item>🎉</item>
-        <item>‼️</item>
-        <item>💞</item>
-        <item>✌️</item>
-        <item>✨</item>
-        <item>🤷</item>
-        <item>😱</item>
-        <item>😌</item>
-        <item>🌸</item>
-        <item>🙌</item>
-        <item>😋</item>
-        <item>💗</item>
-        <item>💚</item>
-        <item>😏</item>
-        <item>💛</item>
-        <item>🙂</item>
-        <item>💓</item>
-        <item>🤩</item>
-        <item>😄</item>
-        <item>😀</item>
-        <item>🖤</item>
-        <item>😃</item>
-        <item>💯</item>
-        <item>🙈</item>
-        <item>👇</item>
-        <item>🎶</item>
-        <item>😒</item>
-        <item>🤭</item>
-        <item>❣️</item>
-        <item>❗</item>
-        <item>😜</item>
-        <item>💋</item>
-        <item>👀</item>
-        <item>😪</item>
-        <item>😑</item>
-        <item>💥</item>
-        <item>🙋</item>
-        <item>😞</item>
-        <item>😩</item>
-        <item>😡</item>
-        <item>🤪</item>
-        <item>👊</item>
-        <item>☀️</item>
-        <item>😥</item>
-        <item>🤤</item>
-        <item>👉</item>
-        <item>💃</item>
-        <item>😳</item>
-        <item>✋</item>
-        <item>😚</item>
-        <item>😝</item>
-        <item>😴</item>
-        <item>🌟</item>
-        <item>😬</item>
-        <item>🙃</item>
-        <item>🍀</item>
-        <item>🌷</item>
-        <item>😻</item>
-        <item>😓</item>
-        <item>⭐</item>
-        <item>✅</item>
-        <item>🌈</item>
-        <item>😈</item>
-        <item>🤘</item>
-        <item>💦</item>
-        <item>✔️</item>
-        <item>😣</item>
-        <item>🥰</item>
-        <item>👎</item>
-        <item>👋</item>
-        <item>🤝</item>
-        <item>🏃</item>
-        <item>💐</item>
-        <item>☹️</item>
-        <item>🎊</item>
-        <item>💘</item>
-        <item>😠</item>
-        <item>☝️</item>
-        <item>😕</item>
-        <item>🌺</item>
-        <item>🎂</item>
-        <item>🌻</item>
-        <item>😐</item>
-        <item>🖕</item>
-        <item>💝</item>
-        <item>🙊</item>
-        <item>😹</item>
+    <!-- Selection based on Unicode emoji frequency; grouped for browsing, not a live ranking. -->
+    <string-array name="emoji_categories">
+        <item>Rostos e emoções</item>
+        <item>Gestos e pessoas</item>
+        <item>Corações e carinho</item>
+        <item>Natureza</item>
+        <item>Festas e música</item>
+        <item>Símbolos</item>
+    </string-array>
+    <string-array name="emoji_groups" translatable="false">
+        <item>😀 😃 😄 😁 😆 😅 😂 🤣 😊 ☺️ 🙂 🙃 😉 😍 🥰 😘 😚 😋 😜 😝 🤪 🤩 😎 😇 🤗 🤭 🤔 🙄 😏 😒 😐 😑 😔 😞 😕 ☹️ 😢 😥 😭 😩 😣 😓 😪 😴 🤤 😬 😳 😱 😡 😠 😈 😻 😹 🙈 🙊 😌</item>
+        <item>👋 👍 👎 👏 🙌 🙏 🤝 💪 👌 ✌️ 🤘 ✋ 👊 ☝️ 👇 👉 🖕 👀 🙋 🤦 🤷 💃 🏃</item>
+        <item>❤️ ♥️ 💕 💔 💖 💙 💜 💞 💗 💚 💛 💓 🖤 ❣️ 💋 💘 💝</item>
+        <item>🌹 🌸 ☀️ 🌟 🍀 🌷 ⭐ 🌈 💐 🌺 🌻</item>
+        <item>🎉 🎊 🎂 🎶</item>
+        <item>🔥 ‼️ ✨ 💯 ❗ 💥 ✅ 💦 ✔️</item>
     </string-array>
 </resources>

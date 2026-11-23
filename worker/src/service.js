@@ -96,6 +96,7 @@ export async function persistMessage(db, uid, data) {
 export async function registerDevice(db, user, data) {
   requireValue(typeof data.deviceId === "string" && /^[a-f0-9-]{36}$/.test(data.deviceId));
   requireValue(typeof data.token === "string" && data.token.length >= 20 && data.token.length <= 4096 && !/[\u0000-\u0020\u007f]/.test(data.token));
+  if (data.buildTime !== undefined) requireValue(Number.isSafeInteger(data.buildTime) && data.buildTime >= 1577836800000 && data.buildTime <= Date.now() + 86400000);
   await quota(db, user.uid, "devices", 1, 120);
   const path = `devices/${await hash(user.uid + ":" + data.deviceId)}`;
   await db.transaction(async tx => {
@@ -108,6 +109,9 @@ export async function registerDevice(db, user, data) {
     if (!paths.includes(path) && paths.length >= 20) throw new ApiError(429, "resource-exhausted");
     if (!paths.includes(path)) paths.push(path);
     tx.set(path, {uid: user.uid, token: data.token, updatedAt: new Date()});
+    // The most recently registered installation, not necessarily the newest build.
+    // Old clients explicitly clear this public date instead of leaving a misleading value.
+    tx.set(`profileBuild/${user.uid}`, {buildTime: data.buildTime ? new Date(data.buildTime) : null, updatedAt: new Date()});
     tx.set(registryPath, {paths});
     for (const stale of snapshots) if (stale && !paths.includes(stale.path)) tx.delete(stale.path);
   });

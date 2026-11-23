@@ -2,7 +2,7 @@ import {test, before, after} from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {initializeTestEnvironment, assertSucceeds, assertFails} from "@firebase/rules-unit-testing";
-import {doc, setDoc, getDoc, getDocs, collection, query, where, orderBy, Timestamp} from "firebase/firestore";
+import {doc, setDoc, getDoc, getDocs, collection, query, where, orderBy, Timestamp, serverTimestamp} from "firebase/firestore";
 import {Firestore} from "../src/firestore.js";
 import {chatId} from "../src/validation.js";
 import {registerProfile, discoverContacts, openChat, persistMessage, quota, registerDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout} from "../src/service.js";
@@ -54,6 +54,36 @@ test("direct client mutations cannot bypass server validation", async () => {
   for (const path of [`chats/${id}`, `chats/${id}/messages/forged`, "users/alice", "directory/forged", "devices/forged", "notificationOutbox/forged", "quotas/forged"]) {
     await assertFails(setDoc(doc(auth("alice"), path), {senderId: "bob", members: ["alice", "mallory"]}));
   }
+});
+test("typing and foreground presence enforce ownership, membership and server timestamps", async () => {
+  const typingPath = `chats/${id}/typing/alice`;
+  await assertSucceeds(setDoc(doc(auth("alice"), typingPath), {active: true, updatedAt: serverTimestamp()}));
+  await assertSucceeds(getDoc(doc(auth("bob"), typingPath)));
+  await assertFails(getDoc(doc(auth("mallory"), typingPath)));
+  await assertFails(setDoc(doc(auth("bob"), typingPath), {active: false, updatedAt: serverTimestamp()}));
+  await assertFails(setDoc(doc(auth("mallory"), `chats/${id}/typing/mallory`), {active: true, updatedAt: serverTimestamp()}));
+  await assertFails(setDoc(doc(auth("alice"), typingPath), {active: true, updatedAt: Timestamp.fromMillis(Date.now() + 86400000)}));
+  await assertFails(setDoc(doc(auth("alice"), typingPath), {active: true, updatedAt: serverTimestamp(), text: "not allowed"}));
+  await assertSucceeds(setDoc(doc(auth("alice"), typingPath), {active: false, updatedAt: serverTimestamp()}));
+  const sessionPath = `presence/alice/sessions/${crypto.randomUUID()}`;
+  await assertSucceeds(setDoc(doc(auth("alice"), sessionPath), {active: true, updatedAt: serverTimestamp()}));
+  await assertSucceeds(getDoc(doc(auth("bob"), sessionPath)));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), sessionPath)));
+  await assertFails(setDoc(doc(auth("bob"), sessionPath), {active: true, updatedAt: serverTimestamp()}));
+  await assertFails(setDoc(doc(auth("alice"), sessionPath), {active: true, updatedAt: Timestamp.fromMillis(Date.now() + 86400000)}));
+  await assertSucceeds(setDoc(doc(auth("alice"), sessionPath), {active: false, updatedAt: serverTimestamp()}));
+});
+test("build date is public without tokens, validates input and supports older installations", async () => {
+  const deviceId = crypto.randomUUID(), token = "build-date-test-registration-token", buildTime = Date.now() - 60000;
+  await registerDevice(db, {uid: "builduser"}, {deviceId, token, buildTime});
+  const value = await assertSucceeds(getDoc(doc(auth("bob"), "profileBuild/builduser")));
+  assert.equal(value.data().buildTime.toMillis(), buildTime);
+  assert.equal(value.data().token, undefined);
+  await assertFails(setDoc(doc(auth("builduser"), "profileBuild/builduser"), {buildTime: serverTimestamp()}));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "profileBuild/builduser")));
+  await assert.rejects(registerDevice(db, {uid: "builduser"}, {deviceId, token, buildTime: Date.now() + 172800000}), {code: "invalid-argument"});
+  await registerDevice(db, {uid: "builduser"}, {deviceId, token});
+  assert.equal((await db.get("profileBuild/builduser")).data.buildTime, null);
 });
 test("quota is enforced in a transaction", async () => {
   await quota(db, "alice", "test", 1, 2); await quota(db, "alice", "test", 1, 2);

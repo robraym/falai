@@ -14,12 +14,25 @@ final class MessageBubble extends Drawable {
         paint.setColor(mine ? (Appearance.selected(context) == 0 ? context.getColor(R.color.bubble_sent) : Appearance.soft(context)) : context.getColor(R.color.bubble_received));
     }
     @Override protected void onBoundsChange(Rect bounds) {
-        float tail = 6 * density, radius = 10 * density;
-        float left = bounds.left + (mine ? 0 : tail), right = bounds.right - (mine ? tail : 0);
-        shape.reset(); shape.addRoundRect(left, bounds.top, right, bounds.bottom, radius, radius, Path.Direction.CW);
-        if (mine) { shape.moveTo(right - radius, bounds.top); shape.lineTo(bounds.right, bounds.top); shape.lineTo(right, bounds.top + radius); }
-        else { shape.moveTo(left + radius, bounds.top); shape.lineTo(bounds.left, bounds.top); shape.lineTo(left, bounds.top + radius); }
+        float tail = Math.min(6 * density, bounds.width() / 4f);
+        float radius = Math.min(10 * density, Math.min((bounds.width() - tail) / 2f, bounds.height() / 2f));
+        float left = bounds.left, right = bounds.right - tail, top = bounds.top, bottom = bounds.bottom;
+        float tip = Math.min(density, tail / 3f);
+        // A single outline joins the curved tail to the body. Overlapping subpaths
+        // can leave a visible seam where a separate triangle meets a rounded corner.
+        shape.reset(); shape.moveTo(left + radius, top);
+        shape.lineTo(bounds.right - tip, top);
+        shape.quadTo(bounds.right, top, bounds.right - tip, top + 2 * tip);
+        shape.cubicTo(bounds.right - 3 * tip, top + radius * .5f, right, top + radius * .7f, right, top + radius * 1.2f);
+        shape.lineTo(right, bottom - radius);
+        shape.quadTo(right, bottom, right - radius, bottom);
+        shape.lineTo(left + radius, bottom); shape.quadTo(left, bottom, left, bottom - radius);
+        shape.lineTo(left, top + radius); shape.quadTo(left, top, left + radius, top);
         shape.close();
+        if (!mine) {
+            Matrix mirror = new Matrix(); mirror.setScale(-1, 1, bounds.exactCenterX(), bounds.exactCenterY());
+            shape.transform(mirror);
+        }
     }
     @Override public void draw(Canvas canvas) { canvas.drawPath(shape, paint); }
     @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); invalidateSelf(); }

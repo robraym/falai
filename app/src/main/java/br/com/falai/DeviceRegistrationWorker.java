@@ -31,7 +31,7 @@ public final class DeviceRegistrationWorker extends Worker {
         if (!Backend.ready() || Backend.uid().isEmpty() || !Backend.uid().equals(getInputData().getString("owner"))) return Result.success();
         try {
             String token = Tasks.await(FirebaseMessaging.getInstance().getToken(), 30, TimeUnit.SECONDS);
-            Tasks.await(Backend.call("registerDevice", Backend.data("deviceId", Backend.deviceId(), "token", token)), 60, TimeUnit.SECONDS);
+            Tasks.await(Backend.call("registerDevice", Backend.deviceData(token)), 60, TimeUnit.SECONDS);
             return Result.success();
         } catch (Exception error) { return Result.retry(); }
     }

@@ -2,6 +2,10 @@
 
 Conferência em 22/11/2026.
 
+Atualização desta implementação: compilação Java debug aprovada após as mudanças de busca, presença, digitação, data do APK, balões e seletor de emojis. Conferência da lista preservou os 120 emojis, sem duplicações, em seis categorias. Não houve instalação ou execução em Android. Release/lint abaixo pertencem à conferência anterior.
+
+Os 27 testes locais passaram (12 unitários e 15 de integração no emulador do Firestore). Os dois novos testes verificam propriedade e permissões de presença/digitação, rejeição de timestamps forjados, data pública do APK sem tokens e compatibilidade com clientes antigos. Regras publicadas; Worker atualizado para `8ccdb5bd-93de-42bd-9e37-bb5837c37fc3`.
+
 ## Android
 
 - `compileDebugJavaWithJavac`: passou.
@@ -12,7 +16,7 @@ Conferência em 22/11/2026.
 
 ## Testes locais
 
-**25 testes atuais passaram:** 12 de autenticação/validação/protocolo e 13 de integração com o emulador local do Firestore.
+**Conferência anterior: 25 testes passaram:** 12 de autenticação/validação/protocolo e 13 de integração com o emulador local do Firestore.
 
 Cobertura relevante: assinatura JWT, projeto e provedor Google corretos, e-mail verificado, validação de texto e emoji, privacidade das conversas, bloqueio de escrita direta, diretório privado, limites de uso, envio concorrente com o mesmo UUID, gravação atômica do aviso pendente, falha parcial de push, retomada sem repetir os dispositivos já confirmados e recuperação de lease vencido.
 

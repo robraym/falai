@@ -17,6 +17,7 @@ public final class FalaiApplication extends Application {
             AppCheckInstaller.install();
             FirebaseFirestore.getInstance().setFirestoreSettings(new FirebaseFirestoreSettings.Builder()
                     .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build()).build());
+            PresenceTracker.install(this);
         }
         FalaiMessagingService.createChannel(this);
     }

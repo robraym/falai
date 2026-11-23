@@ -11,9 +11,25 @@ service cloud.firestore {
     match /users/{uid} { allow get: if signedIn() && request.auth.uid == uid; }
     match /profilePhotos/{uid} { allow get: if signedIn(); }
     match /profileAbout/{uid} { allow get: if signedIn(); }
+    match /profileBuild/{uid} { allow get: if signedIn(); }
+    match /presence/{uid}/sessions/{sessionId} {
+      allow get, list: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && sessionId.matches('[a-f0-9-]{36}')
+        && request.resource.data.keys().hasOnly(['active', 'updatedAt'])
+        && request.resource.data.active is bool
+        && request.resource.data.updatedAt == request.time;
+    }
     match /chats/{chatId} {
       allow get, list: if signedIn() && request.auth.uid in resource.data.members;
       match /messages/{messageId} { allow get, list: if participant(chatId); }
+      match /typing/{uid} {
+        allow get: if participant(chatId);
+        allow create, update: if participant(chatId) && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['active', 'updatedAt'])
+          && request.resource.data.active is bool
+          && request.resource.data.updatedAt == request.time;
+      }
     }
     // All mutations and contact discovery go through the Worker, which verifies the Google/Firebase JWT.
     // Directory, device tokens and quotas are never readable by clients.

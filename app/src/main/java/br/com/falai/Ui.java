@@ -116,6 +116,9 @@ final class Ui {
         return contactRow(c, name, detail, dateTime, uid, status, false);
     }
     static LinearLayout contactRow(Context c, String name, String detail, String dateTime, String uid, int status, boolean showAbout) {
+        return contactRow(c, name, detail, dateTime, uid, status, showAbout, "");
+    }
+    static LinearLayout contactRow(Context c, String name, String detail, String dateTime, String uid, int status, boolean showAbout, String chatId) {
         LinearLayout row = row(c); row.setPadding(dp(c, 8), dp(c, 10), dp(c, 8), dp(c, 10)); row.setMinimumHeight(dp(c, 72));
         row.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
         AvatarView circle = new AvatarView(c); circle.load(uid, name);
@@ -123,24 +126,35 @@ final class Ui {
         LinearLayout labels = column(c); labels.setPadding(dp(c, 14), 0, dp(c, 6), 0);
         LinearLayout headline = row(c);
         TextView title = text(c, name, 16, true); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        headline.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-        labels.addView(headline, new LinearLayout.LayoutParams(-1, -2));
+        boolean hasPresence = !showAbout && !chatId.isEmpty();
+        headline.addView(title, new LinearLayout.LayoutParams(hasPresence ? -2 : 0, -2, 1));
+        if (hasPresence) {
+            PresenceStatusView availability = new PresenceStatusView(c, uid);
+            availability.setMaxWidth(Math.min(dp(c, 140), Math.round(c.getResources().getDisplayMetrics().widthPixels * .4f)));
+            LinearLayout.LayoutParams availabilityParams = new LinearLayout.LayoutParams(-2, -2);
+            availabilityParams.leftMargin = dp(c, 8);
+            headline.addView(availability, availabilityParams);
+        }
+        labels.addView(headline, new LinearLayout.LayoutParams(hasPresence ? -2 : -1, -2));
         TextView sub;
         if (showAbout) {
             AboutTextView phrase = new AboutTextView(c); phrase.setTextSize(13); phrase.setTextColor(c.getColor(R.color.text_secondary)); phrase.setLineSpacing(dp(c, 2), 1); phrase.bind(uid, detail); sub = phrase;
-        } else sub = text(c, detail, 13, false);
+        } else if (!chatId.isEmpty()) sub = new TypingPreviewView(c, chatId, uid, detail);
+        else sub = text(c, detail, 13, false);
         sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
         if (!dateTime.isEmpty()) {
             LinearLayout preview = row(c); preview.setBaselineAligned(true);
             if (status > 0) {
                 MessageChecks checks = new MessageChecks(c, status >= 2, status == 3);
                 LinearLayout.LayoutParams checksParams = new LinearLayout.LayoutParams(dp(c, 24), dp(c, 18)); checksParams.rightMargin = dp(c, 3); preview.addView(checks, checksParams);
+                if (sub instanceof TypingPreviewView) ((TypingPreviewView) sub).setChecks(checks);
             }
             sub.setSingleLine(true); preview.addView(sub, new LinearLayout.LayoutParams(0, -2, 1));
             TextView when = text(c, dateTime, 11, false); when.setSingleLine(true); when.setGravity(Gravity.END);
             when.setPadding(dp(c, 8), 0, 0, 0); preview.addView(when, new LinearLayout.LayoutParams(-2, -2));
             labels.addView(preview, new LinearLayout.LayoutParams(-1, -2));
         } else { sub.setMaxLines(2); labels.addView(sub); }
+        if (showAbout) labels.addView(new BuildDateView(c, uid));
         row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1)); return row;
     }
     static LinearLayout optionRow(Context c, int icon, String title, String summary, boolean section, View.OnClickListener action) {

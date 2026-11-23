@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -32,7 +33,10 @@ public final class ChatActivity extends FalaiActivity {
     private ChatViewModel model;
     private EditText composer;
     private LinearLayout composerRow, retryRow;
-    private TextView status, title;
+    private TextView status, title, searchSummary;
+    private FloatingSearchController floatingSearch;
+    private String messageQuery = "";
+    private ChatPresence presence;
     private AvatarView avatar;
     private Button older;
     private RecyclerView messages;
@@ -67,7 +71,11 @@ public final class ChatActivity extends FalaiActivity {
         avatar = new AvatarView(this); avatar.load("", name); avatar.setContentDescription(getString(R.string.profile)); avatar.setOnClickListener(v -> contactInfo()); header.addView(avatar, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40)));
         title = Ui.text(this, name, 20, true); title.setPadding(Ui.dp(this, 14), 0, 0, 0); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         title.setOnClickListener(v -> contactInfo()); title.setFocusable(true);
-        header.addView(title, new LinearLayout.LayoutParams(0, -2, 1)); root.addView(header);
+        LinearLayout heading = Ui.column(this); heading.addView(title);
+        TextView availability = Ui.text(this, "", 12, false); availability.setPadding(Ui.dp(this, 14), 0, 0, 0); heading.addView(availability);
+        presence = new ChatPresence(this, chatId, availability);
+        header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1)); root.addView(header);
+        searchSummary = Ui.text(this, "", 12, false); searchSummary.setVisibility(View.GONE); root.addView(searchSummary);
         older = Ui.button(this, R.string.older_messages, v -> loadOlder()); older.setVisibility(View.GONE); root.addView(older);
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
         messages.setBackground(new ChatWallpaper(this));
@@ -75,7 +83,9 @@ public final class ChatActivity extends FalaiActivity {
         messages.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override public void onScrolled(@NonNull RecyclerView view, int dx, int dy) { acknowledgeVisible(); }
         });
-        root.addView(messages, new LinearLayout.LayoutParams(-1, 0, 1));
+        FrameLayout searchArea = new FrameLayout(this); searchArea.setId(R.id.floating_search_content_area);
+        messages.setId(R.id.search_dismiss_surface); searchArea.addView(messages, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(searchArea, new LinearLayout.LayoutParams(-1, 0, 1));
         status = Ui.text(this, getString(R.string.loading), 13, false); status.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6)); root.addView(status);
         retryRow = Ui.row(this);
         retryRow.addView(Ui.button(this, R.string.retry, v -> model.retry()), new LinearLayout.LayoutParams(0, -2, 1));
@@ -99,7 +109,7 @@ public final class ChatActivity extends FalaiActivity {
             model.draft = composer.getText().toString();
             if (model.draft.trim().isEmpty()) return;
             if (model.draft.trim().length() > 4000) { composer.setError(getString(R.string.message_too_long)); return; }
-            model.sendText();
+            presence.stopTyping(); model.sendText();
         });
         sendButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.background)));
         sendButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33000000), Ui.shape(this, R.color.action_green, 24), null));
@@ -107,13 +117,23 @@ public final class ChatActivity extends FalaiActivity {
         composerRow.addView(sendButton, sendParams); root.addView(composerRow);
         composer.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            public void onTextChanged(CharSequence s, int start, int before, int count) { model.draft = s.toString(); }
+            public void onTextChanged(CharSequence s, int start, int before, int count) { model.draft = s.toString(); presence.changed(s.length() > 0); }
             public void afterTextChanged(android.text.Editable s) { }
         });
         model.changes.observe(this, ignored -> updateSendState());
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() { leave(); }
         });
+        View searchBar = getLayoutInflater().inflate(R.layout.view_floating_search, searchArea, false);
+        searchBar.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.action_green_soft, 24), null));
+        searchArea.addView(searchBar); floatingSearch = FloatingSearchController.attach(this, "messages", R.id.search_dismiss_surface);
+        EditText search = floatingSearch.getInput(); search.setHint(R.string.search_messages);
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            public void onTextChanged(CharSequence s, int start, int before, int count) { messageQuery = s.toString(); renderMessages(); }
+            public void afterTextChanged(android.text.Editable s) { }
+        });
+        if (state != null) search.setText(state.getString("messageQuery", ""));
     }
     @Override protected void onStart() {
         super.onStart(); if (model == null) return;
@@ -126,13 +146,13 @@ public final class ChatActivity extends FalaiActivity {
             boolean initial = !chatReady;
             clearedBefore = (com.google.firebase.Timestamp) doc.get("clearedBefore." + Backend.uid()); chatReady = true;
             @SuppressWarnings("unchecked") List<String> members = (List<String>) doc.get("members");
-            if (members != null) for (String member : members) if (!member.equals(Backend.uid())) { otherUid = member; avatar.load(member, name); }
+            if (members != null) for (String member : members) if (!member.equals(Backend.uid())) { otherUid = member; avatar.load(member, name); presence.listen(member); }
             @SuppressWarnings("unchecked") Map<String, String> names = (Map<String, String>) doc.get("names");
             if (getString(R.string.app_name).equals(name) && names != null) {
                 for (Map.Entry<String, String> entry : names.entrySet()) if (!entry.getKey().equals(Backend.uid())) { name = entry.getValue(); title.setText(name); }
             }
             if (pendingDocs != null) {
-                merge(pendingDocs); older.setVisibility(!historyExhausted && pendingDocs.size() >= 50 && adapter.getItemCount() > 0 ? View.VISIBLE : View.GONE);
+                merge(pendingDocs); older.setVisibility(!historyExhausted && pendingDocs.size() >= 50 && !loaded.isEmpty() ? View.VISIBLE : View.GONE);
                 if (adapter.getItemCount() > 0) messages.scrollToPosition(adapter.getItemCount() - 1); pendingDocs = null;
                 if (!model.busy && !model.failed) { status.setText(R.string.new_conversation); status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); }
             }
@@ -152,9 +172,9 @@ public final class ChatActivity extends FalaiActivity {
             if (!model.busy && !model.failed) { status.setText(R.string.new_conversation); status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); }
         });
     }
-    @Override protected void onResume() { super.onResume(); visibleChat = chatId; if (messages != null) messages.post(this::acknowledgeVisible); }
+    @Override protected void onResume() { super.onResume(); visibleChat = chatId; if (presence != null) presence.resume(); if (messages != null) messages.post(this::acknowledgeVisible); }
     @Override public void onWindowFocusChanged(boolean focused) { super.onWindowFocusChanged(focused); if (focused && messages != null) messages.post(this::acknowledgeVisible); }
-    @Override protected void onPause() { visibleChat = null; super.onPause(); }
+    @Override protected void onPause() { visibleChat = null; if (presence != null) presence.pause(); if (floatingSearch != null) floatingSearch.collapse(false); super.onPause(); }
     @Override protected void onStop() { if (listener != null) { listener.remove(); listener = null; } if (chatListener != null) { chatListener.remove(); chatListener = null; } super.onStop(); }
     private Query query() {
         return Backend.db().collection("chats").document(chatId).collection("messages")
@@ -180,8 +200,25 @@ public final class ChatActivity extends FalaiActivity {
         loaded.values().removeIf(doc -> !visible(doc));
         List<DocumentSnapshot> sorted = new ArrayList<>(loaded.values());
         sorted.sort(Comparator.comparing((DocumentSnapshot doc) -> doc.getTimestamp("createdAt")).thenComparing(DocumentSnapshot::getId));
-        oldest = sorted.isEmpty() ? null : sorted.get(0); adapter.submit(sorted);
+        oldest = sorted.isEmpty() ? null : sorted.get(0); renderMessages();
         messages.post(this::acknowledgeVisible);
+    }
+    private void renderMessages() {
+        List<DocumentSnapshot> result = new ArrayList<>(loaded.values());
+        String needle = searchable(messageQuery.trim());
+        result.removeIf(doc -> !needle.isEmpty() && (Boolean.TRUE.equals(doc.getBoolean("deletedForAll")) || !searchable(doc.getString("text")).contains(needle)));
+        result.sort(Comparator.comparing((DocumentSnapshot doc) -> doc.getTimestamp("createdAt")).thenComparing(DocumentSnapshot::getId));
+        adapter.submit(result); searchSummary.setVisibility(needle.isEmpty() ? View.GONE : View.VISIBLE);
+        searchSummary.setText(getString(R.string.search_loaded_results, result.size()));
+        messages.post(this::acknowledgeVisible);
+    }
+    private static String searchable(String text) {
+        return java.text.Normalizer.normalize(text == null ? "" : text, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}+", "").toLowerCase(java.util.Locale.ROOT);
+    }
+    @Override protected void onDestroy() {
+        if (floatingSearch != null) floatingSearch.dispose();
+        if (presence != null) presence.pause();
+        super.onDestroy();
     }
     private boolean visible(DocumentSnapshot doc) {
         @SuppressWarnings("unchecked") List<String> hidden = (List<String>) doc.get("hiddenFor");
@@ -242,30 +279,10 @@ public final class ChatActivity extends FalaiActivity {
         else { status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); status.setText(R.string.new_conversation); }
     }
     private void emoji() {
-        String[] emojis = getResources().getStringArray(R.array.common_emojis);
-        LinearLayout grid = Ui.column(this); grid.setPadding(Ui.dp(this, 12), Ui.dp(this, 12), Ui.dp(this, 12), Ui.dp(this, 12));
-        android.widget.ScrollView scroll = new android.widget.ScrollView(this); scroll.addView(grid);
-        LinearLayout container = Ui.column(this);
-        int height = Math.max(96, Math.min(320, Math.round(getResources().getConfiguration().screenHeightDp * .45f)));
-        container.addView(scroll, new LinearLayout.LayoutParams(-1, Ui.dp(this, height)));
-        int cell = Math.max(48, Math.round(36 * getResources().getConfiguration().fontScale));
-        int columns = Math.max(3, Math.min(6, (getResources().getConfiguration().screenWidthDp - 72) / cell));
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(R.string.emoji).setView(container).setNegativeButton(R.string.cancel, null).create();
-        for (int row = 0; row < (emojis.length + columns - 1) / columns; row++) {
-            LinearLayout line = Ui.row(this); grid.addView(line);
-            for (int col = 0; col < columns; col++) {
-                int index = row * columns + col;
-                if (index >= emojis.length) { line.addView(new View(this), new LinearLayout.LayoutParams(0, Ui.dp(this, 52), 1)); continue; }
-                String value = emojis[index]; TextView option = Ui.text(this, value, 26, false); option.setGravity(Gravity.CENTER); option.setContentDescription(value); option.setFocusable(true);
-                option.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), null, new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
-                line.addView(option, new LinearLayout.LayoutParams(0, Ui.dp(this, 52), 1));
-                option.setOnClickListener(v -> {
-                    int start = Math.max(0, composer.getSelectionStart()), end = Math.max(start, composer.getSelectionEnd());
-                    composer.getText().replace(start, end, value); dialog.dismiss();
-                });
-            }
-        }
-        dialog.show();
+        EmojiPicker.show(this, value -> {
+            int start = Math.max(0, composer.getSelectionStart()), end = Math.max(start, composer.getSelectionEnd());
+            composer.getText().replace(start, end, value);
+        });
     }
     private void leave() {
         if (model.busy) { toast(R.string.sending); return; }
@@ -276,7 +293,7 @@ public final class ChatActivity extends FalaiActivity {
     }
     @Override protected void onSaveInstanceState(@NonNull Bundle out) {
         super.onSaveInstanceState(out); if (model == null) return;
-        out.putString("draft", model.draft); out.putString("pendingId", model.pendingId); out.putString("pendingText", model.pendingText);
+        out.putString("messageQuery", messageQuery); out.putString("draft", model.draft); out.putString("pendingId", model.pendingId); out.putString("pendingText", model.pendingText);
     }
     private void toast(int message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
 }

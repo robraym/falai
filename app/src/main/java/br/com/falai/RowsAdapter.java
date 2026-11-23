@@ -36,7 +36,7 @@ final class RowsAdapter extends RecyclerView.Adapter<RowsAdapter.Holder> {
     }
     @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
         LinearLayout root = (LinearLayout) holder.itemView; root.removeAllViews(); Row item = rows.get(position);
-        LinearLayout content = Ui.contactRow(root.getContext(), item.name, item.detail, item.dateTime, item.avatarUid, item.status, item.contact); content.setOnClickListener(v -> item.click.run()); root.addView(content);
+        LinearLayout content = Ui.contactRow(root.getContext(), item.name, item.detail, item.dateTime, item.avatarUid, item.status, item.contact, item.contact ? "" : item.key); content.setOnClickListener(v -> item.click.run()); root.addView(content);
         if (item.hold != null) content.setOnLongClickListener(v -> { item.hold.run(); return true; });
         if (position < rows.size() - 1) root.addView(Ui.divider(root.getContext()));
     }

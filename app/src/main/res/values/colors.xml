@@ -8,6 +8,7 @@
     <!-- Light palette from Alertou; Android selects values-night for dark mode. -->
     <color name="background">#F7F8FA</color>
     <color name="card">#FFFFFF</color>
+    <color name="presence_badge_surface">#EEF1F5</color>
     <color name="action_green">#168A55</color>
     <color name="action_green_soft">#E1F4E9</color>
     <color name="text_primary">#1F2329</color>

@@ -89,7 +89,7 @@
     <string name="notifications_registration_error">Não foi possível ativar os avisos agora. O Falai tentará novamente quando houver conexão.</string>
     <string name="enable_notifications">Ativar notificações</string>
     <string name="privacy">Privacidade</string>
-    <string name="privacy_body">Suas conversas ficam disponíveis somente para os participantes autenticados. Esta versão usa a proteção de conexão e armazenamento do serviço; ainda não possui criptografia de ponta a ponta.</string>
+    <string name="privacy_body">Suas conversas ficam disponíveis somente para os participantes autenticados. Os participantes podem ver quando você está digitando. Usuários autenticados podem consultar sua presença no Falai, a última atividade e a data do APK da instalação registrada mais recentemente. Esta versão usa a proteção de conexão e armazenamento do serviço; ainda não possui criptografia de ponta a ponta.</string>
     <string name="sign_out">Sair da conta</string>
     <string name="sign_out_question">Sair do Falai neste celular?</string>
     <string name="cancel">Cancelar</string>
@@ -107,4 +107,21 @@
     <string name="new_message">Você recebeu uma nova mensagem.</string>
     <string name="draft_discard">Descartar a mensagem pendente e sair da conversa?</string>
     <string name="error_chat_loading">Não foi possível carregar as mensagens.</string>
+    <string name="search_messages">Pesquisar mensagens</string>
+    <string name="search_loaded_results">%1$d resultado(s) nas mensagens carregadas. Carregue mensagens anteriores para buscar mais.</string>
+    <string name="typing">digitando…</string>
+    <string name="emoji_recent">Recentes</string>
+    <string name="emoji_recent_empty">Seus emojis usados aparecerão aqui.</string>
+    <string name="online">online</string>
+    <string name="presence_unknown">Status não informado</string>
+    <string name="offline_now">offline há instantes</string>
+    <string name="offline_minutes">offline há %1$d min</string>
+    <string name="offline_hours">offline há %1$d h</string>
+    <string name="offline_days">offline há %1$d dia(s)</string>
+    <string name="last_seen_now">visto há instantes</string>
+    <string name="last_seen_minutes">visto há %1$d min</string>
+    <string name="last_seen_hours">visto há %1$d h</string>
+    <string name="last_seen_date">visto em %1$s</string>
+    <string name="apk_build_date">APK gerado em %1$s</string>
+    <string name="apk_build_unknown">Data do APK não informada</string>
 </resources>

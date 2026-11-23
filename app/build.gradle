@@ -11,6 +11,8 @@ android {
         versionCode 1
         versionName '1.0'
         buildConfigField 'String', 'WORKER_URL', '"https://falai-notificacoes.robraym-studio.workers.dev"'
+        // Embedded in the binary; never infer this date from install time or registration time.
+        buildConfigField 'long', 'APK_BUILD_TIME', "${System.currentTimeMillis()}L"
         if (!file('google-services.json').exists()) { resValue 'string', 'default_web_client_id', '' }
     }
     buildFeatures { buildConfig true }
