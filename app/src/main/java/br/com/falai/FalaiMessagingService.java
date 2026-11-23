@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.Person;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.IconCompat;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
@@ -63,6 +64,7 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         Intent intent = new Intent(this, MainActivity.class).setAction("br.com.falai.OPEN." + chatId).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("chatId", chatId).putExtra("recipientId", recipient);
         PendingIntent pending = PendingIntent.getActivity(this, chatId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         String sender = message.getData().get("senderName"), text = message.getData().get("text");
+        String senderId = message.getData().get("senderId");
         if (sender == null || sender.trim().isEmpty()) sender = getString(R.string.app_name);
         if (text == null || text.isEmpty()) text = getString(R.string.new_message);
         if (nudge) {
@@ -72,16 +74,34 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         String me = Backend.auth().getCurrentUser().getDisplayName();
         if (me == null || me.trim().isEmpty()) me = getString(R.string.app_name);
         Person recipientPerson = new Person.Builder().setName(me).setKey(recipient).build();
-        Person senderPerson = new Person.Builder().setName(sender).setKey(chatId).build();
+        android.graphics.Bitmap avatar = NotificationAvatar.bitmap(this, senderId, sender);
+        Person senderPerson = new Person.Builder().setName(sender).setKey(NotificationAvatar.valid(senderId) ? senderId : chatId).setIcon(IconCompat.createWithBitmap(avatar)).build();
+        long timestamp = message.getSentTime() > 0 ? message.getSentTime() : System.currentTimeMillis();
         NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(recipientPerson)
-                .setGroupConversation(false).addMessage(text, message.getSentTime() > 0 ? message.getSentTime() : System.currentTimeMillis(), senderPerson);
+                .setGroupConversation(false).addMessage(text, timestamp, senderPerson);
         NotificationCompat.Builder notification = new NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_chat).setContentTitle(sender).setContentText(text)
-                .setStyle(style).setCategory(NotificationCompat.CATEGORY_MESSAGE).addPerson(senderPerson)
+                .setStyle(style).setLargeIcon(avatar).setWhen(timestamp).setCategory(NotificationCompat.CATEGORY_MESSAGE).addPerson(senderPerson)
                 .setVibrate(VIBRATION)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true).setVisibility(NotificationCompat.VISIBILITY_PRIVATE);
         String tag = messageId != null && messageId.matches("[a-f0-9-]{36}") ? messageId : chatId;
         NotificationManagerCompat.from(this).notify(tag, 0, notification.build());
         if (nudge) MessageSound.playNudge(this, recipient + ":" + tag); else MessageSound.play(this, recipient + ":" + tag);
+        if (NotificationAvatar.refresh(senderId) && recipient.equals(Backend.uid())
+                && !getSharedPreferences("deleted_notices", MODE_PRIVATE).getBoolean(tag, false)
+                && !chatId.equals(ChatActivity.visibleChat) && notificationStillVisible(tag)) {
+            android.graphics.Bitmap updatedAvatar = NotificationAvatar.bitmap(this, senderId, sender);
+            Person updatedSender = new Person.Builder().setName(sender).setKey(senderId).setIcon(IconCompat.createWithBitmap(updatedAvatar)).build();
+            NotificationCompat.MessagingStyle updatedStyle = new NotificationCompat.MessagingStyle(recipientPerson)
+                    .setGroupConversation(false).addMessage(text, timestamp, updatedSender);
+            // Update only the existing card; do not replay audio or resurrect a dismissed notice.
+            notification.setStyle(updatedStyle).setLargeIcon(updatedAvatar);
+            NotificationManagerCompat.from(this).notify(tag, 0, notification.build());
+        }
+    }
+    private boolean notificationStillVisible(String tag) {
+        for (android.service.notification.StatusBarNotification notice : getSystemService(NotificationManager.class).getActiveNotifications())
+            if (notice.getId() == 0 && tag.equals(notice.getTag())) return true;
+        return false;
     }
 }

@@ -1,5 +1,6 @@
 import {ApiError, requireValue, hash, normalizeEmail, validUid, validChat, validMessageId, normalizeMessage, chatId} from "./validation.js";
 import {validatePhoto} from "./photo.js";
+import {adjustUnread, isCountedUnread} from "./unread.js";
 
 export async function updateProfileAbout(db, user, data) {
   requireValue(typeof data.text === "string");
@@ -84,7 +85,8 @@ export async function persistMessage(db, uid, data) {
     }
     const recipientId = chat.data.members.find(member => member !== uid);
     const now = new Date();
-    tx.set(path, {...message, senderId: uid, createdAt: now}, false);
+    adjustUnread(chat.data, recipientId, 1);
+    tx.set(path, {...message, senderId: uid, createdAt: now, unreadTracked: true}, false);
     tx.set(`chats/${data.chatId}`, {...chat.data, lastText: message.text, updatedAt: now, lastMessageId: data.messageId,
       lastSenderId: uid, lastKind: "message", lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
     tx.set(`notificationOutbox/${jobId}`, {chatId: data.chatId, messageId: data.messageId, recipientId,
@@ -111,7 +113,8 @@ export async function sendNudge(db, user, data) {
     const count = (sameHour ? usage.data.count : 0) + 1;
     if (count > 20) throw new ApiError(429, "resource-exhausted");
     const createdAt = new Date(now), text = "Chamou sua atenção!";
-    tx.set(messagePath, {senderId: user.uid, kind: "nudge", text, createdAt}, false);
+    adjustUnread(chat.data, chat.data.members.find(uid => uid !== user.uid), 1);
+    tx.set(messagePath, {senderId: user.uid, kind: "nudge", text, createdAt, unreadTracked: true}, false);
     tx.set(`chats/${data.chatId}`, {...chat.data, lastText: text, updatedAt: createdAt, lastMessageId: data.messageId,
       lastSenderId: user.uid, lastKind: "nudge", lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
     tx.set(limitPath, {sentAt: createdAt});
@@ -167,7 +170,10 @@ export async function acknowledgeMessages(db, user, data) {
       const value = {...doc.data};
       let changed = false;
       if (!value.deliveredAt) { value.deliveredAt = now; changed = true; }
-      if (data.state === "read" && !value.readAt) { value.readAt = now; changed = true; }
+      if (data.state === "read" && !value.readAt) {
+        if (isCountedUnread(summary, value, user.uid)) { adjustUnread(summary, user.uid, -1); summaryChanged = true; }
+        value.readAt = now; changed = true;
+      }
       if (changed) tx.set(doc.path, value, true);
       if ((doc.path.endsWith("/" + summary.lastMessageId) || (!summary.lastMessageId && summary.updatedAt?.getTime() === value.createdAt?.getTime())) && value.senderId !== user.uid) {
         if (!summary.lastMessageId) { summary.lastMessageId = doc.path.split("/").at(-1); summary.lastSenderId = value.senderId; summaryChanged = true; }

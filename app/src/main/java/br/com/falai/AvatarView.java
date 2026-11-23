@@ -22,6 +22,9 @@ final class AvatarView extends View {
     private String owner = "", initial = "?";
     public AvatarView(Context context) { super(context); }
     static void invalidatePhoto(String uid) { cache.remove(uid); }
+    static Bitmap cachedPhoto(String uid) { Entry entry = cache.get(uid); return entry == null ? null : entry.bitmap; }
+    static boolean photoFresh(String uid) { Entry entry = cache.get(uid); return entry != null && SystemClock.elapsedRealtime() - entry.time < 600000; }
+    static void cachePhoto(String uid, Bitmap photo) { cache.put(uid, new Entry(photo)); }
     void load(String uid, String name) {
         if (uid != null && uid.equals(owner) && listener != null) return;
         owner = uid == null ? "" : uid;
@@ -45,7 +48,7 @@ final class AvatarView extends View {
         String requested = owner;
         listener = Backend.db().collection("profilePhotos").document(requested).addSnapshotListener((doc, error) -> {
             if (error != null || doc == null) return;
-            Bitmap photo = ProfilePhotos.decode(doc.getString("photo")); cache.put(requested, new Entry(photo));
+            Bitmap photo = ProfilePhotos.decode(doc.getString("photo")); cachePhoto(requested, photo);
             if (requested.equals(owner)) setPhoto(photo);
         });
     }

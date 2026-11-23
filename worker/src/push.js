@@ -16,7 +16,7 @@ export async function sendPush(env, token, job, validateOnly = false) {
   const message = validateOnly ? {topic: "falai-configuration-check", notification: {title: "Falai", body: "Verificação de configuração"}}
     : {token,
       data: {chatId: job.chatId, messageId: job.messageId, recipientId: job.recipientId,
-        senderName: job.senderName || "Falai", text: notificationPreview(job.text || ""), event: job.event || "message",
+        senderId: job.senderId || "", senderName: job.senderName || "Falai", text: notificationPreview(job.text || ""), event: job.event || "message",
         ...(job.event === "nudge" ? {expiresAt: String(job.createdAt.getTime() + 60000)} : {})},
       // Data-only invokes the Android service in foreground and background, so
       // the same ICQ alarm-volume player handles both without duplicate sounds.
@@ -48,6 +48,7 @@ export async function dispatchJob(db, env, path, push = sendPush) {
     claimed.text = message?.data.deletedForAll ? "" : message?.data.text || "";
     if (message?.data.kind === "nudge") claimed.event = "nudge";
     if (message?.data.deletedForAll) claimed.event = "deleted";
+    claimed.senderId = message?.data.senderId || "";
     claimed.senderName = chat?.data.names?.[message?.data.senderId] || "Falai";
     // Collection is indexed by uid; fixed limit bounds reads and Worker subrequests.
     const devices = await db.query("devices", [["uid", "EQUAL", claimed.recipientId]], undefined, 100);

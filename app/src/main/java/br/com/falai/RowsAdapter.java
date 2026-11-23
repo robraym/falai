@@ -10,12 +10,13 @@ import java.util.List;
 
 final class RowsAdapter extends RecyclerView.Adapter<RowsAdapter.Holder> {
     static final class Row {
-        final String key, name, detail, dateTime, avatarUid; final Runnable click, hold; final int status; final boolean contact;
+        final String key, name, detail, dateTime, avatarUid; final Runnable click, hold; final int status, unread; final boolean contact;
         Row(String key, String name, String detail, Runnable click) { this(key, name, detail, "", key, click, null, 0, true); }
         Row(String key, String name, String detail, String dateTime, Runnable click) { this(key, name, detail, dateTime, key, click); }
         Row(String key, String name, String detail, String dateTime, String avatarUid, Runnable click) { this(key, name, detail, dateTime, avatarUid, click, null, 0); }
         Row(String key, String name, String detail, String dateTime, String avatarUid, Runnable click, Runnable hold, int status) { this(key, name, detail, dateTime, avatarUid, click, hold, status, false); }
-        Row(String key, String name, String detail, String dateTime, String avatarUid, Runnable click, Runnable hold, int status, boolean contact) { this.key = key; this.name = name; this.detail = detail; this.dateTime = dateTime; this.avatarUid = avatarUid; this.click = click; this.hold = hold; this.status = status; this.contact = contact; }
+        Row(String key, String name, String detail, String dateTime, String avatarUid, Runnable click, Runnable hold, int status, boolean contact) { this(key, name, detail, dateTime, avatarUid, click, hold, status, contact, 0); }
+        Row(String key, String name, String detail, String dateTime, String avatarUid, Runnable click, Runnable hold, int status, boolean contact, int unread) { this.key = key; this.name = name; this.detail = detail; this.dateTime = dateTime; this.avatarUid = avatarUid; this.click = click; this.hold = hold; this.status = status; this.contact = contact; this.unread = unread; }
     }
     private final List<Row> rows = new ArrayList<>();
     void submit(List<Row> values) {
@@ -25,7 +26,7 @@ final class RowsAdapter extends RecyclerView.Adapter<RowsAdapter.Holder> {
             public int getNewListSize() { return values.size(); }
             public boolean areItemsTheSame(int oldPosition, int newPosition) { return before.get(oldPosition).key.equals(values.get(newPosition).key); }
             public boolean areContentsTheSame(int oldPosition, int newPosition) {
-                Row old = before.get(oldPosition), next = values.get(newPosition); return old.name.equals(next.name) && old.detail.equals(next.detail) && old.dateTime.equals(next.dateTime) && old.status == next.status;
+                Row old = before.get(oldPosition), next = values.get(newPosition); return old.name.equals(next.name) && old.detail.equals(next.detail) && old.dateTime.equals(next.dateTime) && old.status == next.status && old.unread == next.unread;
             }
         });
         rows.clear(); rows.addAll(values); diff.dispatchUpdatesTo(this);
@@ -36,7 +37,7 @@ final class RowsAdapter extends RecyclerView.Adapter<RowsAdapter.Holder> {
     }
     @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
         LinearLayout root = (LinearLayout) holder.itemView; root.removeAllViews(); Row item = rows.get(position);
-        LinearLayout content = Ui.contactRow(root.getContext(), item.name, item.detail, item.dateTime, item.avatarUid, item.status, item.contact, item.contact ? "" : item.key); content.setOnClickListener(v -> item.click.run()); root.addView(content);
+        LinearLayout content = Ui.contactRow(root.getContext(), item.name, item.detail, item.dateTime, item.avatarUid, item.status, item.contact, item.contact ? "" : item.key, item.unread); content.setOnClickListener(v -> item.click.run()); root.addView(content);
         if (item.hold != null) content.setOnLongClickListener(v -> { item.hold.run(); return true; });
     }
     @Override public int getItemCount() { return rows.size(); }

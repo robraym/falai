@@ -36,7 +36,8 @@ final class AppearanceColorPicker {
         GridLayout grid = new GridLayout(activity); grid.setColumnCount(2); grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
         grid.setPadding(Ui.dp(activity, 12), Ui.dp(activity, 6), Ui.dp(activity, 12), Ui.dp(activity, 3));
         ScrollView scroll = new ScrollView(activity); scroll.addView(grid);
-        content.addView(scroll, new LinearLayout.LayoutParams(-1, -2));
+        scroll.setFillViewport(true);
+        content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         List<TextView> options = new ArrayList<>();
         Runnable update = () -> {
             int selected = Appearance.selected(activity), primary = Appearance.primary(activity), soft = Appearance.soft(activity);
@@ -52,7 +53,7 @@ final class AppearanceColorPicker {
         };
         for (int i = 0; i < Appearance.LABELS.length; i++) {
             final int index = i;
-            TextView option = Ui.text(activity, activity.getString(Appearance.LABELS[i]), 13, false); option.setGravity(Gravity.CENTER_VERTICAL); option.setMinHeight(Ui.dp(activity, 32)); option.setMaxLines(2);
+            TextView option = Ui.text(activity, activity.getString(Appearance.LABELS[i]), 13, false); option.setGravity(Gravity.CENTER_VERTICAL); option.setMinHeight(Ui.dp(activity, 48)); option.setMaxLines(2);
             option.setPadding(Ui.dp(activity, i % 2 == 1 ? 12 : 4), Ui.dp(activity, 3), Ui.dp(activity, 4), Ui.dp(activity, 3));
             option.setCompoundDrawablePadding(Ui.dp(activity, 6));
             GradientDrawable swatch = new GradientDrawable(); swatch.setShape(GradientDrawable.OVAL); swatch.setColor(Appearance.primary(activity, i)); swatch.setSize(Ui.dp(activity, 18), Ui.dp(activity, 18));
@@ -76,7 +77,11 @@ final class AppearanceColorPicker {
         update.run(); dialog.show();
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT)); dialog.getWindow().setDimAmount(.65f);
-            dialog.getWindow().setLayout(activity.getResources().getDisplayMetrics().widthPixels - Ui.dp(activity, 12), -2);
+            android.graphics.Rect bounds = new android.graphics.Rect();
+            activity.getWindow().getDecorView().getWindowVisibleDisplayFrame(bounds);
+            int width = bounds.width() > 0 ? bounds.width() : activity.getResources().getDisplayMetrics().widthPixels;
+            int height = bounds.height() > 0 ? bounds.height() : activity.getResources().getDisplayMetrics().heightPixels;
+            dialog.getWindow().setLayout(width - Ui.dp(activity, 12), Math.round(height * .9f));
         }
     }
     private static GradientDrawable background(int color, int radius) {

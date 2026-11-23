@@ -33,6 +33,10 @@ public final class ReceiptWorker extends Worker {
         try {
             Tasks.await(Backend.call("acknowledgeMessages", Backend.data("chatId", getInputData().getString("chat"),
                     "state", getInputData().getString("state"), "messageIds", Arrays.asList(ids))), 60, TimeUnit.SECONDS);
+            if ("read".equals(getInputData().getString("state")) && Backend.uid().equals(getInputData().getString("owner"))) {
+                androidx.core.app.NotificationManagerCompat notices = androidx.core.app.NotificationManagerCompat.from(getApplicationContext());
+                for (String id : ids) notices.cancel(id, 0);
+            }
             return Result.success();
         } catch (Exception error) {
             Throwable cause = error.getCause() == null ? error : error.getCause();

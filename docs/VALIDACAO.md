@@ -2,6 +2,15 @@
 
 ## Atualização em 23/11/2026
 
+### Foto na notificação, não lidas e mais cores
+
+- Foto circular do remetente no `MessagingStyle` e no ícone grande; inicial quando indisponível, cache por dez minutos e busca limitada a dois segundos após publicar o aviso. Atualização do mesmo aviso sem repetir áudio e somente se ainda estiver ativo. O push inclui o UID do remetente obtido da mensagem no servidor.
+- Contagens de não lidas no resumo de cada conversa, atualizadas nas transações já existentes. Leituras parciais, repetição de recibos/envios, respostas, chamadas de atenção, exclusão para todos/para si e recibos antigos após limpar a conversa estão cobertos na integração. A contagem de mensagens novas não exige consultas extras ao histórico. Resumos legados exibem um ponto para a última recebida ainda não lida; não houve migração de todo o histórico antigo.
+- Notificações das mensagens visualizadas são canceladas após a confirmação de leitura. A prévia fica em negrito e a hora recebe a cor do aplicativo enquanto houver pendências.
+- Paleta ampliada de seis para 30 cores, preservando os índices anteriores, com estilos de diálogo e variações claras/escuras correspondentes. Seletor ocupa 90% da altura disponível, com grade rolável, amostras e prévia; Fechar permanece fora da rolagem.
+- Compilação Java debug e lint aprovados (zero erros, 40 avisos). Os 12 testes unitários e 18 testes de integração passaram. Nenhum APK foi instalado/aberto e nenhuma notificação real de teste foi enviada; aparência e comportamento no aparelho ainda não conferidos.
+- Worker atualizado para `9df7213a-3248-4d51-9246-027bd85ca909`; `/health` confirmou banco e validação FCM sem entrega real.
+
 - Falha de abertura confirmada no crash log do S23 Ultra: `MessageSoundPicker` lia o volume via `SharedPreferences` durante a construção de `MainActivity`, antes de `Activity.attach()`. A leitura ficou apenas em `show()`, com o contexto disponível. Compilação debug e lint passaram após a correção; a abertura da versão corrigida ainda precisa ser conferida no aparelho. Nenhum cache ou dado do usuário foi apagado durante a investigação.
 - Volume da barra salvo por aparelho e aplicado às mensagens e ao Chamar atenção; prévia e alertas usam a mesma categoria de áudio de alarme. Aparência agora tem opções diretas de cor e tamanho, com fontes e recuos das linhas padronizados; Privacidade foi retirada dos Ajustes.
 

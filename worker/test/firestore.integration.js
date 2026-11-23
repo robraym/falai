@@ -96,6 +96,46 @@ test("quota is enforced in a transaction", async () => {
   await assert.rejects(quota(db, "alice", "test", 1, 2), {status: 429});
 });
 
+test("unread counts survive replies and retries, and clear only for read or removed messages", async () => {
+  const a = {uid: "unread_a", email: "unread_a@example.com"}, b = {uid: "unread_b", email: "unread_b@example.com"};
+  await registerProfile(db, a, {name: "A"}); await registerProfile(db, b, {name: "B"});
+  const chat = (await openChat(db, a, {uid: b.uid})).chatId;
+  const first = {chatId: chat, messageId: crypto.randomUUID(), text: "Primeira"};
+  const second = {...first, messageId: crypto.randomUUID(), text: "Segunda"};
+  const count = async uid => (await db.get(`chats/${chat}`)).data.unreadCounts?.[uid] || 0;
+  await persistMessage(db, a.uid, first); await persistMessage(db, a.uid, first);
+  await persistMessage(db, a.uid, second); assert.equal(await count(b.uid), 2);
+  const reply = {...first, messageId: crypto.randomUUID(), text: "Resposta"};
+  await persistMessage(db, b.uid, reply);
+  assert.equal(await count(b.uid), 2); assert.equal(await count(a.uid), 1);
+  const receipt = {chatId: chat, messageIds: [first.messageId], state: "delivered"};
+  await acknowledgeMessages(db, b, receipt); assert.equal(await count(b.uid), 2);
+  await acknowledgeMessages(db, b, {...receipt, state: "read"});
+  await acknowledgeMessages(db, b, {...receipt, state: "read"}); assert.equal(await count(b.uid), 1);
+  await changeMessage(db, a, {...second, scope: "all"});
+  await changeMessage(db, a, {...second, scope: "all"}); assert.equal(await count(b.uid), 0);
+  const nudge = {chatId: chat, messageId: crypto.randomUUID()};
+  await sendNudge(db, a, nudge); await sendNudge(db, a, nudge); assert.equal(await count(b.uid), 1);
+  await deleteConversation(db, b, {chatId: chat}); assert.equal(await count(b.uid), 0);
+  const latest = {...first, messageId: crypto.randomUUID(), text: "Após limpar"};
+  await persistMessage(db, a.uid, latest); assert.equal(await count(b.uid), 1);
+  await acknowledgeMessages(db, b, {chatId: chat, messageIds: [nudge.messageId], state: "read"});
+  assert.equal(await count(b.uid), 1); // Late receipt for cleared history cannot erase a new unread message.
+  await acknowledgeMessages(db, b, {chatId: chat, messageIds: [latest.messageId], state: "read"});
+  assert.equal(await count(b.uid), 0);
+  assert.equal(await count(a.uid), 1); // The other participant's state is independent.
+  const hidden = {...first, messageId: crypto.randomUUID(), text: "Ocultar só para mim"};
+  await persistMessage(db, a.uid, hidden); assert.equal(await count(b.uid), 1);
+  await changeMessage(db, b, {...hidden, scope: "self"});
+  await changeMessage(db, b, {...hidden, scope: "self"}); assert.equal(await count(b.uid), 0);
+  await acknowledgeMessages(db, b, {chatId: chat, messageIds: [hidden.messageId], state: "read"});
+  assert.equal(await count(b.uid), 0);
+  await assertFails(setDoc(doc(auth(b.uid), "chats", chat), {unreadCounts: {[b.uid]: 0}}, {merge: true}));
+  for (const msg of [first, second, reply, nudge, latest, hidden]) {
+    await db.commit([db.remove(`notificationOutbox/${chat}_${msg.messageId}`), db.remove(`notificationOutbox/${chat}_${msg.messageId}_deleted`)]);
+  }
+});
+
 test("only the recipient can acknowledge delivery/read and receipts never regress", async () => {
   const messageId = crypto.randomUUID();
   const result = await persistMessage(db, "alice", {chatId: id, messageId, text: "Teste de confirmação"});
@@ -236,7 +276,7 @@ test("nudges authorize participants, are idempotent, enforce cooldown and cannot
   await assertFails(setDoc(doc(auth(alice.uid), `nudgeLimits/${chatId}_${alice.uid}`), {sentAt: serverTimestamp()}));
   await registerDevice(db, bob, {deviceId: crypto.randomUUID(), token: 'nudge-device-test-token'});
   const events = [];
-  await dispatchJob(db, {}, jobPath, async (env, token, job) => { events.push(job.event); return 'sent'; });
+  await dispatchJob(db, {}, jobPath, async (env, token, job) => { assert.equal(job.senderId, alice.uid); events.push(job.event); return 'sent'; });
   assert.deepEqual(events, ['nudge']);
   await changeMessage(db, alice, {...input, scope: 'all'});
   await dispatchJob(db, {}, jobPath + '_deleted', async (env, token, job) => { events.push(job.event); return 'sent'; });

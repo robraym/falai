@@ -1,5 +1,6 @@
 import {ApiError, requireValue, validChat, validMessageId, normalizeMessage} from "./validation.js";
 import {quota} from "./service.js";
+import {adjustUnread, isCountedUnread} from "./unread.js";
 
 export async function changeMessage(db, user, data, editing = false) {
   requireValue(validChat(data.chatId) && validMessageId(data.messageId));
@@ -13,7 +14,14 @@ export async function changeMessage(db, user, data, editing = false) {
     if (!message) throw new ApiError(404, "not-found");
     if ((editing || data.scope === "all") && message.data.senderId !== user.uid) throw new ApiError(403, "permission-denied");
     const last = chat.data.lastMessageId === data.messageId || (!chat.data.lastMessageId && chat.data.updatedAt?.getTime() === message.data.createdAt?.getTime());
-    const summary = {...chat.data}; let jobId;
+    const summary = {...chat.data}; let jobId, countsChanged = false;
+    if (!editing) {
+      for (const uid of summary.members) {
+        if ((data.scope === "all" || uid === user.uid) && isCountedUnread(summary, message.data, uid)) {
+          adjustUnread(summary, uid, -1); countsChanged = true;
+        }
+      }
+    }
     if (editing) {
       if (message.data.kind === "nudge") throw new ApiError(400, "invalid-argument");
       if (message.data.deletedForAll) throw new ApiError(409, "already-exists");
@@ -32,7 +40,7 @@ export async function changeMessage(db, user, data, editing = false) {
       tx.set(`notificationOutbox/${jobId}`, {chatId: data.chatId, messageId: data.messageId, recipientId, event: "deleted",
         createdAt: new Date(), nextAttemptAt: new Date(), status: "pending", attempts: 0, sentDeviceIds: []});
     }
-    if (last) tx.set(`chats/${data.chatId}`, summary, true);
+    if (last || countsChanged) tx.set(`chats/${data.chatId}`, summary, true);
     return {ok: true, ...(jobId ? {jobId} : {})};
   });
 }
@@ -41,7 +49,8 @@ export async function deleteConversation(db, user, data) {
   await db.transaction(async tx => {
     const path = `chats/${data.chatId}`, chat = await tx.get(path);
     if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
-    tx.set(path, {...chat.data, clearedBefore: {...(chat.data.clearedBefore || {}), [user.uid]: new Date()}}, true);
+    tx.set(path, {...chat.data, unreadCounts: {...(chat.data.unreadCounts || {}), [user.uid]: 0},
+      clearedBefore: {...(chat.data.clearedBefore || {}), [user.uid]: new Date()}}, true);
   });
   return {ok: true};
 }

@@ -118,6 +118,9 @@ final class Ui {
         return contactRow(c, name, detail, dateTime, uid, status, showAbout, "");
     }
     static LinearLayout contactRow(Context c, String name, String detail, String dateTime, String uid, int status, boolean showAbout, String chatId) {
+        return contactRow(c, name, detail, dateTime, uid, status, showAbout, chatId, 0);
+    }
+    static LinearLayout contactRow(Context c, String name, String detail, String dateTime, String uid, int status, boolean showAbout, String chatId, int unread) {
         LinearLayout row = row(c); row.setPadding(dp(c, 4), dp(c, 10), dp(c, 4), dp(c, 10)); row.setMinimumHeight(dp(c, 72));
         row.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
         AvatarView circle = new AvatarView(c); circle.load(uid, name);
@@ -141,6 +144,7 @@ final class Ui {
         } else if (!chatId.isEmpty()) sub = new TypingPreviewView(c, chatId, uid, detail);
         else sub = text(c, detail, 13, false);
         sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        if (unread != 0) sub.setTypeface(null, android.graphics.Typeface.BOLD);
         if (!dateTime.isEmpty()) {
             LinearLayout preview = row(c); preview.setBaselineAligned(true);
             if (status > 0) {
@@ -151,9 +155,21 @@ final class Ui {
             sub.setSingleLine(true); preview.addView(sub, new LinearLayout.LayoutParams(0, -2, 1));
             TextView when = text(c, dateTime, 11, false); when.setSingleLine(true); when.setGravity(Gravity.END);
             when.setPadding(dp(c, 8), 0, 0, 0); preview.addView(when, new LinearLayout.LayoutParams(-2, -2));
+            if (unread != 0) when.setTextColor(Appearance.primary(c));
             labels.addView(preview, new LinearLayout.LayoutParams(-1, -2));
         } else { sub.setMaxLines(2); labels.addView(sub); }
-        row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1)); return row;
+        row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+        if (unread != 0) {
+            TextView badge = text(c, unread < 0 ? "•" : unread > 99 ? "99+" : Integer.toString(unread), 11, true);
+            badge.setGravity(Gravity.CENTER); badge.setIncludeFontPadding(false);
+            badge.setMinWidth(dp(c, 22)); badge.setMinHeight(dp(c, 22));
+            badge.setPadding(dp(c, 5), dp(c, 2), dp(c, 5), dp(c, 2));
+            badge.setTextColor(c.getColor(R.color.background)); badge.setBackground(shape(c, R.color.action_green, 11));
+            badge.setContentDescription(unread < 0 ? c.getString(R.string.unread_messages) : c.getResources().getQuantityString(R.plurals.unread_message_count, unread, unread));
+            LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(-2, -2); badgeParams.leftMargin = dp(c, 6);
+            row.addView(badge, badgeParams);
+        }
+        return row;
     }
     static LinearLayout optionRow(Context c, int icon, String title, String summary, boolean section, View.OnClickListener action) {
         LinearLayout row = row(c); row.setBaselineAligned(false); row.setMinimumHeight(dp(c, 72)); row.setPadding(dp(c, 4), dp(c, 10), dp(c, 4), dp(c, 10));

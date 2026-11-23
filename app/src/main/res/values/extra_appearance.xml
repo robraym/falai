@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="color_red">Vermelho</string>
+    <color name="accent_red">#BF3546</color>
+    <style name="Theme.Falai.Red" parent="Theme.Falai"><item name="colorAccent">@color/accent_red</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Red</item></style>
+    <style name="Theme.Falai.Dialog.Red" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_red</item></style>
+    <string name="color_coral">Coral</string>
+    <color name="accent_coral">#BB4B3C</color>
+    <style name="Theme.Falai.Coral" parent="Theme.Falai"><item name="colorAccent">@color/accent_coral</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Coral</item></style>
+    <style name="Theme.Falai.Dialog.Coral" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_coral</item></style>
+    <string name="color_salmon">Salmão</string>
+    <color name="accent_salmon">#AC5548</color>
+    <style name="Theme.Falai.Salmon" parent="Theme.Falai"><item name="colorAccent">@color/accent_salmon</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Salmon</item></style>
+    <style name="Theme.Falai.Dialog.Salmon" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_salmon</item></style>
+    <string name="color_amber">Âmbar</string>
+    <color name="accent_amber">#986600</color>
+    <style name="Theme.Falai.Amber" parent="Theme.Falai"><item name="colorAccent">@color/accent_amber</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Amber</item></style>
+    <style name="Theme.Falai.Dialog.Amber" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_amber</item></style>
+    <string name="color_gold">Dourado</string>
+    <color name="accent_gold">#8F711B</color>
+    <style name="Theme.Falai.Gold" parent="Theme.Falai"><item name="colorAccent">@color/accent_gold</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Gold</item></style>
+    <style name="Theme.Falai.Dialog.Gold" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_gold</item></style>
+    <string name="color_lime">Lima</string>
+    <color name="accent_lime">#637D16</color>
+    <style name="Theme.Falai.Lime" parent="Theme.Falai"><item name="colorAccent">@color/accent_lime</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Lime</item></style>
+    <style name="Theme.Falai.Dialog.Lime" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_lime</item></style>
+    <string name="color_olive">Oliva</string>
+    <color name="accent_olive">#73742E</color>
+    <style name="Theme.Falai.Olive" parent="Theme.Falai"><item name="colorAccent">@color/accent_olive</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Olive</item></style>
+    <style name="Theme.Falai.Dialog.Olive" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_olive</item></style>
+    <string name="color_moss">Musgo</string>
+    <color name="accent_moss">#56733C</color>
+    <style name="Theme.Falai.Moss" parent="Theme.Falai"><item name="colorAccent">@color/accent_moss</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Moss</item></style>
+    <style name="Theme.Falai.Dialog.Moss" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_moss</item></style>
+    <string name="color_mint">Menta</string>
+    <color name="accent_mint">#247E60</color>
+    <style name="Theme.Falai.Mint" parent="Theme.Falai"><item name="colorAccent">@color/accent_mint</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Mint</item></style>
+    <style name="Theme.Falai.Dialog.Mint" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_mint</item></style>
+    <string name="color_jade">Jade</string>
+    <color name="accent_jade">#267D73</color>
+    <style name="Theme.Falai.Jade" parent="Theme.Falai"><item name="colorAccent">@color/accent_jade</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Jade</item></style>
+    <style name="Theme.Falai.Dialog.Jade" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_jade</item></style>
+    <string name="color_emerald">Esmeralda</string>
+    <color name="accent_emerald">#087C61</color>
+    <style name="Theme.Falai.Emerald" parent="Theme.Falai"><item name="colorAccent">@color/accent_emerald</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Emerald</item></style>
+    <style name="Theme.Falai.Dialog.Emerald" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_emerald</item></style>
+    <string name="color_forest">Floresta</string>
+    <color name="accent_forest">#336749</color>
+    <style name="Theme.Falai.Forest" parent="Theme.Falai"><item name="colorAccent">@color/accent_forest</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Forest</item></style>
+    <style name="Theme.Falai.Dialog.Forest" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_forest</item></style>
+    <string name="color_aqua">Água-marinha</string>
+    <color name="accent_aqua">#157C91</color>
+    <style name="Theme.Falai.Aqua" parent="Theme.Falai"><item name="colorAccent">@color/accent_aqua</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Aqua</item></style>
+    <style name="Theme.Falai.Dialog.Aqua" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_aqua</item></style>
+    <string name="color_cyan">Ciano</string>
+    <color name="accent_cyan">#087DAD</color>
+    <style name="Theme.Falai.Cyan" parent="Theme.Falai"><item name="colorAccent">@color/accent_cyan</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Cyan</item></style>
+    <style name="Theme.Falai.Dialog.Cyan" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_cyan</item></style>
+    <string name="color_sky">Azul-céu</string>
+    <color name="accent_sky">#2774AE</color>
+    <style name="Theme.Falai.Sky" parent="Theme.Falai"><item name="colorAccent">@color/accent_sky</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Sky</item></style>
+    <style name="Theme.Falai.Dialog.Sky" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_sky</item></style>
+    <string name="color_indigo">Índigo</string>
+    <color name="accent_indigo">#4C5AC1</color>
+    <style name="Theme.Falai.Indigo" parent="Theme.Falai"><item name="colorAccent">@color/accent_indigo</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Indigo</item></style>
+    <style name="Theme.Falai.Dialog.Indigo" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_indigo</item></style>
+    <string name="color_navy">Azul-marinho</string>
+    <color name="accent_navy">#3A577F</color>
+    <style name="Theme.Falai.Navy" parent="Theme.Falai"><item name="colorAccent">@color/accent_navy</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Navy</item></style>
+    <style name="Theme.Falai.Dialog.Navy" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_navy</item></style>
+    <string name="color_violet">Violeta</string>
+    <color name="accent_violet">#8B43B7</color>
+    <style name="Theme.Falai.Violet" parent="Theme.Falai"><item name="colorAccent">@color/accent_violet</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Violet</item></style>
+    <style name="Theme.Falai.Dialog.Violet" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_violet</item></style>
+    <string name="color_lavender">Lavanda</string>
+    <color name="accent_lavender">#7960A1</color>
+    <style name="Theme.Falai.Lavender" parent="Theme.Falai"><item name="colorAccent">@color/accent_lavender</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Lavender</item></style>
+    <style name="Theme.Falai.Dialog.Lavender" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_lavender</item></style>
+    <string name="color_magenta">Magenta</string>
+    <color name="accent_magenta">#AF389D</color>
+    <style name="Theme.Falai.Magenta" parent="Theme.Falai"><item name="colorAccent">@color/accent_magenta</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Magenta</item></style>
+    <style name="Theme.Falai.Dialog.Magenta" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_magenta</item></style>
+    <string name="color_rose">Rosa antigo</string>
+    <color name="accent_rose">#A85270</color>
+    <style name="Theme.Falai.Rose" parent="Theme.Falai"><item name="colorAccent">@color/accent_rose</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Rose</item></style>
+    <style name="Theme.Falai.Dialog.Rose" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_rose</item></style>
+    <string name="color_wine">Vinho</string>
+    <color name="accent_wine">#903D5D</color>
+    <style name="Theme.Falai.Wine" parent="Theme.Falai"><item name="colorAccent">@color/accent_wine</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Wine</item></style>
+    <style name="Theme.Falai.Dialog.Wine" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_wine</item></style>
+    <string name="color_brown">Marrom</string>
+    <color name="accent_brown">#805B42</color>
+    <style name="Theme.Falai.Brown" parent="Theme.Falai"><item name="colorAccent">@color/accent_brown</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Brown</item></style>
+    <style name="Theme.Falai.Dialog.Brown" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_brown</item></style>
+    <string name="color_slate">Ardósia</string>
+    <color name="accent_slate">#586C7D</color>
+    <style name="Theme.Falai.Slate" parent="Theme.Falai"><item name="colorAccent">@color/accent_slate</item><item name="alertDialogTheme">@style/Theme.Falai.Dialog.Slate</item></style>
+    <style name="Theme.Falai.Dialog.Slate" parent="Theme.Falai.Dialog"><item name="colorAccent">@color/accent_slate</item></style>
+</resources>

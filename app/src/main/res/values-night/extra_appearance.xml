@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent_red">#FF7785</color>
+    <color name="accent_coral">#FF8E7A</color>
+    <color name="accent_salmon">#F4A38F</color>
+    <color name="accent_amber">#F1B847</color>
+    <color name="accent_gold">#E1C464</color>
+    <color name="accent_lime">#BDD45D</color>
+    <color name="accent_olive">#B9BC71</color>
+    <color name="accent_moss">#98BA7C</color>
+    <color name="accent_mint">#7DD9B2</color>
+    <color name="accent_jade">#72D0BC</color>
+    <color name="accent_emerald">#3DD2A4</color>
+    <color name="accent_forest">#86B99B</color>
+    <color name="accent_aqua">#68CEDF</color>
+    <color name="accent_cyan">#52C8F3</color>
+    <color name="accent_sky">#8AC7FF</color>
+    <color name="accent_indigo">#919FFF</color>
+    <color name="accent_navy">#8DAEDB</color>
+    <color name="accent_violet">#C68BF1</color>
+    <color name="accent_lavender">#C8ABE7</color>
+    <color name="accent_magenta">#EF80DB</color>
+    <color name="accent_rose">#DE9DB3</color>
+    <color name="accent_wine">#D38BA8</color>
+    <color name="accent_brown">#C5A080</color>
+    <color name="accent_slate">#A2B6C7</color>
+</resources>

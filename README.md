@@ -2,6 +2,12 @@
 
 Aplicativo Android nativo em **Java**, com texto e emojis, foto de perfil, login Google, descoberta de contatos por e-mail e o visual do Alertou.
 
+A lista de conversas destaca mensagens não lidas com um selo na cor escolhida e contagem até 99+. O contador é mantido pelo servidor no resumo da conversa, sem buscar todo o histórico para cada linha; diminui conforme as mensagens são visualizadas e respeita exclusões e limpeza da conversa. Resumos antigos sem contagem mostram um ponto quando a última mensagem recebida ainda não foi lida. As notificações das mensagens lidas são removidas após a confirmação do servidor.
+
+As notificações usam a foto circular do remetente, com a inicial como alternativa. O aviso é publicado imediatamente; se necessário, a miniatura é buscada depois e o aviso existente é atualizado sem repetir o som. A foto utiliza o cache compartilhado por dez minutos; uma atualização pode consumir uma leitura adicional do Firestore.
+
+O seletor de cores oferece 30 opções com amostras, prévia e variações para tema claro e escuro. Ocupa 90% da altura disponível, com a grade rolável e o botão Fechar sempre acessível; a escolha anterior é preservada.
+
 O seletor ampliado organiza 120 emojis em seis categorias e mantém até 24 recentes em uma fileira horizontal no topo, salvos por conta no aparelho. Os balões enviados e recebidos usam um contorno contínuo com bicos espelhados.
 
 A lupa dentro da conversa começa no canto inferior direito e pode ser arrastada, com posição salva. Ela filtra as mensagens já carregadas, ignorando diferenças de acentos e maiúsculas. O botão de mensagens anteriores permite ampliar o histórico pesquisado sem baixar toda a conversa automaticamente.

@@ -260,7 +260,13 @@ public final class MainActivity extends FalaiActivity {
                 else if ("nudge".equals(chat.getString("lastKind"))) preview = getString(Backend.uid().equals(chat.getString("lastSenderId")) ? R.string.nudge_sent : R.string.nudge_received);
                 String dateTime = updated == null || preview == null || preview.isEmpty() ? "" : lastMessageDateTime(updated.toDate());
                 int checks = Backend.uid().equals(chat.getString("lastSenderId")) ? chat.getTimestamp("lastReadAt") != null ? 3 : chat.getTimestamp("lastDeliveredAt") != null ? 2 : 1 : 0;
-                allRows.add(new RowsAdapter.Row(chat.getId(), name, preview == null || preview.isEmpty() ? getString(R.string.new_conversation) : preview, dateTime, other, () -> ChatActivity.open(this, chat.getId(), name), () -> chatActions(chat.getId()), checks));
+                Number pending = (Number) chat.get("unreadCounts." + Backend.uid());
+                // Older summaries have no counter: still identify the last unread incoming message.
+                int unread = pending != null ? (int) Math.min(9999, Math.max(0, pending.longValue()))
+                    : other.equals(chat.getString("lastSenderId")) && chat.getTimestamp("lastReadAt") == null
+                        && !Boolean.TRUE.equals(chat.getBoolean("lastDeleted"))
+                        && (previewHidden == null || !previewHidden.contains(Backend.uid())) ? -1 : 0;
+                allRows.add(new RowsAdapter.Row(chat.getId(), name, preview == null || preview.isEmpty() ? getString(R.string.new_conversation) : preview, dateTime, other, () -> ChatActivity.open(this, chat.getId(), name), () -> chatActions(chat.getId()), checks, false, unread));
             }
             filter.run();
         };
