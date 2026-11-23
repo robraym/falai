@@ -8,7 +8,7 @@ A lupa dentro da conversa filtra as mensagens já carregadas, ignorando diferen�
 
 O cabeçalho da conversa mostra “digitando…” e presença no Falai. A digitação é renovada no máximo a cada quatro segundos, encerrada após 2,5 segundos sem alterações e expira após oito segundos se a conexão cair. A presença usa sessões por instalação, atualizadas a cada 30 segundos enquanto o app está em primeiro plano, com tela interativa e desbloqueada. Sem encerramento normal, o estado online expira em até 70 segundos após a última atualização. “Visto há…” representa a última atividade informada pelo app, não um monitoramento geral do aparelho. Esses estados consomem leituras/escritas da cota do Firestore.
 
-Contatos mostra a data de geração embutida no APK da instalação registrada mais recentemente. Versões antigas exibem “Data do APK não informada”. A data é informada pelo cliente, não é uma atestação de integridade e não representa a data de instalação.
+A tela de dados da pessoa, aberta ao tocar na foto ou no nome no cabeçalho da conversa, mostra a data de geração embutida no APK da instalação registrada mais recentemente. A lista de Contatos não mostra essa informação. Versões antigas exibem “Data do APK não informada”. A data é informada pelo cliente, não é uma atestação de integridade e não representa a data de instalação.
 
 A aparência acompanha automaticamente o tema claro/escuro do aparelho, com as paletas correspondentes do Alertou. O cabeçalho respeita a barra de status, inclusive ao trocar de aba, e a lista de conversas mostra a data e a hora da última mensagem.
 

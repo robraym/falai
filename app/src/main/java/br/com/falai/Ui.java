@@ -154,7 +154,6 @@ final class Ui {
             when.setPadding(dp(c, 8), 0, 0, 0); preview.addView(when, new LinearLayout.LayoutParams(-2, -2));
             labels.addView(preview, new LinearLayout.LayoutParams(-1, -2));
         } else { sub.setMaxLines(2); labels.addView(sub); }
-        if (showAbout) labels.addView(new BuildDateView(c, uid));
         row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1)); return row;
     }
     static LinearLayout optionRow(Context c, int icon, String title, String summary, boolean section, View.OnClickListener action) {
