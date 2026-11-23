@@ -16,10 +16,11 @@ export async function sendPush(env, token, job, validateOnly = false) {
   const message = validateOnly ? {topic: "falai-configuration-check", notification: {title: "Falai", body: "Verificação de configuração"}}
     : {token,
       data: {chatId: job.chatId, messageId: job.messageId, recipientId: job.recipientId,
-        senderName: job.senderName || "Falai", text: notificationPreview(job.text || ""), event: job.event || "message"},
+        senderName: job.senderName || "Falai", text: notificationPreview(job.text || ""), event: job.event || "message",
+        ...(job.event === "nudge" ? {expiresAt: String(job.createdAt.getTime() + 60000)} : {})},
       // Data-only invokes the Android service in foreground and background, so
       // the same ICQ alarm-volume player handles both without duplicate sounds.
-      android: {priority: "high", ttl: "2419200s"}};
+      android: {priority: "high", ttl: job.event === "nudge" ? `${Math.max(0, Math.min(60, Math.floor((job.createdAt.getTime() + 60000 - Date.now()) / 1000)))}s` : "2419200s"}};
   const response = await httpFetch(`https://fcm.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/messages:send`, {
     method: "POST", headers: {Authorization: "Bearer " + accessToken, "Content-Type": "application/json"},
     body: JSON.stringify({validateOnly, message})});
@@ -33,6 +34,7 @@ export async function dispatchJob(db, env, path, push = sendPush) {
   const claimed = await db.transaction(async tx => {
     const snapshot = await tx.get(path); const job = snapshot?.data;
     if (!job || job.status !== "pending" || job.nextAttemptAt > new Date()) return null;
+    if (job.event === "nudge" && job.createdAt.getTime() + 60000 <= Date.now()) { tx.delete(path); return null; }
     const lease = crypto.randomUUID();
     tx.set(path, {...job, lease, attempts: job.attempts + 1, nextAttemptAt: new Date(Date.now() + 120000)}, true);
     return {...job, lease, attempts: job.attempts + 1};
@@ -44,6 +46,7 @@ export async function dispatchJob(db, env, path, push = sendPush) {
     const chat = await db.get(`chats/${claimed.chatId}`);
     const message = await db.get(`chats/${claimed.chatId}/messages/${claimed.messageId}`);
     claimed.text = message?.data.deletedForAll ? "" : message?.data.text || "";
+    if (message?.data.kind === "nudge") claimed.event = "nudge";
     if (message?.data.deletedForAll) claimed.event = "deleted";
     claimed.senderName = chat?.data.names?.[message?.data.senderId] || "Falai";
     // Collection is indexed by uid; fixed limit bounds reads and Worker subrequests.

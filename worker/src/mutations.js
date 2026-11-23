@@ -15,6 +15,7 @@ export async function changeMessage(db, user, data, editing = false) {
     const last = chat.data.lastMessageId === data.messageId || (!chat.data.lastMessageId && chat.data.updatedAt?.getTime() === message.data.createdAt?.getTime());
     const summary = {...chat.data}; let jobId;
     if (editing) {
+      if (message.data.kind === "nudge") throw new ApiError(400, "invalid-argument");
       if (message.data.deletedForAll) throw new ApiError(409, "already-exists");
       tx.set(path, {...message.data, text: replacement, editedAt: new Date()}, true);
       if (last) summary.lastText = replacement;

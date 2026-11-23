@@ -1,4 +1,4 @@
-import {ApiError, requireValue, hash, normalizeEmail, validUid, normalizeMessage, chatId} from "./validation.js";
+import {ApiError, requireValue, hash, normalizeEmail, validUid, validChat, validMessageId, normalizeMessage, chatId} from "./validation.js";
 import {validatePhoto} from "./photo.js";
 
 export async function updateProfileAbout(db, user, data) {
@@ -86,17 +86,48 @@ export async function persistMessage(db, uid, data) {
     const now = new Date();
     tx.set(path, {...message, senderId: uid, createdAt: now}, false);
     tx.set(`chats/${data.chatId}`, {...chat.data, lastText: message.text, updatedAt: now, lastMessageId: data.messageId,
-      lastSenderId: uid, lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
+      lastSenderId: uid, lastKind: "message", lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
     tx.set(`notificationOutbox/${jobId}`, {chatId: data.chatId, messageId: data.messageId, recipientId,
       createdAt: now, nextAttemptAt: now, status: "pending", attempts: 0, sentDeviceIds: []}, false);
     return true;
   });
   return {messageId: data.messageId, jobId, created};
 }
+export async function sendNudge(db, user, data) {
+  requireValue(validChat(data.chatId) && validMessageId(data.messageId));
+  const jobId = `${data.chatId}_${data.messageId}`;
+  await db.transaction(async tx => {
+    const messagePath = `chats/${data.chatId}/messages/${data.messageId}`;
+    const limitPath = `nudgeLimits/${data.chatId}_${user.uid}`, quotaPath = `quotas/${user.uid}_nudges`;
+    const [chat, existing, limit, usage] = await tx.getAll([`chats/${data.chatId}`, messagePath, limitPath, quotaPath]);
+    if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
+    if (existing) {
+      if (existing.data.senderId !== user.uid || existing.data.kind !== "nudge") throw new ApiError(409, "already-exists");
+      return;
+    }
+    const now = Date.now();
+    if (limit?.data.sentAt?.getTime() > now - 60000) throw new ApiError(429, "nudge-cooldown");
+    const sameHour = usage && usage.data.start > now - 3600000;
+    const count = (sameHour ? usage.data.count : 0) + 1;
+    if (count > 20) throw new ApiError(429, "resource-exhausted");
+    const createdAt = new Date(now), text = "Chamou sua atenção!";
+    tx.set(messagePath, {senderId: user.uid, kind: "nudge", text, createdAt}, false);
+    tx.set(`chats/${data.chatId}`, {...chat.data, lastText: text, updatedAt: createdAt, lastMessageId: data.messageId,
+      lastSenderId: user.uid, lastKind: "nudge", lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
+    tx.set(limitPath, {sentAt: createdAt});
+    tx.set(quotaPath, {start: sameHour ? usage.data.start : now, count});
+    tx.set(`notificationOutbox/${jobId}`, {chatId: data.chatId, messageId: data.messageId,
+      recipientId: chat.data.members.find(uid => uid !== user.uid), event: "nudge", createdAt,
+      nextAttemptAt: createdAt, status: "pending", attempts: 0, sentDeviceIds: []}, false);
+  });
+  return {messageId: data.messageId, jobId};
+}
 export async function registerDevice(db, user, data) {
   requireValue(typeof data.deviceId === "string" && /^[a-f0-9-]{36}$/.test(data.deviceId));
   requireValue(typeof data.token === "string" && data.token.length >= 20 && data.token.length <= 4096 && !/[\u0000-\u0020\u007f]/.test(data.token));
   if (data.buildTime !== undefined) requireValue(Number.isSafeInteger(data.buildTime) && data.buildTime >= 1577836800000 && data.buildTime <= Date.now() + 86400000);
+  if (data.versionName !== undefined || data.versionCode !== undefined) requireValue(typeof data.versionName === "string" && /^[A-Za-z0-9._+-]{1,40}$/.test(data.versionName)
+    && Number.isSafeInteger(data.versionCode) && data.versionCode >= 1 && data.versionCode <= 2147483647);
   await quota(db, user.uid, "devices", 1, 120);
   const path = `devices/${await hash(user.uid + ":" + data.deviceId)}`;
   await db.transaction(async tx => {
@@ -111,7 +142,8 @@ export async function registerDevice(db, user, data) {
     tx.set(path, {uid: user.uid, token: data.token, updatedAt: new Date()});
     // The most recently registered installation, not necessarily the newest build.
     // Old clients explicitly clear this public date instead of leaving a misleading value.
-    tx.set(`profileBuild/${user.uid}`, {buildTime: data.buildTime ? new Date(data.buildTime) : null, updatedAt: new Date()});
+    tx.set(`profileBuild/${user.uid}`, {buildTime: data.buildTime ? new Date(data.buildTime) : null,
+      versionName: data.versionName || null, versionCode: data.versionCode || null, updatedAt: new Date()});
     tx.set(registryPath, {paths});
     for (const stale of snapshots) if (stale && !paths.includes(stale.path)) tx.delete(stale.path);
   });

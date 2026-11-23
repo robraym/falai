@@ -52,6 +52,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         LinearLayout bubble = Ui.column(c); bubble.setPadding(Ui.dp(c, mine ? 11 : 17), Ui.dp(c, 7), Ui.dp(c, mine ? 17 : 11), Ui.dp(c, 7)); bubble.setBackground(new MessageBubble(c, mine));
         boolean deleted = Boolean.TRUE.equals(doc.getBoolean("deletedForAll"));
         String content = deleted ? c.getString(R.string.message_deleted) : doc.getString("text");
+        if (!deleted && "nudge".equals(doc.getString("kind"))) content = c.getString(mine ? R.string.nudge_sent : R.string.nudge_received);
         TextView message = Ui.text(c, "", 16, false); message.setTextColor(c.getColor(deleted ? R.color.text_secondary : R.color.text_primary));
         message.setTypeface(android.graphics.Typeface.DEFAULT, deleted ? android.graphics.Typeface.ITALIC : android.graphics.Typeface.NORMAL);
         String time = timestamp == null ? "" : android.text.format.DateFormat.getTimeFormat(c).format(timestamp.toDate());

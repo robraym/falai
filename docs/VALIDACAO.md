@@ -2,9 +2,18 @@
 
 ## Atualização em 23/11/2026
 
+- Falha de abertura confirmada no crash log do S23 Ultra: `MessageSoundPicker` lia o volume via `SharedPreferences` durante a construção de `MainActivity`, antes de `Activity.attach()`. A leitura ficou apenas em `show()`, com o contexto disponível. Compilação debug e lint passaram após a correção; a abertura da versão corrigida ainda precisa ser conferida no aparelho. Nenhum cache ou dado do usuário foi apagado durante a investigação.
+- Volume da barra salvo por aparelho e aplicado às mensagens e ao Chamar atenção; prévia e alertas usam a mesma categoria de áudio de alarme. Aparência agora tem opções diretas de cor e tamanho, com fontes e recuos das linhas padronizados; Privacidade foi retirada dos Ajustes.
+
+- Versão 1.1 (código 2): troca da data de geração pela versão registrada, com validação no Worker e fallback para versões antigas.
+- Chamar atenção: mensagem autenticada, deduplicação, cooldown por conversa/remetente, limite por hora, validade de 60 segundos no push, som MSN separado e animação curta apenas no Falai em primeiro plano. Casos de edição, exclusão, repetição concorrente, abuso e expiração cobertos no servidor.
+- 29 testes locais aprovados (12 unitários e 17 de integração com Firestore). Compilação debug e lint aprovados, com 0 erros e 34 avisos. Áudio, animação e espaçamento ainda não conferidos em aparelho; nenhuma instalação, abertura ou notificação real de teste foi feita.
+- Margens e recuos laterais reduzidos, preservando a aplicação dos insets do sistema.
+- Worker com chamadas de atenção e versão do APK publicado como `38b74de5-07fd-4de8-86d0-87dd636393a5`; `/health` confirmou banco e FCM em modo de validação, sem envio de aviso real.
+
 - Seletor de cores: amostras circulares, grade de duas colunas, prévia e aplicação ao fechar, conferidos contra o código do Alertou.
 - Contagem de Contatos em selo; navegação selecionada com destaque arredondado atrás do ícone e título em negrito. Papel de parede em todas as telas, sem contorno externo dos cards ou divisores horizontais.
-- Ajustes mantém Aparência, Sons das mensagens, Privacidade e Sair da conta. A linha de Notificações foi removida.
+- Ajustes mostra Cor do aplicativo, Tamanho dos textos, Sons das mensagens e Sair da conta diretamente. Notificações e Privacidade foram removidas.
 - Investigação por ADB, somente leitura, no S23 Ultra (`SM_S918B`): canal `messages_icq_v1` com `mImportance=4`, `mSound=null`, `mVibrationEnabled=false` e `mUserLockedFields=0`.
 - Nova implementação usa `messages_alerts_v2`, vibração e `MessagingStyle`, mantendo áudio separado e respeitando a importância/bloqueio do canal antigo. Nenhuma notificação foi disparada durante a investigação.
 - Compilação Java debug e lint aprovados após a última edição visual (0 erros, 34 avisos). Não houve instalação, execução ou captura em Android; confirmação visual e acendimento da tela do relógio permanecem pendentes.

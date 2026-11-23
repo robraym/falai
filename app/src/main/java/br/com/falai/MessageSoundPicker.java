@@ -25,12 +25,13 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
     private Dialog dialog;
     private LinearLayout options;
     private MediaPlayer preview;
-    private float volume = .72f;
+    private float volume;
     private String previewKey = MessageSounds.DEFAULT;
     private boolean destroyed, importing;
     private Runnable changed = () -> { };
     MessageSoundPicker(MainActivity activity) {
         this.activity = activity;
+        // Constructed before Activity.attach(): read preferences only in show(), after context attachment.
         picker = activity.registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
             if (uri == null || importing) return;
             importing = true;
@@ -49,6 +50,7 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
     }
     void show(Runnable onChanged) {
         changed = onChanged;
+        volume = MessageSounds.volume(activity);
         if (dialog != null) { dialog.dismiss(); dialog = null; }
         Dialog next = new Dialog(activity); dialog = next;
         LinearLayout content = Ui.column(activity); content.setPadding(dp(20), dp(18), dp(20), dp(12)); content.setBackground(Ui.shape(activity, R.color.card, 24));
@@ -71,10 +73,14 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar seek, int progress, boolean fromUser) {
                 volume = progress / 100f;
+                if (fromUser) MessageSounds.saveVolume(activity, progress);
+                if (fromUser && (preview == null || !previewKey.equals(MessageSounds.selected(activity)))) {
+                    play(MessageSounds.selected(activity)); return;
+                }
                 if (preview != null) { float level = volume * ("icq_soft".equals(previewKey) ? .55f : 1f); preview.setVolume(level, level); }
             }
             public void onStartTrackingTouch(SeekBar seek) { }
-            public void onStopTrackingTouch(SeekBar seek) { }
+            public void onStopTrackingTouch(SeekBar seek) { play(MessageSounds.selected(activity)); }
         }); bar.addView(slider, new LinearLayout.LayoutParams(0, -2, 1));
         LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, -2); barParams.topMargin = dp(8); barParams.bottomMargin = dp(2); content.addView(bar, barParams);
         LinearLayout actions = Ui.row(activity); actions.setGravity(Gravity.END);
@@ -139,7 +145,7 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
     private void play(String key) {
         stopPreview();
         try {
-            previewKey = key; MediaPlayer player = MessageSounds.create(activity, key, true); preview = player;
+            previewKey = key; MediaPlayer player = MessageSounds.create(activity, key); preview = player;
             player.setOnCompletionListener(done -> { if (preview == done) stopPreview(); });
             player.setOnErrorListener((failed, what, extra) -> { if (preview == failed) stopPreview(); return true; });
             MessageSounds.start(player, key, volume);

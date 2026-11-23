@@ -5,7 +5,7 @@ import {initializeTestEnvironment, assertSucceeds, assertFails} from "@firebase/
 import {doc, setDoc, getDoc, getDocs, collection, query, where, orderBy, Timestamp, serverTimestamp} from "firebase/firestore";
 import {Firestore} from "../src/firestore.js";
 import {chatId} from "../src/validation.js";
-import {registerProfile, discoverContacts, openChat, persistMessage, quota, registerDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout} from "../src/service.js";
+import {registerProfile, discoverContacts, openChat, persistMessage, quota, registerDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge} from "../src/service.js";
 import {changeMessage, deleteConversation} from "../src/mutations.js";
 import {dispatchJob, drainOutbox} from "../src/push.js";
 
@@ -84,6 +84,12 @@ test("build date is public without tokens, validates input and supports older in
   await assert.rejects(registerDevice(db, {uid: "builduser"}, {deviceId, token, buildTime: Date.now() + 172800000}), {code: "invalid-argument"});
   await registerDevice(db, {uid: "builduser"}, {deviceId, token});
   assert.equal((await db.get("profileBuild/builduser")).data.buildTime, null);
+  await registerDevice(db, {uid: "builduser"}, {deviceId, token, versionName: "1.1", versionCode: 2});
+  const version = (await assertSucceeds(getDoc(doc(auth("bob"), "profileBuild/builduser")))).data();
+  assert.equal(version.versionName, "1.1"); assert.equal(version.versionCode, 2); assert.equal(version.buildTime, null);
+  await assert.rejects(registerDevice(db, {uid: "builduser"}, {deviceId, token, versionName: "bad version", versionCode: -1}), {code: "invalid-argument"});
+  await registerDevice(db, {uid: "builduser"}, {deviceId, token});
+  assert.equal((await db.get("profileBuild/builduser")).data.versionName, null);
 });
 test("quota is enforced in a transaction", async () => {
   await quota(db, "alice", "test", 1, 2); await quota(db, "alice", "test", 1, 2);
@@ -212,4 +218,40 @@ test("about phrases are shared separately from private data and can only be chan
     await assert.rejects(updateProfileAbout(db, user, {text: invalid}), {code: "invalid-argument"});
   await registerProfile(db, user, {name: "Álice"}); assert.equal((await db.get("profileAbout/alice")).data.text, result.text);
   await updateProfileAbout(db, user, {text: ""}); assert.equal(await db.get("profileAbout/alice"), null);
+});
+
+test("nudges authorize participants, are idempotent, enforce cooldown and cannot be edited", async () => {
+  const alice = {uid: 'nudgealice', email: 'nudgealice@example.com'}, bob = {uid: 'nudgebob', email: 'nudgebob@example.com'};
+  await registerProfile(db, alice, {name: 'Alice'}); await registerProfile(db, bob, {name: 'Bob'});
+  const chatId = (await openChat(db, alice, {uid: bob.uid})).chatId, messageId = crypto.randomUUID();
+  const input = {chatId, messageId};
+  await assert.rejects(sendNudge(db, {uid: 'mallory'}, input), {code: 'permission-denied'});
+  await Promise.all([sendNudge(db, alice, input), sendNudge(db, alice, input)]);
+  const messagePath = `chats/${chatId}/messages/${messageId}`, jobPath = `notificationOutbox/${chatId}_${messageId}`;
+  assert.equal((await db.get(messagePath)).data.kind, 'nudge');
+  assert.equal((await db.get(jobPath)).data.recipientId, bob.uid);
+  assert.equal((await db.get('quotas/nudgealice_nudges')).data.count, 1);
+  await assert.rejects(sendNudge(db, alice, {chatId, messageId: crypto.randomUUID()}), {code: 'nudge-cooldown'});
+  await assert.rejects(changeMessage(db, alice, {...input, text: 'Forged nudge'}, true), {code: 'invalid-argument'});
+  await assertFails(setDoc(doc(auth(alice.uid), `nudgeLimits/${chatId}_${alice.uid}`), {sentAt: serverTimestamp()}));
+  await registerDevice(db, bob, {deviceId: crypto.randomUUID(), token: 'nudge-device-test-token'});
+  const events = [];
+  await dispatchJob(db, {}, jobPath, async (env, token, job) => { events.push(job.event); return 'sent'; });
+  assert.deepEqual(events, ['nudge']);
+  await changeMessage(db, alice, {...input, scope: 'all'});
+  await dispatchJob(db, {}, jobPath + '_deleted', async (env, token, job) => { events.push(job.event); return 'sent'; });
+  assert.deepEqual(events, ['nudge', 'deleted']);
+  await db.commit([db.write(`nudgeLimits/${chatId}_${alice.uid}`, {sentAt: new Date(Date.now() - 61000)}), db.write('quotas/nudgealice_nudges', {start: Date.now(), count: 20})]);
+  await assert.rejects(sendNudge(db, alice, {chatId, messageId: crypto.randomUUID()}), {code: 'resource-exhausted'});
+});
+test("an expired nudge is not delivered late but its history remains", async () => {
+  const alice = {uid: 'expiryalice', email: 'expiryalice@example.com'}, bob = {uid: 'expirybob', email: 'expirybob@example.com'};
+  await registerProfile(db, alice, {name: 'Alice'}); await registerProfile(db, bob, {name: 'Bob'});
+  const chatId = (await openChat(db, alice, {uid: bob.uid})).chatId, messageId = crypto.randomUUID();
+  await sendNudge(db, alice, {chatId, messageId});
+  const path = `notificationOutbox/${chatId}_${messageId}`, job = (await db.get(path)).data;
+  await db.commit([db.write(path, {...job, createdAt: new Date(Date.now() - 61000)})]);
+  let calls = 0; await dispatchJob(db, {}, path, async () => { calls++; return 'sent'; });
+  assert.equal(calls, 0); assert.equal(await db.get(path), null);
+  assert.equal((await db.get(`chats/${chatId}/messages/${messageId}`)).data.kind, 'nudge');
 });

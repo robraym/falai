@@ -52,17 +52,23 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         if (messageId != null && getSharedPreferences("deleted_notices", MODE_PRIVATE).getBoolean(messageId, false)) return;
         if (messageId != null && messageId.matches("[a-f0-9-]{36}"))
             ReceiptWorker.schedule(chatId, java.util.Collections.singletonList(messageId), false);
-        if (chatId.equals(ChatActivity.visibleChat)) return;
+        boolean nudge = "nudge".equals(message.getData().get("event"));
+        if (chatId.equals(ChatActivity.visibleChat) && !nudge) return;
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
         createChannel(this);
         if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) return;
         if (Build.VERSION.SDK_INT >= 26 && getSystemService(NotificationManager.class)
                 .getNotificationChannel(CHANNEL_ID).getImportance() == NotificationManager.IMPORTANCE_NONE) return;
+        if (nudge && !NudgeFeedback.accept(this, messageId, message.getData().get("expiresAt"))) return;
         Intent intent = new Intent(this, MainActivity.class).setAction("br.com.falai.OPEN." + chatId).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("chatId", chatId).putExtra("recipientId", recipient);
         PendingIntent pending = PendingIntent.getActivity(this, chatId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         String sender = message.getData().get("senderName"), text = message.getData().get("text");
         if (sender == null || sender.trim().isEmpty()) sender = getString(R.string.app_name);
         if (text == null || text.isEmpty()) text = getString(R.string.new_message);
+        if (nudge) {
+            text = getString(R.string.nudge_received); NudgeFeedback.shake(sender);
+            if (chatId.equals(ChatActivity.visibleChat)) { MessageSound.playNudge(this, recipient + ":" + messageId); return; }
+        }
         String me = Backend.auth().getCurrentUser().getDisplayName();
         if (me == null || me.trim().isEmpty()) me = getString(R.string.app_name);
         Person recipientPerson = new Person.Builder().setName(me).setKey(recipient).build();
@@ -76,6 +82,6 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
                 .setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true).setVisibility(NotificationCompat.VISIBILITY_PRIVATE);
         String tag = messageId != null && messageId.matches("[a-f0-9-]{36}") ? messageId : chatId;
         NotificationManagerCompat.from(this).notify(tag, 0, notification.build());
-        MessageSound.play(this, recipient + ":" + tag);
+        if (nudge) MessageSound.playNudge(this, recipient + ":" + tag); else MessageSound.play(this, recipient + ":" + tag);
     }
 }

@@ -257,6 +257,7 @@ public final class MainActivity extends FalaiActivity {
                 String preview = chat.getString("lastText"); com.google.firebase.Timestamp updated = chat.getTimestamp("updatedAt");
                 @SuppressWarnings("unchecked") List<String> previewHidden = (List<String>) chat.get("previewHiddenFor");
                 if (Boolean.TRUE.equals(chat.getBoolean("lastDeleted")) || (previewHidden != null && previewHidden.contains(Backend.uid()))) preview = getString(R.string.message_deleted);
+                else if ("nudge".equals(chat.getString("lastKind"))) preview = getString(Backend.uid().equals(chat.getString("lastSenderId")) ? R.string.nudge_sent : R.string.nudge_received);
                 String dateTime = updated == null || preview == null || preview.isEmpty() ? "" : lastMessageDateTime(updated.toDate());
                 int checks = Backend.uid().equals(chat.getString("lastSenderId")) ? chat.getTimestamp("lastReadAt") != null ? 3 : chat.getTimestamp("lastDeliveredAt") != null ? 2 : 1 : 0;
                 allRows.add(new RowsAdapter.Row(chat.getId(), name, preview == null || preview.isEmpty() ? getString(R.string.new_conversation) : preview, dateTime, other, () -> ChatActivity.open(this, chat.getId(), name), () -> chatActions(chat.getId()), checks));
@@ -374,25 +375,14 @@ public final class MainActivity extends FalaiActivity {
     }
     private void showSettings() {
         LinearLayout contents = scrollBody();
-        LinearLayout appearance = Ui.column(this); appearance.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0); contents.addView(appearance);
-        LinearLayout options = Ui.column(this);
-        boolean expanded = Appearance.prefs(this).getBoolean("expanded", true); options.setVisibility(expanded ? View.VISIBLE : View.GONE);
-        LinearLayout heading = Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.appearance), getString(R.string.appearance_summary), true, v -> {
-            boolean show = options.getVisibility() != View.VISIBLE; options.setVisibility(show ? View.VISIBLE : View.GONE);
-            Appearance.prefs(this).edit().putBoolean("expanded", show).apply();
-            ((LinearLayout) v).getChildAt(2).setRotation(show ? 90 : 0);
-        });
-        heading.getChildAt(2).setRotation(expanded ? 90 : 0); appearance.addView(heading); appearance.addView(options);
-        options.addView(Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.app_color), getString(Appearance.LABELS[Appearance.selected(this)]), false, v -> chooseColor()));
-        options.addView(Ui.optionRow(this, R.drawable.ic_font, getString(R.string.text_size), getString(R.string.text_size_value, Appearance.percent(this)), false, v -> chooseTextSize()));
-        LinearLayout general = Ui.column(this); general.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0); contents.addView(general);
+        contents.addView(Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.app_color), getString(Appearance.LABELS[Appearance.selected(this)]), false, v -> chooseColor()));
+        contents.addView(Ui.optionRow(this, R.drawable.ic_font, getString(R.string.text_size), getString(R.string.text_size_value, Appearance.percent(this)), false, v -> chooseTextSize()));
+        LinearLayout general = Ui.column(this); contents.addView(general);
         LinearLayout soundRow = Ui.optionRow(this, R.drawable.ic_volume_preview, getString(R.string.message_sounds), MessageSounds.label(this, MessageSounds.selected(this)), true, null);
         messageSoundSummary = (TextView) ((LinearLayout) soundRow.getChildAt(1)).getChildAt(1);
         soundRow.setOnClickListener(view -> messageSounds.show(() -> {
             if (messageSoundSummary != null) messageSoundSummary.setText(MessageSounds.label(this, MessageSounds.selected(this)));
         })); soundRow.setFocusable(true); general.addView(soundRow);
-        general.addView(Ui.optionRow(this, R.drawable.ic_lock, getString(R.string.privacy), getString(R.string.privacy_summary), true,
-                v -> new AlertDialog.Builder(this).setTitle(R.string.privacy).setMessage(R.string.privacy_body).setPositiveButton(android.R.string.ok, null).show()));
         general.addView(Ui.optionRow(this, R.drawable.ic_logout, getString(R.string.sign_out), getString(R.string.sign_out_summary), true, v -> new AlertDialog.Builder(this).setMessage(R.string.sign_out_question).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.sign_out, (dialog, which) -> {
             Backend.signOut().addOnCompleteListener(this, task -> {
                 if (!task.isSuccessful() && !Backend.uid().isEmpty()) { toast(Backend.error(this, task.getException())); return; }

@@ -118,11 +118,11 @@ final class Ui {
         return contactRow(c, name, detail, dateTime, uid, status, showAbout, "");
     }
     static LinearLayout contactRow(Context c, String name, String detail, String dateTime, String uid, int status, boolean showAbout, String chatId) {
-        LinearLayout row = row(c); row.setPadding(dp(c, 8), dp(c, 10), dp(c, 8), dp(c, 10)); row.setMinimumHeight(dp(c, 72));
+        LinearLayout row = row(c); row.setPadding(dp(c, 4), dp(c, 10), dp(c, 4), dp(c, 10)); row.setMinimumHeight(dp(c, 72));
         row.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
         AvatarView circle = new AvatarView(c); circle.load(uid, name);
         row.addView(circle, new LinearLayout.LayoutParams(dp(c, 46), dp(c, 46)));
-        LinearLayout labels = column(c); labels.setPadding(dp(c, 14), 0, dp(c, 6), 0);
+        LinearLayout labels = column(c); labels.setPadding(dp(c, 12), 0, dp(c, 2), 0);
         LinearLayout headline = row(c);
         TextView title = text(c, name, 16, true); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         boolean hasPresence = !showAbout && !chatId.isEmpty();
@@ -156,12 +156,12 @@ final class Ui {
         row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1)); return row;
     }
     static LinearLayout optionRow(Context c, int icon, String title, String summary, boolean section, View.OnClickListener action) {
-        LinearLayout row = row(c); row.setBaselineAligned(false); row.setMinimumHeight(dp(c, section ? 80 : 60)); row.setPadding(dp(c, 8), dp(c, 10), dp(c, 8), dp(c, 10));
+        LinearLayout row = row(c); row.setBaselineAligned(false); row.setMinimumHeight(dp(c, 72)); row.setPadding(dp(c, 4), dp(c, 10), dp(c, 4), dp(c, 10));
         ImageView image = new ImageView(c); image.setImageResource(icon); image.setImageTintList(ColorStateList.valueOf(Appearance.primary(c)));
         image.setPadding(dp(c, 8), dp(c, 8), dp(c, 8), dp(c, 8)); image.setBackground(shape(c, R.color.action_green_soft, 24));
-        row.addView(image, new LinearLayout.LayoutParams(dp(c, section ? 44 : 40), dp(c, section ? 44 : 40)));
+        row.addView(image, new LinearLayout.LayoutParams(dp(c, 46), dp(c, 46)));
         LinearLayout labels = column(c); labels.setPadding(dp(c, 12), 0, dp(c, 4), 0);
-        TextView heading = text(c, title, section ? 18 : 14, false); heading.setMaxLines(2); labels.addView(heading);
+        TextView heading = text(c, title, 16, false); heading.setMaxLines(2); labels.addView(heading);
         TextView detail = text(c, summary, 13, false); detail.setMaxLines(2); detail.setEllipsize(android.text.TextUtils.TruncateAt.END); labels.addView(detail);
         row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
         if (action != null) {

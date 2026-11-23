@@ -116,15 +116,22 @@
     <string name="sound_remove_question">Remover “%1$s” dos sons personalizados? O arquivo original será mantido.</string>
     <string name="sound_remove_error">Não foi possível remover o som.</string>
     <string name="sound_preview_error">Não foi possível reproduzir esse som.</string>
-    <string name="sound_preview_volume">Volume da prévia</string>
+    <string name="sound_preview_volume">Volume das mensagens</string>
     <string name="sound_listen">Ouvir prévia do som selecionado</string>
     <string name="sound_close">Fechar</string>
     <string name="sound_selected">, selecionado</string>
     <string name="color_preview_action">Exemplo de ação</string>
+    <string name="nudge_action">Chamar atenção</string>
+    <string name="nudge_question">Chamar a atenção de %1$s com o som do MSN e uma tremida no Falai?</string>
+    <string name="nudge_sent">Você chamou a atenção.</string>
+    <string name="nudge_received">Chamou sua atenção!</string>
+    <string name="nudge_from">%1$s chamou sua atenção!</string>
+    <string name="nudge_wait">Aguarde um minuto entre chamadas para a mesma pessoa. Limite de 20 chamadas por hora.</string>
+    <string name="nudge_error">Não foi possível confirmar a chamada. Toque em Chamar atenção para tentar novamente.</string>
     <string name="notifications_registration_error">Não foi possível ativar os avisos agora. O Falai tentará novamente quando houver conexão.</string>
     <string name="enable_notifications">Ativar notificações</string>
     <string name="privacy">Privacidade</string>
-    <string name="privacy_body">Suas conversas ficam disponíveis somente para os participantes autenticados. Os participantes podem ver quando você está digitando. Usuários autenticados podem consultar sua presença no Falai, a última atividade e a data do APK da instalação registrada mais recentemente. Esta versão usa a proteção de conexão e armazenamento do serviço; ainda não possui criptografia de ponta a ponta.</string>
+    <string name="privacy_body">Suas conversas ficam disponíveis somente para os participantes autenticados. Os participantes podem ver quando você está digitando. Usuários autenticados podem consultar sua presença no Falai, a última atividade e a versão do APK da instalação registrada mais recentemente. Esta versão usa a proteção de conexão e armazenamento do serviço; ainda não possui criptografia de ponta a ponta.</string>
     <string name="sign_out">Sair da conta</string>
     <string name="sign_out_question">Sair do Falai neste celular?</string>
     <string name="cancel">Cancelar</string>
@@ -157,6 +164,6 @@
     <string name="last_seen_minutes">visto há %1$d min</string>
     <string name="last_seen_hours">visto há %1$d h</string>
     <string name="last_seen_date">visto em %1$s</string>
-    <string name="apk_build_date">APK gerado em %1$s</string>
-    <string name="apk_build_unknown">Data do APK não informada</string>
+    <string name="apk_version">Versão do APK: %1$s (%2$d)</string>
+    <string name="apk_version_unknown">Versão não informada</string>
 </resources>

@@ -28,6 +28,8 @@ final class MessageSounds {
         Custom(String key, String name) { this.key = key; this.name = name; }
     }
     private static android.content.SharedPreferences prefs(Context c) { return c.getSharedPreferences("message_sound", Context.MODE_PRIVATE); }
+    static float volume(Context c) { return Math.max(0, Math.min(100, prefs(c).getInt("volume", 100))) / 100f; }
+    static void saveVolume(Context c, int percent) { prefs(c).edit().putInt("volume", Math.max(0, Math.min(100, percent))).apply(); }
     private static int index(String key) { for (int i = 0; i < KEYS.length; i++) if (KEYS[i].equals(key)) return i; return -1; }
     private static File file(Context c, String key) {
         if (key == null || !key.matches("custom:[a-f0-9-]{36}")) return null;
@@ -100,10 +102,11 @@ final class MessageSounds {
         List<Custom> values = custom(c); values.removeIf(sound -> sound.key.equals(key)); saveList(c, values);
         if (key.equals(prefs(c).getString("selected", DEFAULT))) prefs(c).edit().putString("selected", DEFAULT).apply();
     }
-    static MediaPlayer create(Context c, String key, boolean preview) throws IOException {
+    static MediaPlayer create(Context c, String key) throws IOException {
         MediaPlayer player = new MediaPlayer();
         try {
-            player.setAudioAttributes(new AudioAttributes.Builder().setUsage(preview ? AudioAttributes.USAGE_MEDIA : AudioAttributes.USAGE_ALARM)
+            // Preview and incoming messages use the same stream so the preview reflects the alert level.
+            player.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
             int i = index(key);
             if (i >= 0) {

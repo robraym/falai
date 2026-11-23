@@ -39,6 +39,7 @@ public final class ChatActivity extends FalaiActivity {
     private ChatPresence presence;
     private AvatarView avatar;
     private Button older;
+    private android.widget.ImageButton nudgeButton;
     private RecyclerView messages;
     private LinearLayoutManager layoutManager;
     private MessageAdapter adapter;
@@ -75,7 +76,11 @@ public final class ChatActivity extends FalaiActivity {
         LinearLayout heading = Ui.column(this); heading.addView(title);
         TextView availability = Ui.text(this, "", 12, false); availability.setPadding(Ui.dp(this, 14), 0, 0, 0); heading.addView(availability);
         presence = new ChatPresence(this, chatId, availability);
-        header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1)); root.addView(header);
+        header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+        nudgeButton = Ui.icon(this, R.drawable.ic_nudge, R.string.nudge_action, view -> new AlertDialog.Builder(this)
+            .setTitle(R.string.nudge_action).setMessage(getString(R.string.nudge_question, name)).setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.nudge_action, (dialog, which) -> model.sendNudge()).show());
+        header.addView(nudgeButton); root.addView(header);
         searchSummary = Ui.text(this, "", 12, false); searchSummary.setVisibility(View.GONE); root.addView(searchSummary);
         older = Ui.button(this, R.string.older_messages, v -> loadOlder()); older.setVisibility(View.GONE); root.addView(older);
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
@@ -188,9 +193,9 @@ public final class ChatActivity extends FalaiActivity {
         TextView contactName = Ui.text(this, name, 22, false); contactName.setGravity(Gravity.CENTER); contactName.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 8)); content.addView(contactName);
         AboutTextView phrase = new AboutTextView(this); phrase.setTextSize(16); phrase.setTextColor(getColor(R.color.text_secondary)); phrase.setGravity(Gravity.CENTER);
         phrase.bind(otherUid, ""); content.addView(phrase, new LinearLayout.LayoutParams(-1, -2));
-        BuildDateView buildDate = new BuildDateView(this, otherUid); buildDate.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams buildDateParams = new LinearLayout.LayoutParams(-1, -2); buildDateParams.topMargin = Ui.dp(this, 16);
-        content.addView(buildDate, buildDateParams);
+        AppVersionView version = new AppVersionView(this, otherUid); version.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(-1, -2); versionParams.topMargin = Ui.dp(this, 16);
+        content.addView(version, versionParams);
         new AlertDialog.Builder(this).setView(content).setPositiveButton(android.R.string.ok, null).show();
     }
     private void merge(List<DocumentSnapshot> docs) {
@@ -230,10 +235,11 @@ public final class ChatActivity extends FalaiActivity {
         if (!Backend.uid().equals(doc.getString("senderId"))) return;
         if (doc.getId().equals(model.pendingId)) { toast(model.busy ? R.string.sending : R.string.error_send); return; }
         boolean deleted = Boolean.TRUE.equals(doc.getBoolean("deletedForAll"));
-        String[] choices = deleted ? new String[]{getString(R.string.delete_for_me), getString(R.string.cancel)} : new String[]{getString(R.string.edit_message), getString(R.string.delete_for_all), getString(R.string.delete_for_me), getString(R.string.cancel)};
+        boolean nudge = "nudge".equals(doc.getString("kind"));
+        String[] choices = deleted ? new String[]{getString(R.string.delete_for_me), getString(R.string.cancel)} : nudge ? new String[]{getString(R.string.delete_for_all), getString(R.string.delete_for_me), getString(R.string.cancel)} : new String[]{getString(R.string.edit_message), getString(R.string.delete_for_all), getString(R.string.delete_for_me), getString(R.string.cancel)};
         new AlertDialog.Builder(this).setItems(choices, (menu, selected) -> {
             if (selected == choices.length - 1) return;
-            if (!deleted && selected == 0) {
+            if (!deleted && !nudge && selected == 0) {
                 EditText field = Ui.input(this, R.string.message_hint); field.setSingleLine(false); field.setText(doc.getString("text"));
                 AlertDialog edit = new AlertDialog.Builder(this).setTitle(R.string.edit_message).setView(field).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create();
                 edit.setOnShowListener(ignored -> edit.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
@@ -243,7 +249,7 @@ public final class ChatActivity extends FalaiActivity {
                     });
                 })); edit.show();
             } else {
-                String scope = !deleted && selected == 1 ? "all" : "self";
+                String scope = !deleted && selected == (nudge ? 0 : 1) ? "all" : "self";
                 new AlertDialog.Builder(this).setMessage(R.string.delete_message_question).setNegativeButton(R.string.cancel, null).setPositiveButton("all".equals(scope) ? R.string.delete_for_all : R.string.delete_for_me, (confirm, button) ->
                     Backend.call("deleteMessage", Backend.data("chatId", chatId, "messageId", doc.getId(), "scope", scope)).addOnCompleteListener(this, task -> {
                         if (!task.isSuccessful()) Toast.makeText(this, Backend.error(this, task.getException()), Toast.LENGTH_LONG).show();
@@ -274,6 +280,8 @@ public final class ChatActivity extends FalaiActivity {
         });
     }
     private void updateSendState() {
+        nudgeButton.setEnabled(!model.nudgeBusy);
+        if (model.nudgeNotice != 0) { toast(model.nudgeNotice); model.nudgeNotice = 0; }
         Ui.enable(composerRow, !model.busy && model.pendingId == null); retryRow.setVisibility(model.failed ? View.VISIBLE : View.GONE);
         if (!composer.getText().toString().equals(model.draft)) composer.setText(model.draft);
         if (model.busy) { status.setVisibility(View.VISIBLE); status.setText(R.string.sending); }

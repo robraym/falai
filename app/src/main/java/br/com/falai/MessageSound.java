@@ -11,6 +11,12 @@ final class MessageSound {
     private static MediaPlayer current;
 
     static synchronized void play(Context context, String messageKey) {
+        play(context, messageKey, false);
+    }
+    static synchronized void playNudge(Context context, String messageKey) {
+        play(context, messageKey, true);
+    }
+    private static void play(Context context, String messageKey, boolean nudge) {
         SharedPreferences prefs = context.getSharedPreferences("message_sound", Context.MODE_PRIVATE);
         ArrayList<String> recent = new ArrayList<>(prefs.getStringSet("recent", new HashSet<>()));
         if (recent.contains(messageKey)) return;
@@ -22,12 +28,17 @@ final class MessageSound {
             if (current != null) { current.release(); current = null; }
             String selected = MessageSounds.selected(context);
             MediaPlayer player;
-            try { player = MessageSounds.create(context.getApplicationContext(), selected, false); }
-            catch (java.io.IOException | RuntimeException error) { selected = MessageSounds.DEFAULT; player = MessageSounds.create(context.getApplicationContext(), selected, false); }
+            try { player = nudge ? MediaPlayer.create(context.getApplicationContext(), R.raw.nudge,
+                    new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build(), 0)
+                    : MessageSounds.create(context.getApplicationContext(), selected); }
+            catch (java.io.IOException | RuntimeException error) { selected = MessageSounds.DEFAULT; player = MessageSounds.create(context.getApplicationContext(), selected); }
+            if (player == null) return;
             current = player;
             player.setOnCompletionListener(MessageSound::release);
             player.setOnErrorListener((failed, what, extra) -> { release(failed); return true; });
-            MessageSounds.start(player, selected, 1f);
+            float volume = MessageSounds.volume(context);
+            if (nudge) { player.setVolume(volume, volume); player.start(); }
+            else MessageSounds.start(player, selected, volume);
         } catch (java.io.IOException | RuntimeException ignored) {
             if (current != null) release(current);
         }
