@@ -1,5 +1,16 @@
 # Validação da adaptação gratuita
 
+## Atualização em 23/11/2026
+
+- Seletor de cores: amostras circulares, grade de duas colunas, prévia e aplicação ao fechar, conferidos contra o código do Alertou.
+- Contagem de Contatos em selo; navegação selecionada com destaque arredondado atrás do ícone e título em negrito. Papel de parede em todas as telas, sem contorno externo dos cards ou divisores horizontais.
+- Ajustes mantém Aparência, Sons das mensagens, Privacidade e Sair da conta. A linha de Notificações foi removida.
+- Investigação por ADB, somente leitura, no S23 Ultra (`SM_S918B`): canal `messages_icq_v1` com `mImportance=4`, `mSound=null`, `mVibrationEnabled=false` e `mUserLockedFields=0`.
+- Nova implementação usa `messages_alerts_v2`, vibração e `MessagingStyle`, mantendo áudio separado e respeitando a importância/bloqueio do canal antigo. Nenhuma notificação foi disparada durante a investigação.
+- Compilação Java debug e lint aprovados após a última edição visual (0 erros, 34 avisos). Não houve instalação, execução ou captura em Android; confirmação visual e acendimento da tela do relógio permanecem pendentes.
+
+## Conferências anteriores
+
 Conferência em 22/11/2026.
 
 Ampliação final dos sons: 18 opções (8 variações ICQ e 10 toques curtos), com `compileDebugJavaWithJavac` aprovado após a última edição. Os dez WAV totalizam aproximadamente 165 KiB, duram de 0,14 a 0,60 segundo e foram gerados sem saturação. As verificações auditivas e de interação em aparelho continuam pendentes.

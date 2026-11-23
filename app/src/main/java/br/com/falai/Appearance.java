@@ -14,8 +14,10 @@ final class Appearance {
     static int selected(Context c) { return Math.max(0, Math.min(LABELS.length - 1, prefs(c).getInt("color", 0))); }
     static int percent(Context c) { return Math.max(70, Math.min(150, prefs(c).getInt("text", 100))); }
     static boolean dark(Context c) { return (c.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES; }
-    static int primary(Context c) { return Color.parseColor((dark(c) ? DARK : LIGHT)[selected(c)]); }
-    static int soft(Context c) { return Color.parseColor((dark(c) ? SOFT_DARK : SOFT_LIGHT)[selected(c)]); }
+    static int primary(Context c) { return primary(c, selected(c)); }
+    static int primary(Context c, int index) { return Color.parseColor((dark(c) ? DARK : LIGHT)[index]); }
+    static int soft(Context c) { return soft(c, selected(c)); }
+    static int soft(Context c, int index) { return Color.parseColor((dark(c) ? SOFT_DARK : SOFT_LIGHT)[index]); }
     static int ripple(Context c) { return androidx.core.graphics.ColorUtils.setAlphaComponent(primary(c), 50); }
     static int theme(Context c) { return new int[]{R.style.Theme_Falai, R.style.Theme_Falai_Blue, R.style.Theme_Falai_Purple, R.style.Theme_Falai_Orange, R.style.Theme_Falai_Pink, R.style.Theme_Falai_Teal}[selected(c)]; }
     private Appearance() { }

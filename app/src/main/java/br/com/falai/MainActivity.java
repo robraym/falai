@@ -191,12 +191,19 @@ public final class MainActivity extends FalaiActivity {
         int[] titles = {R.string.conversations, R.string.contacts, R.string.settings}; int[] icons = {R.drawable.ic_chat, R.drawable.ic_contacts, R.drawable.ic_settings};
         for (int i = 0; i < 3; i++) {
             final int index = i; LinearLayout item = Ui.column(this); item.setGravity(Gravity.CENTER); item.setBaselineAligned(false); item.setClickable(true); item.setFocusable(true);
+            item.setSelected(i == selected);
             item.setContentDescription(getString(titles[i])); item.setOnClickListener(v -> showHome(index));
-            View indicator = new View(this); indicator.setBackground(Ui.shape(this, R.color.action_green, 2)); indicator.setVisibility(i == selected ? View.VISIBLE : View.INVISIBLE);
-            item.addView(indicator, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 3)));
             ImageView icon = new ImageView(this); icon.setScaleType(ImageView.ScaleType.FIT_CENTER); icon.setImageResource(icons[i]); icon.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.color(this, i == selected ? R.color.action_green : R.color.text_secondary)));
-            item.addView(icon, new LinearLayout.LayoutParams(Ui.dp(this, 25), Ui.dp(this, 25)));
-            TextView label = Ui.text(this, getString(titles[i]), 12, false); label.setTextColor(Ui.color(this, i == selected ? R.color.action_green : R.color.text_secondary));
+            FrameLayout iconArea = new FrameLayout(this);
+            if (i == selected) {
+                android.graphics.drawable.GradientDrawable highlight = new android.graphics.drawable.GradientDrawable();
+                highlight.setCornerRadius(Ui.dp(this, 12));
+                highlight.setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(Appearance.primary(this), 40));
+                iconArea.setBackground(highlight);
+            }
+            iconArea.addView(icon, new FrameLayout.LayoutParams(Ui.dp(this, 25), Ui.dp(this, 25), Gravity.CENTER));
+            item.addView(iconArea, new LinearLayout.LayoutParams(Ui.dp(this, 56), Ui.dp(this, 38)));
+            TextView label = Ui.text(this, getString(titles[i]), 12, i == selected); label.setTextColor(Ui.color(this, i == selected ? R.color.action_green : R.color.text_secondary));
             label.setGravity(Gravity.CENTER); label.setIncludeFontPadding(false); label.setSingleLine(true); label.setPadding(0, Ui.dp(this, 4), 0, 0);
             item.addView(label, new LinearLayout.LayoutParams(-1, Ui.dp(this, 24)));
             nav.addView(item, new LinearLayout.LayoutParams(0, -1, 1)); if (i == selected) selectedView = item;
@@ -332,7 +339,14 @@ public final class MainActivity extends FalaiActivity {
         });
     }
     private void renderContacts() {
-        TextView count = root.findViewById(R.id.page_subtitle); count.setText(getResources().getQuantityString(R.plurals.contact_count, contacts.contacts.size(), contacts.contacts.size())); count.setVisibility(View.VISIBLE);
+        TextView count = root.findViewById(R.id.page_subtitle); count.setText(getResources().getQuantityString(R.plurals.contact_count, contacts.contacts.size(), contacts.contacts.size()));
+        count.setTextSize(10.5f); count.setTypeface(null, android.graphics.Typeface.BOLD); count.setGravity(Gravity.CENTER); count.setMinHeight(Ui.dp(this, 24));
+        count.setPadding(Ui.dp(this, 7), Ui.dp(this, 3), Ui.dp(this, 7), Ui.dp(this, 3)); count.setTextColor(Appearance.primary(this));
+        android.graphics.drawable.GradientDrawable badge = Ui.shape(this, R.color.presence_badge_surface, 8);
+        badge.setStroke(Ui.dp(this, 1), androidx.core.graphics.ColorUtils.setAlphaComponent(Appearance.primary(this), 80)); count.setBackground(badge);
+        ((LinearLayout) root.findViewById(R.id.page_title_box)).setBaselineAligned(false);
+        LinearLayout.LayoutParams countParams = (LinearLayout.LayoutParams) count.getLayoutParams(); countParams.gravity = Gravity.CENTER_VERTICAL; count.setLayoutParams(countParams);
+        count.setVisibility(View.VISIBLE);
         body.removeAllViews(); RowsAdapter adapter = new RowsAdapter();
         FrameLayout area = new FrameLayout(this); body.addView(area, new LinearLayout.LayoutParams(-1, -1));
         LinearLayout content = Ui.column(this); area.addView(content, new FrameLayout.LayoutParams(-1, -1));
@@ -369,30 +383,16 @@ public final class MainActivity extends FalaiActivity {
             ((LinearLayout) v).getChildAt(2).setRotation(show ? 90 : 0);
         });
         heading.getChildAt(2).setRotation(expanded ? 90 : 0); appearance.addView(heading); appearance.addView(options);
-        options.addView(Ui.divider(this));
         options.addView(Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.app_color), getString(Appearance.LABELS[Appearance.selected(this)]), false, v -> chooseColor()));
-        options.addView(Ui.divider(this));
         options.addView(Ui.optionRow(this, R.drawable.ic_font, getString(R.string.text_size), getString(R.string.text_size_value, Appearance.percent(this)), false, v -> chooseTextSize()));
-        LinearLayout general = Ui.column(this); general.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0); contents.addView(Ui.divider(this)); contents.addView(general);
-        general.addView(Ui.optionRow(this, R.drawable.ic_bell, getString(R.string.notifications), getString(R.string.notifications_summary), true, v -> new AlertDialog.Builder(this)
-                .setTitle(R.string.notifications).setMessage(R.string.notifications_body).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.enable_notifications, (dialog, which) -> {
-                    if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);
-                    else {
-                        Backend.registerDevice();
-                        if (Build.VERSION.SDK_INT >= 26) startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
-                        else startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
-                    }
-                }).show()));
-        general.addView(Ui.divider(this));
+        LinearLayout general = Ui.column(this); general.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0); contents.addView(general);
         LinearLayout soundRow = Ui.optionRow(this, R.drawable.ic_volume_preview, getString(R.string.message_sounds), MessageSounds.label(this, MessageSounds.selected(this)), true, null);
         messageSoundSummary = (TextView) ((LinearLayout) soundRow.getChildAt(1)).getChildAt(1);
         soundRow.setOnClickListener(view -> messageSounds.show(() -> {
             if (messageSoundSummary != null) messageSoundSummary.setText(MessageSounds.label(this, MessageSounds.selected(this)));
         })); soundRow.setFocusable(true); general.addView(soundRow);
-        general.addView(Ui.divider(this));
         general.addView(Ui.optionRow(this, R.drawable.ic_lock, getString(R.string.privacy), getString(R.string.privacy_summary), true,
                 v -> new AlertDialog.Builder(this).setTitle(R.string.privacy).setMessage(R.string.privacy_body).setPositiveButton(android.R.string.ok, null).show()));
-        general.addView(Ui.divider(this));
         general.addView(Ui.optionRow(this, R.drawable.ic_logout, getString(R.string.sign_out), getString(R.string.sign_out_summary), true, v -> new AlertDialog.Builder(this).setMessage(R.string.sign_out_question).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.sign_out, (dialog, which) -> {
             Backend.signOut().addOnCompleteListener(this, task -> {
                 if (!task.isSuccessful() && !Backend.uid().isEmpty()) { toast(Backend.error(this, task.getException())); return; }
@@ -402,10 +402,7 @@ public final class MainActivity extends FalaiActivity {
         }).show()));
     }
     private void chooseColor() {
-        String[] names = new String[Appearance.LABELS.length]; for (int i = 0; i < names.length; i++) names[i] = getString(Appearance.LABELS[i]);
-        new AlertDialog.Builder(this).setTitle(R.string.app_color).setSingleChoiceItems(names, Appearance.selected(this), (dialog, which) -> {
-            Appearance.prefs(this).edit().putInt("color", which).apply(); dialog.dismiss(); recreate();
-        }).setNegativeButton(R.string.cancel, null).show();
+        AppearanceColorPicker.show(this);
     }
     private void chooseTextSize() {
         LinearLayout content = Ui.column(this); content.setPadding(Ui.dp(this, 24), Ui.dp(this, 16), Ui.dp(this, 24), Ui.dp(this, 8));

@@ -34,7 +34,7 @@ final class Ui {
     static LinearLayout row(Context c) { LinearLayout v = new LinearLayout(c); v.setGravity(Gravity.CENTER_VERTICAL); return v; }
     static LinearLayout root(ComponentActivity activity) {
         WindowCompat.setDecorFitsSystemWindows(activity.getWindow(), false);
-        LinearLayout root = column(activity); root.setBackgroundColor(activity.getColor(R.color.background));
+        LinearLayout root = column(activity); root.setBackground(new ChatWallpaper(activity));
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
             applySystemInsets(view, insets); return insets;
         });
@@ -102,7 +102,6 @@ final class Ui {
         t.setPadding(dp(c, 14), dp(c, 12), dp(c, 14), dp(c, 12)); t.setBackground(shape(c, R.color.input_background, 12));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.topMargin = dp(c, 12); t.setLayoutParams(lp); return t;
     }
-    static View divider(Context c) { View v = new View(c); v.setBackgroundColor(c.getColor(R.color.divider)); v.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(c, 1))); return v; }
     static LinearLayout contactRow(Context c, String name, String detail) {
         return contactRow(c, name, detail, "");
     }

@@ -131,8 +131,7 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
     }
     private LinearLayout section(int title) {
         LinearLayout row = Ui.row(activity); row.setPadding(0, dp(8), 0, dp(4)); row.addView(Ui.text(activity, activity.getString(title), 12, true));
-        GradientDrawable line = new GradientDrawable(); line.setShape(GradientDrawable.LINE); line.setStroke(dp(1), activity.getColor(R.color.divider), dp(2), dp(3)); View rule = new View(activity); rule.setBackground(line);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(1), 1); params.leftMargin = dp(10); row.addView(rule, params); return row;
+        return row;
     }
     private TextView action(String text, int description) {
         TextView view = Ui.text(activity, text, 14, true); view.setGravity(Gravity.CENTER); view.setPadding(dp(12), 0, 0, 0); view.setMinWidth(dp(48)); view.setMinHeight(dp(48)); view.setFocusable(true); view.setContentDescription(activity.getString(description)); return view;

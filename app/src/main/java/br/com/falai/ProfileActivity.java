@@ -43,6 +43,7 @@ public final class ProfileActivity extends FalaiActivity {
     private void render() {
         if (isFinishing() || !owner.equals(Backend.uid())) return;
         root = Ui.root(this);
+        NavigationSurface.attachCard(root);
         LinearLayout header = Ui.row(this); header.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 6));
         ImageButton back = Ui.icon(this, R.drawable.ic_back, R.string.back, v -> finish()); header.addView(back);
         TextView title = Ui.text(this, getString(R.string.profile), 25, true); title.setPadding(Ui.dp(this, 16), 0, 0, 0); header.addView(title); root.addView(header);
@@ -73,8 +74,7 @@ public final class ProfileActivity extends FalaiActivity {
         displayName.setContentDescription(getString(R.string.edit_name) + ": " + name); displayName.setOnClickListener(v -> editName()); displayName.setFocusable(true); content.addView(displayName, new LinearLayout.LayoutParams(-2, -2));
         TextView mail = Ui.text(this, email, 15, false); mail.setGravity(Gravity.CENTER); mail.setSingleLine(true); mail.setEllipsize(android.text.TextUtils.TruncateAt.END);
         content.addView(mail, new LinearLayout.LayoutParams(-1, -2));
-        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)); dividerParams.topMargin = Ui.dp(this, 24); dividerParams.bottomMargin = Ui.dp(this, 8);
-        content.addView(Ui.divider(this), dividerParams);
+        Ui.gap(content, 32);
         LinearLayout aboutRow = Ui.row(this); aboutRow.setGravity(Gravity.TOP); aboutRow.setBaselineAligned(false);
         aboutRow.setPadding(Ui.dp(this, 4), Ui.dp(this, 8), 0, Ui.dp(this, 12));
         LinearLayout text = Ui.column(this);

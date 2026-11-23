@@ -120,6 +120,7 @@
     <string name="sound_listen">Ouvir prévia do som selecionado</string>
     <string name="sound_close">Fechar</string>
     <string name="sound_selected">, selecionado</string>
+    <string name="color_preview_action">Exemplo de ação</string>
     <string name="notifications_registration_error">Não foi possível ativar os avisos agora. O Falai tentará novamente quando houver conexão.</string>
     <string name="enable_notifications">Ativar notificações</string>
     <string name="privacy">Privacidade</string>

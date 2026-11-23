@@ -66,6 +66,7 @@ public final class ChatActivity extends FalaiActivity {
             model.pendingText = state.getString("pendingText"); model.failed = model.pendingId != null;
         }
         LinearLayout root = Ui.root(this);
+        NavigationSurface.attachCard(root);
         LinearLayout header = Ui.row(this); header.setPadding(Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12));
         header.addView(Ui.icon(this, R.drawable.ic_back, R.string.back, v -> leave()));
         avatar = new AvatarView(this); avatar.load("", name); avatar.setContentDescription(getString(R.string.profile)); avatar.setOnClickListener(v -> contactInfo()); header.addView(avatar, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40)));
@@ -78,7 +79,6 @@ public final class ChatActivity extends FalaiActivity {
         searchSummary = Ui.text(this, "", 12, false); searchSummary.setVisibility(View.GONE); root.addView(searchSummary);
         older = Ui.button(this, R.string.older_messages, v -> loadOlder()); older.setVisibility(View.GONE); root.addView(older);
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
-        messages.setBackground(new ChatWallpaper(this));
         messages.setLayoutManager(layoutManager); adapter = new MessageAdapter(Backend.uid(), this::messageActions); messages.setAdapter(adapter);
         messages.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override public void onScrolled(@NonNull RecyclerView view, int dx, int dy) { acknowledgeVisible(); }

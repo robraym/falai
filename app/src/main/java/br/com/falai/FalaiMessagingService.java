@@ -11,18 +11,26 @@ import android.os.Build;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.app.Person;
 import androidx.core.content.ContextCompat;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 public final class FalaiMessagingService extends FirebaseMessagingService {
-    static final String CHANNEL_ID = "messages_icq_v1";
+    static final String CHANNEL_ID = "messages_alerts_v2";
+    private static final String LEGACY_CHANNEL_ID = "messages_icq_v1";
+    private static final long[] VIBRATION = {0, 180, 100, 180};
     static void createChannel(Context context) {
         if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, context.getString(R.string.message_channel), NotificationManager.IMPORTANCE_HIGH);
-            // The selected message sound is played once via alarm audio, as in Alertou.
+            NotificationManager manager = context.getSystemService(NotificationManager.class);
+            NotificationChannel previous = manager.getNotificationChannel(LEGACY_CHANNEL_ID);
+            int importance = previous == null ? NotificationManager.IMPORTANCE_HIGH : previous.getImportance();
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, context.getString(R.string.message_channel), importance);
+            // Keep custom audio separate, but publish an actual haptic alert for wearable bridging.
+            // A new channel is necessary: Android does not update an existing channel's behavior.
             channel.setSound(null, null);
-            context.getSystemService(NotificationManager.class).createNotificationChannel(channel);
+            channel.enableVibration(true); channel.setVibrationPattern(VIBRATION);
+            manager.createNotificationChannel(channel);
         }
     }
     @Override public void onNewToken(@NonNull String token) {
@@ -55,8 +63,15 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         String sender = message.getData().get("senderName"), text = message.getData().get("text");
         if (sender == null || sender.trim().isEmpty()) sender = getString(R.string.app_name);
         if (text == null || text.isEmpty()) text = getString(R.string.new_message);
+        String me = Backend.auth().getCurrentUser().getDisplayName();
+        if (me == null || me.trim().isEmpty()) me = getString(R.string.app_name);
+        Person recipientPerson = new Person.Builder().setName(me).setKey(recipient).build();
+        Person senderPerson = new Person.Builder().setName(sender).setKey(chatId).build();
+        NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(recipientPerson)
+                .setGroupConversation(false).addMessage(text, message.getSentTime() > 0 ? message.getSentTime() : System.currentTimeMillis(), senderPerson);
         NotificationCompat.Builder notification = new NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_chat).setContentTitle(sender).setContentText(text)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
+                .setStyle(style).setCategory(NotificationCompat.CATEGORY_MESSAGE).addPerson(senderPerson)
+                .setVibrate(VIBRATION)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true).setVisibility(NotificationCompat.VISIBILITY_PRIVATE);
         String tag = messageId != null && messageId.matches("[a-f0-9-]{36}") ? messageId : chatId;
