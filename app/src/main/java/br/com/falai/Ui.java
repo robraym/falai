@@ -124,11 +124,16 @@ final class Ui {
         LinearLayout row = row(c); row.setPadding(dp(c, 4), dp(c, 10), dp(c, 4), dp(c, 10)); row.setMinimumHeight(dp(c, 72));
         row.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
         AvatarView circle = new AvatarView(c); circle.load(uid, name);
+        if (showAbout) {
+            circle.setContentDescription(c.getString(R.string.profile) + ": " + name);
+            circle.setFocusable(true);
+            circle.setOnClickListener(v -> ContactProfileDialog.show(c, uid, name));
+        }
         row.addView(circle, new LinearLayout.LayoutParams(dp(c, 46), dp(c, 46)));
         LinearLayout labels = column(c); labels.setPadding(dp(c, 12), 0, dp(c, 2), 0);
         LinearLayout headline = row(c);
         TextView title = text(c, name, 16, true); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        boolean hasPresence = !showAbout && !chatId.isEmpty();
+        boolean hasPresence = showAbout || !chatId.isEmpty();
         headline.addView(title, new LinearLayout.LayoutParams(hasPresence ? -2 : 0, -2, 1));
         if (hasPresence) {
             PresenceStatusView availability = new PresenceStatusView(c, uid);

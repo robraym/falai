@@ -2,6 +2,8 @@
 
 Aplicativo Android nativo em **Java**, com texto e emojis, foto de perfil, login Google, descoberta de contatos por e-mail e o visual do Alertou.
 
+Conversas e Contatos mostram o selo de presença online/offline com o tempo desde a última atividade informada. Em Contatos, tocar na foto abre o perfil público; tocar no nome ou no restante da linha abre a conversa.
+
 A lista de conversas destaca mensagens não lidas com um selo na cor escolhida e contagem até 99+. O contador é mantido pelo servidor no resumo da conversa, sem buscar todo o histórico para cada linha; diminui conforme as mensagens são visualizadas e respeita exclusões e limpeza da conversa. Resumos antigos sem contagem mostram um ponto quando a última mensagem recebida ainda não foi lida. As notificações das mensagens lidas são removidas após a confirmação do servidor.
 
 As notificações usam a foto circular do remetente, com a inicial como alternativa. O aviso é publicado imediatamente; se necessário, a miniatura é buscada depois e o aviso existente é atualizado sem repetir o som. A foto utiliza o cache compartilhado por dez minutos; uma atualização pode consumir uma leitura adicional do Firestore.

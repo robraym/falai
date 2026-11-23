@@ -188,15 +188,7 @@ public final class ChatActivity extends FalaiActivity {
     }
     private void contactInfo() {
         if (otherUid.isEmpty()) { toast(R.string.loading); return; }
-        LinearLayout content = Ui.column(this); content.setGravity(Gravity.CENTER_HORIZONTAL); content.setPadding(Ui.dp(this, 24), Ui.dp(this, 24), Ui.dp(this, 24), Ui.dp(this, 16));
-        AvatarView photo = new AvatarView(this); photo.load(otherUid, name); content.addView(photo, new LinearLayout.LayoutParams(Ui.dp(this, 96), Ui.dp(this, 96)));
-        TextView contactName = Ui.text(this, name, 22, false); contactName.setGravity(Gravity.CENTER); contactName.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 8)); content.addView(contactName);
-        AboutTextView phrase = new AboutTextView(this); phrase.setTextSize(16); phrase.setTextColor(getColor(R.color.text_secondary)); phrase.setGravity(Gravity.CENTER);
-        phrase.bind(otherUid, ""); content.addView(phrase, new LinearLayout.LayoutParams(-1, -2));
-        AppVersionView version = new AppVersionView(this, otherUid); version.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(-1, -2); versionParams.topMargin = Ui.dp(this, 16);
-        content.addView(version, versionParams);
-        new AlertDialog.Builder(this).setView(content).setPositiveButton(android.R.string.ok, null).show();
+        ContactProfileDialog.show(this, otherUid, name);
     }
     private void merge(List<DocumentSnapshot> docs) {
         if (clearedBefore != null) for (DocumentSnapshot doc : docs) if (doc.getTimestamp("createdAt") != null && doc.getTimestamp("createdAt").compareTo(clearedBefore) <= 0) historyExhausted = true;
