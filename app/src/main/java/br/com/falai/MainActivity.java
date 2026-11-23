@@ -486,13 +486,6 @@ public final class MainActivity extends FalaiActivity {
         general.addView(Ui.optionRow(this, R.drawable.ic_settings, getString(R.string.app_update),
                 getString(R.string.installed_app_version, BuildConfig.VERSION_NAME),
                 true, view -> showAppUpdate()));
-        general.addView(Ui.optionRow(this, R.drawable.ic_logout, getString(R.string.sign_out), getString(R.string.sign_out_summary), true, v -> new AlertDialog.Builder(this).setMessage(R.string.sign_out_question).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.sign_out, (dialog, which) -> {
-            Backend.signOut().addOnCompleteListener(this, task -> {
-                if (!task.isSuccessful() && !Backend.uid().isEmpty()) { toast(Backend.error(this, task.getException())); return; }
-                GoogleLogin.clear(this); ContactsRepository.clear(); cachedChats.clear(); chatState.locallyCleared.clear(); chatState.owner = ""; contacts = null; profileLoaded = false; profileName = ""; email = ""; getIntent().removeExtra("chatId"); showLogin();
-                getSystemService(android.app.NotificationManager.class).cancelAll();
-            });
-        }).show()));
     }
     private void showAppUpdate() {
         AlertDialog about = new AlertDialog.Builder(this)
