@@ -44,12 +44,16 @@ export async function changeMessage(db, user, data, editing = false) {
     return {ok: true, ...(jobId ? {jobId} : {})};
   });
 }
-export async function deleteConversation(db, user, data) {
+export async function clearConversation(db, user, data) {
+  return deleteConversation(db, user, data, true);
+}
+export async function deleteConversation(db, user, data, keepVisible = false) {
   requireValue(validChat(data.chatId)); await quota(db, user.uid, "clearChats", 1, 100);
   await db.transaction(async tx => {
     const path = `chats/${data.chatId}`, chat = await tx.get(path);
     if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
     tx.set(path, {...chat.data, unreadCounts: {...(chat.data.unreadCounts || {}), [user.uid]: 0},
+      clearedVisible: {...(chat.data.clearedVisible || {}), [user.uid]: keepVisible},
       clearedBefore: {...(chat.data.clearedBefore || {}), [user.uid]: new Date()}}, true);
   });
   return {ok: true};

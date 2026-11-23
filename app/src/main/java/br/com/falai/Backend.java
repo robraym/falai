@@ -88,7 +88,9 @@ final class Backend {
         task.addOnFailureListener(error -> DeviceRegistrationWorker.schedule()); return task;
     }
     static Map<String, Object> deviceData(String token) {
-        return data("deviceId", deviceId(), "token", token, "versionName", BuildConfig.VERSION_NAME, "versionCode", BuildConfig.VERSION_CODE);
+        return data("deviceId", deviceId(), "token", token, "versionName", BuildConfig.VERSION_NAME, "versionCode", BuildConfig.VERSION_CODE,
+                "retentionHours", HistoryRetention.HOURS[HistoryRetention.selected(FalaiApplication.instance)],
+                "retentionRevision", HistoryRetention.revision(FalaiApplication.instance));
     }
     static Task<Void> signOut() {
         DeviceRegistrationWorker.cancel(uid());

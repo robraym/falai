@@ -10,6 +10,8 @@ service cloud.firestore {
     }
     match /users/{uid} { allow get: if signedIn() && request.auth.uid == uid; }
     match /profilePhotos/{uid} { allow get: if signedIn(); }
+    match /profileNames/{uid} { allow get: if signedIn(); }
+    match /profileRetention/{uid} { allow get: if signedIn(); }
     match /profileAbout/{uid} { allow get: if signedIn(); }
     match /profileBuild/{uid} { allow get: if signedIn(); }
     match /presence/{uid}/sessions/{sessionId} {

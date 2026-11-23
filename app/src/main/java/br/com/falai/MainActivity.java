@@ -49,6 +49,7 @@ public final class MainActivity extends FalaiActivity {
     private long contactsAt;
     private android.os.CancellationSignal googleCancellation;
     private FloatingSearchController floatingSearch;
+    private Runnable retentionRefresh;
     private String chatQuery = "", contactQuery = "";
     public static final class ConversationState extends androidx.lifecycle.ViewModel {
         final List<DocumentSnapshot> documents = new ArrayList<>();
@@ -98,7 +99,7 @@ public final class MainActivity extends FalaiActivity {
     @Override protected void onDestroy() {
         if (googleCancellation != null) googleCancellation.cancel(); super.onDestroy();
     }
-    private void detach() { if (chatsListener != null) { chatsListener.remove(); chatsListener = null; } if (floatingSearch != null) { floatingSearch.dispose(); floatingSearch = null; } }
+    private void detach() { retentionRefresh = null; if (chatsListener != null) { chatsListener.remove(); chatsListener = null; } if (floatingSearch != null) { floatingSearch.dispose(); floatingSearch = null; } }
     private void observeContacts() {
         if (!observingContacts && ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
             getContentResolver().registerContentObserver(android.provider.ContactsContract.Data.CONTENT_URI, true, contactsObserver); observingContacts = true;
@@ -236,11 +237,12 @@ public final class MainActivity extends FalaiActivity {
         List<RowsAdapter.Row> allRows = new ArrayList<>();
         Runnable filter = () -> {
             List<RowsAdapter.Row> filtered = new ArrayList<>(); String value = searchable(search.getText().toString());
-            for (RowsAdapter.Row row : allRows) if (searchable(row.name + " " + row.detail).contains(value)) filtered.add(row);
+            for (RowsAdapter.Row row : allRows) if (searchable(ProfileNameView.current(row.avatarUid, row.name) + " " + row.detail).contains(value)) filtered.add(row);
             adapter.submit(filtered); state.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
             state.setText(value.isEmpty() ? R.string.empty_chats_body : R.string.no_search_results);
         };
         java.util.function.Consumer<List<DocumentSnapshot>> display = docs -> {
+            long retentionCutoff = HistoryRetention.cutoff(this);
             allRows.clear();
             for (DocumentSnapshot chat : docs) {
                 @SuppressWarnings("unchecked") List<String> members = (List<String>) chat.get("members");
@@ -252,7 +254,9 @@ public final class MainActivity extends FalaiActivity {
                     chatState.locallyCleared.remove(chat.getId());
                 }
                 com.google.firebase.Timestamp cutoff = (com.google.firebase.Timestamp) chat.get("clearedBefore." + Backend.uid());
-                if (cutoff != null && chat.getTimestamp("updatedAt") != null && chat.getTimestamp("updatedAt").compareTo(cutoff) <= 0) continue;
+                boolean cleared = cutoff != null && chat.getTimestamp("updatedAt") != null && chat.getTimestamp("updatedAt").compareTo(cutoff) <= 0;
+                if (cleared && !Boolean.TRUE.equals(chat.getBoolean("clearedVisible." + Backend.uid()))) continue;
+                if (chat.getTimestamp("updatedAt") != null && chat.getTimestamp("updatedAt").toDate().getTime() <= retentionCutoff) cleared = true;
                 String other = members.get(0).equals(Backend.uid()) ? members.get(1) : members.get(0), name = contactName(other, names.get(other));
                 String preview = chat.getString("lastText"); com.google.firebase.Timestamp updated = chat.getTimestamp("updatedAt");
                 @SuppressWarnings("unchecked") List<String> previewHidden = (List<String>) chat.get("previewHiddenFor");
@@ -266,11 +270,13 @@ public final class MainActivity extends FalaiActivity {
                     : other.equals(chat.getString("lastSenderId")) && chat.getTimestamp("lastReadAt") == null
                         && !Boolean.TRUE.equals(chat.getBoolean("lastDeleted"))
                         && (previewHidden == null || !previewHidden.contains(Backend.uid())) ? -1 : 0;
+                if (cleared) { preview = getString(R.string.chat_cleared); dateTime = ""; checks = 0; unread = 0; }
                 allRows.add(new RowsAdapter.Row(chat.getId(), name, preview == null || preview.isEmpty() ? getString(R.string.new_conversation) : preview, dateTime, other, () -> ChatActivity.open(this, chat.getId(), name), () -> chatActions(chat.getId()), checks, false, unread));
             }
             filter.run();
         };
         search.addTextChangedListener(new TextWatcher() { public void beforeTextChanged(CharSequence s, int start, int count, int after) { } public void onTextChanged(CharSequence s, int start, int before, int count) { chatQuery = s.toString(); filter.run(); } public void afterTextChanged(Editable e) { } });
+        retentionRefresh = () -> display.accept(cachedChats);
         if (!cachedChats.isEmpty()) display.accept(cachedChats);
         chatsListener = Backend.db().collection("chats").whereArrayContains("members", Backend.uid()).orderBy("updatedAt", Query.Direction.DESCENDING).limit(100)
                 .addSnapshotListener(this, (snap, error) -> {
@@ -292,18 +298,21 @@ public final class MainActivity extends FalaiActivity {
         com.google.firebase.Timestamp previous = null;
         for (DocumentSnapshot doc : cachedChats) if (doc.getId().equals(id)) previous = doc.getTimestamp("updatedAt");
         final com.google.firebase.Timestamp lastMessage = previous;
-        new AlertDialog.Builder(this).setItems(new String[]{getString(R.string.delete_chat), getString(R.string.cancel)}, (dialog, choice) -> {
-            if (choice != 0) return;
-            new AlertDialog.Builder(this).setMessage(R.string.delete_chat_question).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.delete_chat, (confirmation, button) ->
-                Backend.call("deleteConversation", Backend.data("chatId", id)).addOnCompleteListener(this, task -> {
-                    if (task.isSuccessful()) { if (lastMessage != null) chatState.locallyCleared.put(id, lastMessage); cachedChats.removeIf(doc -> doc.getId().equals(id)); showHome(0); }
+        new AlertDialog.Builder(this).setItems(new String[]{getString(R.string.delete_chat), getString(R.string.clear_chat), getString(R.string.cancel)}, (dialog, choice) -> {
+            if (choice == 2) return;
+            boolean clear = choice == 1;
+            new AlertDialog.Builder(this).setMessage(clear ? R.string.clear_chat_question : R.string.delete_chat_question).setNegativeButton(R.string.cancel, null).setPositiveButton(clear ? R.string.clear_chat : R.string.delete_chat, (confirmation, button) ->
+                Backend.call(clear ? "clearConversation" : "deleteConversation", Backend.data("chatId", id)).addOnCompleteListener(this, task -> {
+                    if (task.isSuccessful()) {
+                        if (!clear) { if (lastMessage != null) chatState.locallyCleared.put(id, lastMessage); cachedChats.removeIf(doc -> doc.getId().equals(id)); }
+                        showHome(0);
+                    }
                     else toast(Backend.error(this, task.getException()));
                 })).show();
         }).show();
     }
     private String contactName(String uid, String fallback) {
-        if (contacts != null) for (ContactsRepository.Contact contact : contacts.contacts) if (contact.uid.equals(uid)) return contact.name;
-        return fallback == null ? getString(R.string.app_name) : fallback;
+        return ProfileNameView.current(uid, fallback == null ? getString(R.string.app_name) : fallback);
     }
     private String lastMessageDateTime(java.util.Date value) {
         java.util.Calendar day = java.util.Calendar.getInstance(), today = java.util.Calendar.getInstance(); day.setTime(value);
@@ -362,7 +371,7 @@ public final class MainActivity extends FalaiActivity {
         EditText search = attachSearch(area, people, "contacts"); search.setText(contactQuery);
         Runnable filter = () -> {
             String query = searchable(search.getText().toString()); List<RowsAdapter.Row> rows = new ArrayList<>();
-            for (ContactsRepository.Contact c : contacts.contacts) if (searchable(c.name + " " + c.email).contains(query)) rows.add(new RowsAdapter.Row(c.uid, c.name, c.email, () -> openContact(c)));
+            for (ContactsRepository.Contact c : contacts.contacts) if (searchable(ProfileNameView.current(c.uid, c.name) + " " + c.email).contains(query)) rows.add(new RowsAdapter.Row(c.uid, c.name, c.email, () -> openContact(c)));
             adapter.submit(rows); empty.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE); empty.setText(query.isEmpty() ? R.string.no_contacts_body : R.string.no_search_results);
         };
         search.addTextChangedListener(new TextWatcher() { public void beforeTextChanged(CharSequence s, int start, int count, int after) { } public void onTextChanged(CharSequence s, int start, int before, int count) { contactQuery = s.toString(); filter.run(); } public void afterTextChanged(Editable e) { } }); filter.run();
@@ -381,6 +390,7 @@ public final class MainActivity extends FalaiActivity {
     }
     private void showSettings() {
         LinearLayout contents = scrollBody();
+        contents.addView(Ui.optionRow(this, R.drawable.ic_history_duration, getString(R.string.history_duration), getString(HistoryRetention.LABELS[HistoryRetention.selected(this)]), false, v -> chooseHistoryDuration()));
         contents.addView(Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.app_color), getString(Appearance.LABELS[Appearance.selected(this)]), false, v -> chooseColor()));
         contents.addView(Ui.optionRow(this, R.drawable.ic_font, getString(R.string.text_size), getString(R.string.text_size_value, Appearance.percent(this)), false, v -> chooseTextSize()));
         LinearLayout general = Ui.column(this); contents.addView(general);
@@ -396,6 +406,30 @@ public final class MainActivity extends FalaiActivity {
                 getSystemService(android.app.NotificationManager.class).cancelAll();
             });
         }).show()));
+    }
+    @Override protected void onHistoryRetentionChanged() {
+        if (home && profileLoaded && tab == 0 && retentionRefresh != null) retentionRefresh.run();
+    }
+    private void chooseHistoryDuration() {
+        String[] labels = new String[HistoryRetention.LABELS.length];
+        for (int i = 0; i < labels.length; i++) labels[i] = getString(HistoryRetention.LABELS[i]);
+        int[] chosen = {HistoryRetention.selected(this)};
+        TextView explanation = Ui.text(this, getString(R.string.retention_info), 13, false);
+        explanation.setPadding(Ui.dp(this, 24), Ui.dp(this, 12), Ui.dp(this, 24), Ui.dp(this, 12));
+        new AlertDialog.Builder(this).setTitle(R.string.history_duration).setView(explanation)
+            .setSingleChoiceItems(labels, chosen[0], (dialog, index) -> chosen[0] = index)
+            .setPositiveButton(R.string.retention_apply, (dialog, button) -> {
+                int index = chosen[0]; if (index == HistoryRetention.selected(this)) return;
+                Runnable apply = () -> {
+                    HistoryRetention.select(this, index); showHome(2);
+                    Backend.registerDevice().addOnFailureListener(this, error -> {
+                        DeviceRegistrationWorker.schedule(); toast(getString(R.string.retention_notice_pending));
+                    });
+                };
+                if (index == 0) apply.run();
+                else new AlertDialog.Builder(this).setMessage(getString(R.string.retention_confirm, labels[index]))
+                    .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.retention_apply, (confirmation, ignored) -> apply.run()).show();
+            }).setNegativeButton(R.string.cancel, null).show();
     }
     private void chooseColor() {
         AppearanceColorPicker.show(this);

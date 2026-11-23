@@ -53,6 +53,10 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         if (messageId != null && getSharedPreferences("deleted_notices", MODE_PRIVATE).getBoolean(messageId, false)) return;
         if (messageId != null && messageId.matches("[a-f0-9-]{36}"))
             ReceiptWorker.schedule(chatId, java.util.Collections.singletonList(messageId), false);
+        long createdAt = message.getSentTime();
+        try { createdAt = Long.parseLong(message.getData().get("createdAt")); } catch (RuntimeException ignored) { }
+        long historyCutoff = HistoryRetention.cutoff(this);
+        if (createdAt > 0 && createdAt <= historyCutoff) return;
         boolean nudge = "nudge".equals(message.getData().get("event"));
         if (chatId.equals(ChatActivity.visibleChat) && !nudge) return;
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
@@ -76,11 +80,13 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         Person recipientPerson = new Person.Builder().setName(me).setKey(recipient).build();
         android.graphics.Bitmap avatar = NotificationAvatar.bitmap(this, senderId, sender);
         Person senderPerson = new Person.Builder().setName(sender).setKey(NotificationAvatar.valid(senderId) ? senderId : chatId).setIcon(IconCompat.createWithBitmap(avatar)).build();
-        long timestamp = message.getSentTime() > 0 ? message.getSentTime() : System.currentTimeMillis();
+        long timestamp = createdAt > 0 ? createdAt : System.currentTimeMillis();
+        android.os.Bundle historyMetadata = new android.os.Bundle(); historyMetadata.putLong("falai_createdAt", timestamp);
         NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(recipientPerson)
                 .setGroupConversation(false).addMessage(text, timestamp, senderPerson);
         NotificationCompat.Builder notification = new NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_chat).setContentTitle(sender).setContentText(text)
                 .setStyle(style).setLargeIcon(avatar).setWhen(timestamp).setCategory(NotificationCompat.CATEGORY_MESSAGE).addPerson(senderPerson)
+                .addExtras(historyMetadata)
                 .setVibrate(VIBRATION)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true).setVisibility(NotificationCompat.VISIBILITY_PRIVATE);

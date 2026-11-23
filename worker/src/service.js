@@ -43,6 +43,7 @@ export async function registerProfile(db, user, data) {
       oldPath = `directory/${await hash(previous.data.email)}`; oldDirectory = await tx.get(oldPath);
     }
     tx.set(`users/${user.uid}`, {name, email: user.email, updatedAt: new Date()});
+    tx.set(`profileNames/${user.uid}`, {name});
     tx.set(directoryPath, {uid: user.uid, name});
     if (oldDirectory?.data.uid === user.uid) tx.delete(oldPath);
   });
@@ -128,6 +129,8 @@ export async function sendNudge(db, user, data) {
 export async function registerDevice(db, user, data) {
   requireValue(typeof data.deviceId === "string" && /^[a-f0-9-]{36}$/.test(data.deviceId));
   requireValue(typeof data.token === "string" && data.token.length >= 20 && data.token.length <= 4096 && !/[\u0000-\u0020\u007f]/.test(data.token));
+  if (data.retentionHours !== undefined) requireValue([0, 24, 168, 2160].includes(data.retentionHours)
+    && Number.isSafeInteger(data.retentionRevision) && data.retentionRevision >= 0);
   if (data.buildTime !== undefined) requireValue(Number.isSafeInteger(data.buildTime) && data.buildTime >= 1577836800000 && data.buildTime <= Date.now() + 86400000);
   if (data.versionName !== undefined || data.versionCode !== undefined) requireValue(typeof data.versionName === "string" && /^[A-Za-z0-9._+-]{1,40}$/.test(data.versionName)
     && Number.isSafeInteger(data.versionCode) && data.versionCode >= 1 && data.versionCode <= 2147483647);
@@ -150,7 +153,31 @@ export async function registerDevice(db, user, data) {
     tx.set(registryPath, {paths});
     for (const stale of snapshots) if (stale && !paths.includes(stale.path)) tx.delete(stale.path);
   });
+  if (data.retentionHours !== undefined) await publishRetentionNotice(db, user.uid, data.deviceId, data.retentionHours, data.retentionRevision);
   return {ok: true};
+}
+async function publishRetentionNotice(db, uid, deviceId, hours, revision) {
+  const key = await hash(deviceId);
+  await db.transaction(async tx => {
+    const path = `retentionDevices/${uid}`, previous = await tx.get(path);
+    const devices = {...(previous?.data.devices || {})};
+    const current = devices[key];
+    if (!current && hours === 0) return;
+    if (revision === undefined) revision = Math.max(Date.now(), (current?.revision || 0) + 1);
+    if (current && (revision < current.revision || (revision === current.revision && hours === current.hours))) return;
+    if (current && revision === current.revision && hours !== current.hours) throw new ApiError(409, "already-exists");
+    const durations = values => [...new Set(Object.values(values).map(value => value.hours).filter(value => value > 0))].sort((a, b) => a - b);
+    const before = durations(devices);
+    if (!current && Object.keys(devices).length >= 20) {
+      const inactive = Object.entries(devices).filter(([, value]) => value.hours === 0).sort((a, b) => a[1].revision - b[1].revision)[0];
+      if (!inactive) throw new ApiError(429, "resource-exhausted");
+      delete devices[inactive[0]];
+    }
+    devices[key] = {hours, revision};
+    tx.set(path, {devices});
+    const after = durations(devices);
+    if (JSON.stringify(before) !== JSON.stringify(after)) tx.set(`profileRetention/${uid}`, {durations: after, updatedAt: new Date()});
+  });
 }
 export async function acknowledgeMessages(db, user, data) {
   requireValue(typeof data.chatId === "string" && /^[a-f0-9]{64}$/.test(data.chatId));

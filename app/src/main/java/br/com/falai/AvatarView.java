@@ -26,9 +26,9 @@ final class AvatarView extends View {
     static boolean photoFresh(String uid) { Entry entry = cache.get(uid); return entry != null && SystemClock.elapsedRealtime() - entry.time < 600000; }
     static void cachePhoto(String uid, Bitmap photo) { cache.put(uid, new Entry(photo)); }
     void load(String uid, String name) {
-        if (uid != null && uid.equals(owner) && listener != null) return;
-        owner = uid == null ? "" : uid;
         initial = name == null || name.isEmpty() ? "?" : name.substring(0, name.offsetByCodePoints(0, 1)).toUpperCase(java.util.Locale.ROOT);
+        if (uid != null && uid.equals(owner) && listener != null) { invalidate(); return; }
+        owner = uid == null ? "" : uid;
         if (listener != null) { listener.remove(); listener = null; }
         setPhoto(null);
         if (owner.isEmpty() || !Backend.ready() || Backend.uid().isEmpty()) return;

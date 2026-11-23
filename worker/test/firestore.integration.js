@@ -6,7 +6,7 @@ import {doc, setDoc, getDoc, getDocs, collection, query, where, orderBy, Timesta
 import {Firestore} from "../src/firestore.js";
 import {chatId} from "../src/validation.js";
 import {registerProfile, discoverContacts, openChat, persistMessage, quota, registerDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge} from "../src/service.js";
-import {changeMessage, deleteConversation} from "../src/mutations.js";
+import {changeMessage, deleteConversation, clearConversation} from "../src/mutations.js";
 import {dispatchJob, drainOutbox} from "../src/push.js";
 
 let env, db, id;
@@ -31,6 +31,19 @@ test("Google participants can read chats and profiles, others cannot", async () 
   await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "chats", id)));
   await assertFails(getDoc(doc(env.authenticatedContext("alice", {email_verified: true, firebase: {sign_in_provider: "phone"}}).firestore(), "chats", id)));
 });
+test("profile name updates are public without email and cannot be forged by clients", async () => {
+  const person = {uid: "rename_user", email: "rename@example.com"};
+  await registerProfile(db, person, {name: "Nome anterior"});
+  await registerProfile(db, person, {name: "Novo nome"});
+  const publicName = await assertSucceeds(getDoc(doc(auth("bob"), "profileNames", person.uid)));
+  assert.deepEqual(publicName.data(), {name: "Novo nome"});
+  await assertFails(getDoc(doc(auth("bob"), "users", person.uid)));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "profileNames", person.uid)));
+  await assertFails(getDocs(collection(auth("bob"), "profileNames")));
+  await assertFails(setDoc(doc(auth(person.uid), "profileNames", person.uid), {name: "Forjado"}));
+  assert.equal((await discoverContacts(db, {uid: "bob"}, {emails: [person.email]})).contacts[0].name, "Novo nome");
+});
+
 test("email discovery finds only registered contacts and does not expose the directory", async () => {
   assert.deepEqual(await discoverContacts(db, user, {emails: ["BOB@example.com", "unknown@example.com", "alice@example.com"]}),
     {contacts: [{uid: "bob", name: "Beto", email: "bob@example.com"}]});
@@ -91,6 +104,30 @@ test("build date is public without tokens, validates input and supports older in
   await registerDevice(db, {uid: "builduser"}, {deviceId, token});
   assert.equal((await db.get("profileBuild/builduser")).data.versionName, null);
 });
+test("retention disclosures share durations only, preserve multiple devices and ignore stale registrations", async () => {
+  const owner = {uid: "retentionowner"}, first = crypto.randomUUID(), second = crypto.randomUUID();
+  const input = {deviceId: first, token: "retention-test-token-for-notices", retentionHours: 0, retentionRevision: 0};
+  await registerDevice(db, owner, input);
+  assert.equal(await db.get(`profileRetention/${owner.uid}`), null);
+  await registerDevice(db, owner, {...input, retentionHours: 24, retentionRevision: 1});
+  let shared = (await assertSucceeds(getDoc(doc(auth("bob"), "profileRetention", owner.uid)))).data();
+  assert.deepEqual(shared.durations, [24]); assert.deepEqual(Object.keys(shared).sort(), ["durations", "updatedAt"]);
+  await registerDevice(db, owner, {...input, deviceId: second, retentionHours: 168, retentionRevision: 1});
+  await registerDevice(db, owner, {...input, retentionHours: 0, retentionRevision: 2});
+  assert.deepEqual((await db.get(`profileRetention/${owner.uid}`)).data.durations, [168]);
+  await registerDevice(db, owner, {...input, retentionHours: 24, retentionRevision: 1});
+  assert.deepEqual((await db.get(`profileRetention/${owner.uid}`)).data.durations, [168]);
+  await registerDevice(db, owner, {...input, deviceId: second, retentionHours: 0, retentionRevision: 2});
+  assert.deepEqual((await db.get(`profileRetention/${owner.uid}`)).data.durations, []);
+  await registerDevice(db, owner, {deviceId: first, token: input.token}); // Old clients cannot reset the disclosure.
+  assert.deepEqual((await db.get(`profileRetention/${owner.uid}`)).data.durations, []);
+  await assert.rejects(registerDevice(db, owner, {...input, retentionHours: 10}), {code: "invalid-argument"});
+  await assertFails(getDoc(doc(auth("bob"), "retentionDevices", owner.uid)));
+  await assertFails(getDocs(collection(auth("bob"), "profileRetention")));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "profileRetention", owner.uid)));
+  await assertFails(setDoc(doc(auth(owner.uid), "profileRetention", owner.uid), {durations: [24]}));
+});
+
 test("quota is enforced in a transaction", async () => {
   await quota(db, "alice", "test", 1, 2); await quota(db, "alice", "test", 1, 2);
   await assert.rejects(quota(db, "alice", "test", 1, 2), {status: 429});
@@ -222,6 +259,24 @@ test("edit and delete are authorized, preserve receipt dates and update the last
   assert.equal((await db.get("notificationOutbox/" + deleted.jobId)).data.event, "deleted");
   await assert.rejects(changeMessage(db, user, {...data, text: "restore"}, true), {code: "already-exists"});
   await assertFails(setDoc(doc(auth("alice"), "chats", id, "messages", messageId), {text: "bypass"}, {merge: true}));
+});
+
+test("clearing a conversation keeps it visible for that user and preserves the other history", async () => {
+  const alice = {uid: "clearalice", email: "clearalice@example.com"}, bob = {uid: "clearbob", email: "clearbob@example.com"};
+  await registerProfile(db, alice, {name: "Alice"}); await registerProfile(db, bob, {name: "Bob"});
+  const id = (await openChat(db, alice, {uid: bob.uid})).chatId;
+  const messageId = crypto.randomUUID(); await persistMessage(db, alice.uid, {chatId: id, messageId, text: "Preservar histórico"});
+  await assert.rejects(clearConversation(db, {uid: "mallory"}, {chatId: id}), {code: "permission-denied"});
+  const before = (await db.get(`chats/${id}`)).data;
+  const message = await db.get(`chats/${id}/messages/${before.lastMessageId}`);
+  await clearConversation(db, bob, {chatId: id});
+  const chat = (await db.get(`chats/${id}`)).data;
+  assert.equal(chat.clearedVisible[bob.uid], true); assert.equal(chat.unreadCounts[bob.uid], 0);
+  assert.deepEqual(chat.clearedBefore[alice.uid], before.clearedBefore?.[alice.uid]);
+  assert.deepEqual((await db.get(message.path)).data, message.data);
+  await deleteConversation(db, bob, {chatId: id});
+  assert.equal((await db.get(`chats/${id}`)).data.clearedVisible[bob.uid], false);
+  await db.commit([db.remove(`notificationOutbox/${id}_${messageId}`)]);
 });
 
 test("deleting a conversation affects only that user and new messages can restore it", async () => {

@@ -83,7 +83,8 @@ final class ContactsRepository {
                     List<Map<String, Object>> found = (List<Map<String, Object>>) response.get("contacts");
                     for (Map<String, Object> contact : found) {
                         String email = (String) contact.get("email");
-                        result.contacts.add(new Contact((String) contact.get("uid"), result.names.getOrDefault(email, (String) contact.get("name")), email));
+                        String profileName = (String) contact.get("name");
+                        result.contacts.add(new Contact((String) contact.get("uid"), profileName == null || profileName.trim().isEmpty() ? result.names.get(email) : profileName, email));
                     }
                     return discover(result, emails, offset + 100, owner);
                 });

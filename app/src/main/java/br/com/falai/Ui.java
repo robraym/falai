@@ -132,7 +132,8 @@ final class Ui {
         row.addView(circle, new LinearLayout.LayoutParams(dp(c, 46), dp(c, 46)));
         LinearLayout labels = column(c); labels.setPadding(dp(c, 12), 0, dp(c, 2), 0);
         LinearLayout headline = row(c);
-        TextView title = text(c, name, 16, true); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        ProfileNameView title = new ProfileNameView(c); title.setTextSize(16); title.setTypeface(null, Typeface.BOLD); title.setTextColor(c.getColor(R.color.text_primary));
+        title.bind(uid, name, resolved -> circle.load(uid, resolved)); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         boolean hasPresence = showAbout || !chatId.isEmpty();
         headline.addView(title, new LinearLayout.LayoutParams(hasPresence ? -2 : 0, -2, 1));
         if (hasPresence) {

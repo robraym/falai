@@ -9,6 +9,16 @@ abstract class FalaiActivity extends AppCompatActivity {
     private int color, size;
     private static java.lang.ref.WeakReference<FalaiActivity> foreground = new java.lang.ref.WeakReference<>(null);
     private android.animation.ObjectAnimator nudgeAnimation;
+    private final android.os.Handler historyHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable historyTick = new Runnable() {
+        @Override public void run() {
+            if (Backend.ready() && !Backend.uid().isEmpty() && HistoryRetention.selected(FalaiActivity.this) != 0) {
+                HistoryRetention.removeExpiredNotifications(FalaiActivity.this); onHistoryRetentionChanged();
+            }
+            historyHandler.postDelayed(this, 60000);
+        }
+    };
+    protected void onHistoryRetentionChanged() { }
     @Override protected void attachBaseContext(Context base) {
         int percent = Appearance.percent(base);
         if (percent == 100) { super.attachBaseContext(base); return; }
@@ -21,8 +31,11 @@ abstract class FalaiActivity extends AppCompatActivity {
     @Override protected void onResume() {
         super.onResume(); if (color != Appearance.selected(this) || size != Appearance.percent(this)) recreate();
         foreground = new java.lang.ref.WeakReference<>(this);
+        historyHandler.removeCallbacks(historyTick); historyHandler.postDelayed(historyTick, 60000);
+        if (Backend.ready() && !Backend.uid().isEmpty()) { HistoryRetention.removeExpiredNotifications(this); onHistoryRetentionChanged(); }
     }
     @Override protected void onPause() {
+        historyHandler.removeCallbacks(historyTick);
         if (foreground.get() == this) foreground.clear();
         if (nudgeAnimation != null) { nudgeAnimation.cancel(); findViewById(android.R.id.content).setTranslationX(0); nudgeAnimation = null; }
         super.onPause();

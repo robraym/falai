@@ -13,7 +13,7 @@ final class ContactProfileDialog {
         content.setPadding(Ui.dp(context, 24), Ui.dp(context, 24), Ui.dp(context, 24), Ui.dp(context, 16));
         AvatarView photo = new AvatarView(context); photo.load(uid, name);
         content.addView(photo, new LinearLayout.LayoutParams(Ui.dp(context, 96), Ui.dp(context, 96)));
-        TextView title = Ui.text(context, name, 22, false); title.setGravity(Gravity.CENTER);
+        ProfileNameView title = new ProfileNameView(context); title.setTextSize(22); title.setTextColor(context.getColor(R.color.text_primary)); title.bind(uid, name, resolved -> photo.load(uid, resolved)); title.setGravity(Gravity.CENTER);
         title.setPadding(0, Ui.dp(context, 16), 0, Ui.dp(context, 8)); content.addView(title);
         AboutTextView phrase = new AboutTextView(context); phrase.setTextSize(16);
         phrase.setTextColor(context.getColor(R.color.text_secondary)); phrase.setGravity(Gravity.CENTER);

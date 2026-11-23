@@ -2,6 +2,20 @@
 
 ## Atualização em 23/11/2026
 
+- Aviso de duração no cabeçalho do chat para os dois participantes: identifica quem configurou e quais prazos estão ativos; mostra desativação e explica o alcance local. Dois observadores de documentos são ligados somente enquanto a tela está anexada/visível; não há push real nem mensagem inserida no histórico por essa divulgação.
+- Registro de dispositivo divulga o prazo salvo e a revisão local. O servidor mantém até 20 registros privados de configuração e publica somente a união de durações e a data da alteração. Reenvios antigos não sobrescrevem configurações novas, e aparelhos antigos sem esses campos não apagam a divulgação. Alterações da preferência tentam sincronização imediatamente, com retomada pelo `DeviceRegistrationWorker` em falha.
+- Compilação Java e lint aprovados (zero erros, 40 avisos), 12 testes unitários e 21 de integração aprovados. Integração cobre múltiplos aparelhos, desativação, revisão antiga, ausência de dados privados, acesso autenticado e bloqueios de listagem/escrita. As oito verificações locais da política de duração também passaram após incluir a revisão. Sem instalação, abertura ou teste visual em aparelho.
+- Regras de divulgação publicadas e Worker atualizado para `19e7fb27-9afe-4a18-bad3-0ed220b57a44`; `/health` confirmou banco e validação FCM.
+
+- Duração local das conversas: Desativado/24 horas/7 dias/90 dias, por conta e aparelho, com confirmação antes de aplicar ao histórico atual. Limite monotônico salvo; ampliação/desativação preservam o corte anterior. Limpeza da visualização, sem apagar documentos no Firestore ou marcar mensagens como lidas. A aplicação usa o horário do aparelho; desinstalar/limpar os dados pode remover a preferência.
+- Atualização das telas ao retornar e a cada minuto, sem recriar a navegação. Query do histórico limitada pelo corte local e avisos expirados cancelados. Push inclui data original para impedir que uma entrega atrasada gere aviso após o prazo local.
+- Compilação Java e lint aprovados novamente (zero erros, 40 avisos), 12 testes unitários do Worker aprovados após adicionar a data original ao push. Verificação Java local da classe real `HistoryRetention` com substitutos mínimos das APIs Android passou em oito cenários: padrão desativado, três durações, ampliação/desativação sem restauração, isolamento e preservação por conta. Essa verificação não substitui teste de interface em aparelho. Nenhum APK instalado/aberto.
+- Worker final publicado como `dc9caa18-0927-488c-a57d-9c6cc72cb1ec`; `/health` confirmou banco e FCM. Regras de nomes públicos já publicadas na etapa anterior. Sem envio ao Git nesta etapa.
+
+- Nome público sincronizado por `profileNames/{uid}`, com leitura autenticada de documento individual e sem listagem/escrita direta. Atualização do perfil publica o nome na mesma transação; clientes observam somente linhas/cabeçalhos visíveis. Nome do perfil priorizado sobre a agenda e nome atual utilizado no push. Integração valida alteração, descoberta, ausência de e-mail e bloqueios de acesso/escrita.
+- Limpar conversa conserva a linha e oculta o histórico anterior apenas para o usuário; Excluir conversa conserva o comportamento anterior. Ambas as opções exigem confirmação. Teste cobre autorização, contador de não lidas, preservação do histórico e exclusão após limpeza.
+- Compilação Java e lint aprovados (zero erros, 40 avisos); 12 testes unitários e 20 de integração aprovados. Regras do Firestore publicadas e Worker `2d1a077f-7ee1-40d8-932e-ac990815e025` implantado, com banco/FCM saudáveis no `/health`. Nenhuma instalação, abertura em aparelho ou notificação real de teste.
+
 - Intervalo do Chamar atenção reduzido para dez segundos por remetente/conversa; limite de 20 chamadas por hora preservado. Texto do aviso atualizado. Os 18 testes de integração passaram, incluindo bloqueio aos cinco segundos e liberação após onze segundos. Worker publicado como `2c386b9b-56ed-4483-abb0-ce3c1572a0f3`, com `/health` saudável. Nenhum teste em aparelho nem envio real de notificação.
 
 ### Foto na notificação, não lidas e mais cores

@@ -4,11 +4,19 @@ Aplicativo Android nativo em **Java**, com texto e emojis, foto de perfil, login
 
 Conversas e Contatos mostram o selo de presença online/offline com o tempo desde a última atividade informada. Em Contatos, tocar na foto abre o perfil público; tocar no nome ou no restante da linha abre a conversa.
 
+O nome do perfil tem prioridade sobre o nome da agenda e é acompanhado em tempo real nas linhas visíveis, no cabeçalho do chat e no perfil público. Alterar o nome publica apenas esse campo em `profileNames/{uid}`, sem expor e-mail ou outros dados privados. Perfis antigos sem esse documento usam o nome disponível até o próximo salvamento do perfil; o aparelho que exibe a conversa precisa da versão atualizada. As notificações consultam o nome atual no servidor.
+
+Segurar uma conversa oferece Excluir conversa, Limpar conversa e Cancelar. Limpar esconde o histórico anterior apenas para o usuário e mantém a conversa na lista; excluir também a retira da lista até uma nova mensagem. O histórico do outro participante é preservado.
+
+Em Ajustes, Duração das conversas oferece Desativado (padrão), 24 horas, 7 dias ou 90 dias. O prazo usa a idade de cada mensagem e vale apenas para a conta neste aparelho, inclusive para o histórico atual após confirmação. É uma limpeza da visualização local: não apaga os documentos no Firestore nem o histórico da outra pessoa. O limite já aplicado fica salvo para não recuperar mensagens ao ampliar ou desativar o prazo; reinstalação/limpeza dos dados pode remover essa preferência local. A tela é atualizada ao retornar e a cada minuto enquanto aberta; ao abrir o histórico, a consulta evita mensagens anteriores ao limite. Avisos expirados são removidos ao retornar ao app e pushes antigos deixam de gerar nova notificação. Os contadores do servidor continuam representando o estado de leitura da conta; a limpeza local não envia confirmação de leitura.
+
 A lista de conversas destaca mensagens não lidas com um selo na cor escolhida e contagem até 99+. O contador é mantido pelo servidor no resumo da conversa, sem buscar todo o histórico para cada linha; diminui conforme as mensagens são visualizadas e respeita exclusões e limpeza da conversa. Resumos antigos sem contagem mostram um ponto quando a última mensagem recebida ainda não foi lida. As notificações das mensagens lidas são removidas após a confirmação do servidor.
 
 As notificações usam a foto circular do remetente, com a inicial como alternativa. O aviso é publicado imediatamente; se necessário, a miniatura é buscada depois e o aviso existente é atualizado sem repetir o som. A foto utiliza o cache compartilhado por dez minutos; uma atualização pode consumir uma leitura adicional do Firestore.
 
 O seletor de cores oferece 30 opções com amostras, prévia e variações para tema claro e escuro. Ocupa 90% da altura disponível, com a grade rolável e o botão Fechar sempre acessível; a escolha anterior é preservada.
+
+A conversa mostra um aviso para os dois participantes com os prazos de limpeza local informados por cada pessoa e também quando forem desativados. O aviso explica que um prazo não altera o histórico dos aparelhos da outra pessoa. Os registros dos aparelhos ficam privados; `profileRetention/{uid}` compartilha apenas os prazos ativos e a data de atualização, com leitura autenticada sem listagem ou escrita direta. Configurações de vários aparelhos são combinadas, e revisões impedem que uma sincronização antiga substitua uma escolha nova. A preferência local funciona sem rede; a publicação do aviso é retomada pelo registro de dispositivo quando houver conexão. Ambos precisam da versão atualizada para ver o aviso.
 
 O seletor ampliado organiza 120 emojis em seis categorias e mantém até 24 recentes em uma fileira horizontal no topo, salvos por conta no aparelho. Os balões enviados e recebidos usam um contorno contínuo com bicos espelhados.
 
