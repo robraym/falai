@@ -293,7 +293,7 @@ final class FloatingSearchController {
             x = Math.round(maxX * fractionX);
             y = Math.round(maxY * fractionY);
         } else {
-            x = dp(12);
+            x = "messages".equals(positionKey) ? Math.max(0, maxX - dp(12)) : Math.min(maxX, dp(12));
             y = Math.max(0, maxY - dp(10));
         }
         collapsedX = x;

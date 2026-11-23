@@ -39,6 +39,7 @@ import java.util.Map;
 
 public final class MainActivity extends FalaiActivity {
     private LinearLayout root, body;
+    private TextView messageSoundSummary;
     private ListenerRegistration chatsListener;
     private String email = "", profileName = "";
     private int tab, generation;
@@ -70,6 +71,7 @@ public final class MainActivity extends FalaiActivity {
     private final ActivityResultLauncher<String> notificationPermission = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
         if (granted) Backend.registerDevice();
     });
+    private final MessageSoundPicker messageSounds = new MessageSoundPicker(this);
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -381,6 +383,12 @@ public final class MainActivity extends FalaiActivity {
                         else startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
                     }
                 }).show()));
+        general.addView(Ui.divider(this));
+        LinearLayout soundRow = Ui.optionRow(this, R.drawable.ic_volume_preview, getString(R.string.message_sounds), MessageSounds.label(this, MessageSounds.selected(this)), true, null);
+        messageSoundSummary = (TextView) ((LinearLayout) soundRow.getChildAt(1)).getChildAt(1);
+        soundRow.setOnClickListener(view -> messageSounds.show(() -> {
+            if (messageSoundSummary != null) messageSoundSummary.setText(MessageSounds.label(this, MessageSounds.selected(this)));
+        })); soundRow.setFocusable(true); general.addView(soundRow);
         general.addView(Ui.divider(this));
         general.addView(Ui.optionRow(this, R.drawable.ic_lock, getString(R.string.privacy), getString(R.string.privacy_summary), true,
                 v -> new AlertDialog.Builder(this).setTitle(R.string.privacy).setMessage(R.string.privacy_body).setPositiveButton(android.R.string.ok, null).show()));

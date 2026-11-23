@@ -2,6 +2,10 @@
 
 Conferência em 22/11/2026.
 
+Ampliação final dos sons: 18 opções (8 variações ICQ e 10 toques curtos), com `compileDebugJavaWithJavac` aprovado após a última edição. Os dez WAV totalizam aproximadamente 165 KiB, duram de 0,14 a 0,60 segundo e foram gerados sem saturação. As verificações auditivas e de interação em aparelho continuam pendentes.
+
+Sons/ícone/lupa: `compileDebugJavaWithJavac` e `lintDebug` aprovados após adicionar o seletor e os recursos do ícone (0 erros, 27 avisos). A posição inicial da lupa interna foi revisada no código depois dessa verificação. Os três WAV foram gerados como PCM mono de 22.050 Hz, com picos abaixo de 0,9 e tamanho total inferior a 50 KiB. Não houve teste auditivo, instalação ou execução em aparelho. A importação, seleção e remoção de personalizados ainda precisam de conferência no Android.
+
 Atualização desta implementação: compilação Java debug aprovada após as mudanças de busca, presença, digitação, data do APK, balões e seletor de emojis. Conferência da lista preservou os 120 emojis, sem duplicações, em seis categorias. Não houve instalação ou execução em Android. Release/lint abaixo pertencem à conferência anterior.
 
 Os 27 testes locais passaram (12 unitários e 15 de integração no emulador do Firestore). Os dois novos testes verificam propriedade e permissões de presença/digitação, rejeição de timestamps forjados, data pública do APK sem tokens e compatibilidade com clientes antigos. Regras publicadas; Worker atualizado para `8ccdb5bd-93de-42bd-9e37-bb5837c37fc3`.

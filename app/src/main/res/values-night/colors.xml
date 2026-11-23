@@ -6,6 +6,7 @@
     <color name="background">#090A0C</color>
     <color name="card">#17191D</color>
     <color name="presence_badge_surface">#22262E</color>
+    <color name="sound_remove_color">#FF8A80</color>
     <color name="action_green">#45C98A</color>
     <color name="action_green_soft">#142D22</color>
     <color name="text_primary">#F4F4F5</color>

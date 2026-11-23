@@ -1,6 +1,23 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.82" android:scaleY="0.82">
-        <path android:fillColor="#FFFFFF" android:pathData="M27,29h54a6,6 0,0 1,6 6v34a6,6 0,0 1,-6 6h-30l-15,10v-10h-9a6,6 0,0 1,-6 -6v-34a6,6 0,0 1,6 -6z" />
-        <path android:fillColor="#285B00" android:pathData="M43,40h25v6h-19v6h16v6h-16v12h-6z" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Subtle bevel follows the green plate, with a transparent foreground outside it. -->
+    <path android:fillColor="#00000000" android:strokeColor="#36507D00" android:strokeWidth="1.6" android:pathData="M39,20h30a19,19 0,0 1,19 19v30a19,19 0,0 1,-19 19h-30a19,19 0,0 1,-19 -19v-30a19,19 0,0 1,19 -19z" />
+    <path android:fillColor="#00000000" android:strokeColor="#8CD9FF8C" android:strokeWidth="0.8" android:pathData="M39,19h30a19,19 0,0 1,19 19v30a19,19 0,0 1,-19 19h-30a19,19 0,0 1,-19 -19v-30a19,19 0,0 1,19 -19z" />
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.79" android:scaleY="0.79" android:rotation="-5">
+        <group android:translateY="5" android:translateX="1.5">
+            <path android:fillColor="#18294C00" android:pathData="M27,29h54a6,6 0,0 1,6 6v34a6,6 0,0 1,-6 6h-30l-15,10v-10h-9a6,6 0,0 1,-6 -6v-34a6,6 0,0 1,6 -6z" />
+        </group>
+        <group android:translateY="3" android:translateX="0.5">
+            <path android:fillColor="#30294C00" android:pathData="M27,29h54a6,6 0,0 1,6 6v34a6,6 0,0 1,-6 6h-30l-15,10v-10h-9a6,6 0,0 1,-6 -6v-34a6,6 0,0 1,6 -6z" />
+        </group>
+        <path android:strokeColor="#CFFFFFFF" android:strokeWidth="0.9" android:pathData="M27,29h54a6,6 0,0 1,6 6v34a6,6 0,0 1,-6 6h-30l-15,10v-10h-9a6,6 0,0 1,-6 -6v-34a6,6 0,0 1,6 -6z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:startX="32" android:startY="29" android:endX="73" android:endY="81" android:startColor="#FFFFFF" android:centerColor="#FAFFF5" android:endColor="#DCE8CE" android:type="linear" />
+            </aapt:attr>
+        </path>
+        <path android:pathData="M43,40h25v6h-19v6h16v6h-16v12h-6z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:startX="43" android:startY="40" android:endX="62" android:endY="70" android:startColor="#214D00" android:endColor="#4A8C09" android:type="linear" />
+            </aapt:attr>
+        </path>
     </group>
 </vector>

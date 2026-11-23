@@ -2,7 +2,6 @@ package br.com.falai;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -21,16 +20,15 @@ final class MessageSound {
         prefs.edit().putStringSet("recent", new HashSet<>(recent)).apply();
         try {
             if (current != null) { current.release(); current = null; }
-            AudioAttributes attributes = new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
-            MediaPlayer player = MediaPlayer.create(context.getApplicationContext(), R.raw.icq_uh_oh, attributes, 0);
-            if (player == null) return;
+            String selected = MessageSounds.selected(context);
+            MediaPlayer player;
+            try { player = MessageSounds.create(context.getApplicationContext(), selected, false); }
+            catch (java.io.IOException | RuntimeException error) { selected = MessageSounds.DEFAULT; player = MessageSounds.create(context.getApplicationContext(), selected, false); }
             current = player;
             player.setOnCompletionListener(MessageSound::release);
             player.setOnErrorListener((failed, what, extra) -> { release(failed); return true; });
-            player.start();
-        } catch (RuntimeException ignored) {
+            MessageSounds.start(player, selected, 1f);
+        } catch (java.io.IOException | RuntimeException ignored) {
             if (current != null) release(current);
         }
     }

@@ -20,7 +20,7 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
     static void createChannel(Context context) {
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, context.getString(R.string.message_channel), NotificationManager.IMPORTANCE_HIGH);
-            // The short ICQ sound is played once via alarm audio, as in Alertou.
+            // The selected message sound is played once via alarm audio, as in Alertou.
             channel.setSound(null, null);
             context.getSystemService(NotificationManager.class).createNotificationChannel(channel);
         }
