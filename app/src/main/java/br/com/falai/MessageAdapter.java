@@ -72,12 +72,30 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         });
         messages.clear(); messages.addAll(docs); items.clear(); items.addAll(next); diff.dispatchUpdatesTo(this);
     }
-    static final class Holder extends RecyclerView.ViewHolder { Holder(LinearLayout v) { super(v); } }
+    static final class Holder extends RecyclerView.ViewHolder {
+        android.view.View bubble, reactions;
+        Holder(LinearLayout root) { super(root); }
+        void setReplyOffset(float offset, boolean animate) {
+            move(bubble, offset, animate);
+            move(reactions, offset, animate);
+        }
+        private void move(android.view.View view, float offset, boolean animate) {
+            if (view == null) return;
+            view.animate().cancel();
+            if (animate && view.getTranslationX() != offset) {
+                view.animate().translationX(offset).setDuration(140).start();
+            } else {
+                view.setTranslationX(offset);
+            }
+        }
+    }
     @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
         LinearLayout root = Ui.column(parent.getContext()); root.setLayoutParams(new RecyclerView.LayoutParams(-1, -2)); return new Holder(root);
     }
     @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
         LinearLayout root = (LinearLayout) holder.itemView; android.content.Context c = root.getContext(); root.removeAllViews();
+        holder.bubble = null;
+        holder.reactions = null;
         Item item = items.get(position);
         if (item.notice != null) { bindNotice(root, item.notice); return; }
         DocumentSnapshot doc = item.message; boolean mine = uid.equals(doc.getString("senderId"));
@@ -92,6 +110,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
             root.addView(day, dateParams);
         }
         LinearLayout bubble = Ui.column(c); bubble.setPadding(Ui.dp(c, mine ? 11 : 17), Ui.dp(c, 7), Ui.dp(c, mine ? 17 : 11), Ui.dp(c, 7)); bubble.setBackground(new MessageBubble(c, mine));
+        holder.bubble = bubble;
         boolean deleted = Boolean.TRUE.equals(doc.getBoolean("deletedForAll"));
         String replyId = doc.getString("reply.messageId");
         if (!deleted && replyId != null) {
@@ -139,6 +158,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
                 }
                 String label = String.join("  ", labels);
                 TextView badge = Ui.text(c, label, 13, false);
+                holder.reactions = badge;
                 badge.setPadding(Ui.dp(c, 8), Ui.dp(c, 3), Ui.dp(c, 8), Ui.dp(c, 3));
                 badge.setBackground(new android.graphics.drawable.RippleDrawable(
                         android.content.res.ColorStateList.valueOf(Appearance.ripple(c)),

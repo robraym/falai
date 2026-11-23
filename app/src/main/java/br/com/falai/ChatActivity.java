@@ -97,6 +97,7 @@ public final class ChatActivity extends FalaiActivity {
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
         messages.setLayoutManager(layoutManager); adapter = new MessageAdapter(Backend.uid(), this::messageActions,
                 loaded::get, () -> name, this::jumpToMessage); messages.setAdapter(adapter);
+        messages.addOnItemTouchListener(new SwipeToReply(messages, adapter, this::canReply, this::beginReply));
         retentionNotice = new RetentionNoticeController(this, notices -> {
             boolean bottom = layoutManager.findLastVisibleItemPosition() >= adapter.getItemCount() - 3;
             adapter.setNotices(notices);
@@ -333,7 +334,7 @@ public final class ChatActivity extends FalaiActivity {
         dialog.show();
     }
     private void beginReply(DocumentSnapshot doc) {
-        if (model.pendingId != null || HistoryRetention.expired(doc)) return;
+        if (!canReply(doc)) return;
         Bundle reply = new Bundle();
         reply.putString("id", doc.getId());
         reply.putString("sender", doc.getString("senderId"));
@@ -344,6 +345,10 @@ public final class ChatActivity extends FalaiActivity {
         composer.requestFocus();
         composer.post(() -> ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
                 .showSoftInput(composer, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT));
+    }
+    private boolean canReply(DocumentSnapshot doc) {
+        return model.pendingId == null && !Boolean.TRUE.equals(doc.getBoolean("deletedForAll"))
+                && !HistoryRetention.expired(doc);
     }
     private void renderReplyPreview() {
         replyPreview.removeAllViews();
