@@ -281,7 +281,15 @@ test("nudges authorize participants, are idempotent, enforce cooldown and cannot
   await changeMessage(db, alice, {...input, scope: 'all'});
   await dispatchJob(db, {}, jobPath + '_deleted', async (env, token, job) => { events.push(job.event); return 'sent'; });
   assert.deepEqual(events, ['nudge', 'deleted']);
-  await db.commit([db.write(`nudgeLimits/${chatId}_${alice.uid}`, {sentAt: new Date(Date.now() - 61000)}), db.write('quotas/nudgealice_nudges', {start: Date.now(), count: 20})]);
+  // Still blocked within ten seconds; allowed after ten, without waiting a minute.
+  await db.commit([db.write(`nudgeLimits/${chatId}_${alice.uid}`, {sentAt: new Date(Date.now() - 5000)})]);
+  await assert.rejects(sendNudge(db, alice, {chatId, messageId: crypto.randomUUID()}), {code: 'nudge-cooldown'});
+  await db.commit([db.write(`nudgeLimits/${chatId}_${alice.uid}`, {sentAt: new Date(Date.now() - 11000)})]);
+  const again = crypto.randomUUID();
+  await sendNudge(db, alice, {chatId, messageId: again});
+  assert.equal((await db.get('quotas/nudgealice_nudges')).data.count, 2);
+  await db.commit([db.remove(`notificationOutbox/${chatId}_${again}`)]);
+  await db.commit([db.write(`nudgeLimits/${chatId}_${alice.uid}`, {sentAt: new Date(Date.now() - 11000)}), db.write('quotas/nudgealice_nudges', {start: Date.now(), count: 20})]);
   await assert.rejects(sendNudge(db, alice, {chatId, messageId: crypto.randomUUID()}), {code: 'resource-exhausted'});
 });
 test("an expired nudge is not delivered late but its history remains", async () => {

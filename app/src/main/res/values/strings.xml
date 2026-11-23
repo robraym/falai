@@ -126,7 +126,7 @@
     <string name="nudge_sent">Você chamou a atenção.</string>
     <string name="nudge_received">Chamou sua atenção!</string>
     <string name="nudge_from">%1$s chamou sua atenção!</string>
-    <string name="nudge_wait">Aguarde um minuto entre chamadas para a mesma pessoa. Limite de 20 chamadas por hora.</string>
+    <string name="nudge_wait">Aguarde 10 segundos entre chamadas para a mesma pessoa. Limite de 20 chamadas por hora.</string>
     <string name="nudge_error">Não foi possível confirmar a chamada. Toque em Chamar atenção para tentar novamente.</string>
     <string name="notifications_registration_error">Não foi possível ativar os avisos agora. O Falai tentará novamente quando houver conexão.</string>
     <string name="enable_notifications">Ativar notificações</string>

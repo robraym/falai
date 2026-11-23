@@ -108,7 +108,7 @@ export async function sendNudge(db, user, data) {
       return;
     }
     const now = Date.now();
-    if (limit?.data.sentAt?.getTime() > now - 60000) throw new ApiError(429, "nudge-cooldown");
+    if (limit?.data.sentAt?.getTime() > now - 10000) throw new ApiError(429, "nudge-cooldown");
     const sameHour = usage && usage.data.start > now - 3600000;
     const count = (sameHour ? usage.data.count : 0) + 1;
     if (count > 20) throw new ApiError(429, "resource-exhausted");

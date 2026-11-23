@@ -2,6 +2,8 @@
 
 ## Atualização em 23/11/2026
 
+- Intervalo do Chamar atenção reduzido para dez segundos por remetente/conversa; limite de 20 chamadas por hora preservado. Texto do aviso atualizado. Os 18 testes de integração passaram, incluindo bloqueio aos cinco segundos e liberação após onze segundos. Worker publicado como `2c386b9b-56ed-4483-abb0-ce3c1572a0f3`, com `/health` saudável. Nenhum teste em aparelho nem envio real de notificação.
+
 ### Foto na notificação, não lidas e mais cores
 
 - Foto circular do remetente no `MessagingStyle` e no ícone grande; inicial quando indisponível, cache por dez minutos e busca limitada a dois segundos após publicar o aviso. Atualização do mesmo aviso sem repetir áudio e somente se ainda estiver ativo. O push inclui o UID do remetente obtido da mensagem no servidor.
