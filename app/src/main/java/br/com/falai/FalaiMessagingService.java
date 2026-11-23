@@ -19,6 +19,7 @@ import com.google.firebase.messaging.RemoteMessage;
 
 public final class FalaiMessagingService extends FirebaseMessagingService {
     static final String CHANNEL_ID = "messages_alerts_v2";
+    private static final String NUDGE_CHANNEL_ID = "attention_alerts_v1";
     private static final String LEGACY_CHANNEL_ID = "messages_icq_v1";
     private static final long[] VIBRATION = {0, 180, 100, 180};
     static void createChannel(Context context) {
@@ -33,6 +34,20 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
             channel.enableVibration(true); channel.setVibrationPattern(VIBRATION);
             manager.createNotificationChannel(channel);
         }
+    }
+    @androidx.annotation.RequiresApi(26)
+    private NotificationChannel nudgeChannel(NotificationManager manager, NotificationChannel messages) {
+        NotificationChannel existing = manager.getNotificationChannel(NUDGE_CHANNEL_ID);
+        if (existing != null) return existing;
+        NotificationChannel channel = new NotificationChannel(NUDGE_CHANNEL_ID,
+                getString(R.string.nudge_action), messages.getImportance());
+        channel.setSound(null, null);
+        if (messages.shouldVibrate()) {
+            if (Build.VERSION.SDK_INT >= 35) channel.setVibrationEffect(NudgeFeedback.vibrationEffect());
+            else channel.setVibrationPattern(NudgeFeedback.VIBRATION);
+        }
+        manager.createNotificationChannel(channel);
+        return channel;
     }
     @Override public void onNewToken(@NonNull String token) {
         DeviceRegistrationWorker.schedule();
@@ -65,8 +80,17 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
         createChannel(this);
         if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) return;
-        if (Build.VERSION.SDK_INT >= 26 && getSystemService(NotificationManager.class)
-                .getNotificationChannel(CHANNEL_ID).getImportance() == NotificationManager.IMPORTANCE_NONE) return;
+        boolean nudgeVibrates = true;
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            NotificationChannel messages = manager.getNotificationChannel(CHANNEL_ID);
+            if (messages.getImportance() == NotificationManager.IMPORTANCE_NONE) return;
+            if (nudge) {
+                NotificationChannel attention = nudgeChannel(manager, messages);
+                if (attention.getImportance() == NotificationManager.IMPORTANCE_NONE) return;
+                nudgeVibrates = attention.shouldVibrate();
+            }
+        }
         if (nudge && !NudgeFeedback.accept(this, messageId, message.getData().get("expiresAt"))) return;
         Intent intent = new Intent(this, MainActivity.class).setAction("br.com.falai.OPEN." + chatId).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("chatId", chatId).putExtra("recipientId", recipient);
         PendingIntent pending = PendingIntent.getActivity(this, chatId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -76,7 +100,11 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         if (text == null || text.isEmpty()) text = getString(R.string.new_message);
         if (nudge) {
             text = getString(R.string.nudge_received); NudgeFeedback.shake(sender);
-            if (chatId.equals(ChatActivity.visibleChat)) { MessageSound.playNudge(this, recipient + ":" + messageId); return; }
+            if (chatId.equals(ChatActivity.visibleChat)) {
+                if (nudgeVibrates) NudgeFeedback.vibrate(this);
+                MessageSound.playNudge(this, recipient + ":" + messageId);
+                return;
+            }
         }
         String me = Backend.auth().getCurrentUser().getDisplayName();
         if (me == null || me.trim().isEmpty()) me = getString(R.string.app_name);
@@ -88,11 +116,11 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         historyMetadata.putLong("falai_expiresAt", messageExpiresAt);
         NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(recipientPerson)
                 .setGroupConversation(false).addMessage(text, timestamp, senderPerson);
-        NotificationCompat.Builder notification = new NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_chat).setContentTitle(sender).setContentText(text)
+        NotificationCompat.Builder notification = new NotificationCompat.Builder(this, nudge ? NUDGE_CHANNEL_ID : CHANNEL_ID).setSmallIcon(R.drawable.ic_chat).setContentTitle(sender).setContentText(text)
                 .setStyle(style).setLargeIcon(avatar).setWhen(timestamp).setCategory(NotificationCompat.CATEGORY_MESSAGE).addPerson(senderPerson)
                 .addExtras(historyMetadata)
                 .setTimeoutAfter(messageExpiresAt > 0 ? Math.max(1, messageExpiresAt - System.currentTimeMillis()) : 0)
-                .setVibrate(VIBRATION)
+                .setVibrate(nudge ? NudgeFeedback.VIBRATION : VIBRATION)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true).setVisibility(NotificationCompat.VISIBILITY_PRIVATE);
         String tag = messageId != null && messageId.matches("[a-f0-9-]{36}") ? messageId : chatId;
