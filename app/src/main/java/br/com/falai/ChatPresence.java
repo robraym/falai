@@ -4,15 +4,27 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.text.TextUtils;
+import android.util.LruCache;
 import android.widget.TextView;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.ListenerRegistration;
-import java.util.ArrayList;
-import java.util.List;
+import com.google.firebase.firestore.MetadataChanges;
 
 /** Typing is ephemeral, never part of message history or notification payloads. */
 final class ChatPresence {
+    private static final LruCache<String, PresenceSnapshot> CACHE = new LruCache<>(256);
+    private static final PresenceSnapshot UNKNOWN = new PresenceSnapshot(0, 0);
+
+    private static final class PresenceSnapshot {
+        final long lastSeen, lastActive;
+        PresenceSnapshot(long lastSeen, long lastActive) {
+            this.lastSeen = lastSeen;
+            this.lastActive = lastActive;
+        }
+    }
+
     private final Context context;
     private final String chatId;
     private final TextView label;
@@ -23,7 +35,7 @@ final class ChatPresence {
     private boolean resumed, typing;
     private long lastSent;
     private DocumentSnapshot remoteTyping;
-    private List<DocumentSnapshot> sessions = new ArrayList<>();
+    private PresenceSnapshot presence = UNKNOWN;
     private final Runnable stop = this::stopTyping;
     private final Runnable refresh = new Runnable() {
         @Override public void run() { render(); if (resumed) handler.postDelayed(this, 1000); }
@@ -34,13 +46,32 @@ final class ChatPresence {
     }
     void listen(String uid) {
         if (uid.equals(otherUid) && presenceListener != null) return;
-        clearListeners(); otherUid = uid;
+        clearListeners(); otherUid = uid; remoteTyping = null;
+        String owner = Backend.uid();
+        String key = owner + ":" + uid;
+        PresenceSnapshot cached = uid.isEmpty() || owner.isEmpty() ? null : CACHE.get(key);
+        presence = cached == null ? UNKNOWN : cached;
+        render();
         if (!resumed || uid.isEmpty()) return;
-        if (showTyping) typingListener = Backend.db().collection("chats").document(chatId).collection("typing").document(uid).addSnapshotListener(com.google.firebase.firestore.MetadataChanges.INCLUDE, (doc, error) -> {
+        if (showTyping) typingListener = Backend.db().collection("chats").document(chatId).collection("typing").document(uid).addSnapshotListener(MetadataChanges.INCLUDE, (doc, error) -> {
             remoteTyping = error == null ? doc : null; render();
         });
-        presenceListener = Backend.db().collection("presence").document(uid).collection("sessions").orderBy("updatedAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener(com.google.firebase.firestore.MetadataChanges.INCLUDE, (docs, error) -> {
-            sessions = error == null && docs != null ? docs.getDocuments() : new ArrayList<>(); render();
+        presenceListener = Backend.db().collection("presence").document(uid).collection("sessions").orderBy("updatedAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener(MetadataChanges.INCLUDE, (docs, error) -> {
+            if (error != null || docs == null || docs.getMetadata().isFromCache() || !owner.equals(Backend.uid())) return;
+            long lastSeen = 0, lastActive = 0, now = System.currentTimeMillis();
+            for (DocumentSnapshot session : docs) {
+                com.google.firebase.Timestamp timestamp = session.getTimestamp("updatedAt");
+                if (timestamp == null) continue;
+                long time = timestamp.toDate().getTime();
+                lastSeen = Math.max(lastSeen, time);
+                if (!session.getMetadata().hasPendingWrites() && time <= now + 5000
+                        && Boolean.TRUE.equals(session.getBoolean("active"))) {
+                    lastActive = Math.max(lastActive, time);
+                }
+            }
+            presence = new PresenceSnapshot(lastSeen, lastActive);
+            CACHE.put(key, presence);
+            render();
         });
     }
     void resume() { resumed = true; listen(otherUid); handler.removeCallbacks(refresh); refresh.run(); }
@@ -65,35 +96,38 @@ final class ChatPresence {
             .set(Backend.data("active", active, "updatedAt", FieldValue.serverTimestamp()));
     }
     private void render() {
-        long now = System.currentTimeMillis(), last = 0;
-        boolean online = false;
-        for (DocumentSnapshot session : sessions) {
-            com.google.firebase.Timestamp timestamp = session.getTimestamp("updatedAt"); if (timestamp == null) continue;
-            long time = timestamp.toDate().getTime(); last = Math.max(last, time);
-            if (!session.getMetadata().isFromCache() && Boolean.TRUE.equals(session.getBoolean("active")) && now - time < 70000 && time <= now + 5000) online = true;
-        }
+        long now = System.currentTimeMillis(), last = presence.lastSeen;
+        boolean online = presence.lastActive > 0 && now - presence.lastActive < 70000
+                && presence.lastActive <= now + 5000;
         if (remoteTyping != null && !remoteTyping.getMetadata().isFromCache() && Boolean.TRUE.equals(remoteTyping.getBoolean("active"))) {
             com.google.firebase.Timestamp time = remoteTyping.getTimestamp("updatedAt");
-            if (time != null && now - time.toDate().getTime() < 8000 && time.toDate().getTime() <= now + 5000) { label.setText(R.string.typing); return; }
+            if (time != null && now - time.toDate().getTime() < 8000 && time.toDate().getTime() <= now + 5000) { setLabel(R.string.typing); return; }
         }
         if (!showTyping) {
-            label.setTextColor(online ? Appearance.primary(context) : context.getColor(R.color.text_secondary));
-            if (label instanceof PresenceStatusView) ((PresenceStatusView) label).refreshBadge();
-            if (online) { label.setText(R.string.online); return; }
-            if (last == 0) { label.setText(R.string.presence_unknown); return; }
+            int color = online ? Appearance.primary(context) : context.getColor(R.color.text_secondary);
+            if (label.getCurrentTextColor() != color) {
+                label.setTextColor(color);
+                if (label instanceof PresenceStatusView) ((PresenceStatusView) label).refreshBadge();
+            }
+            if (online) { setLabel(R.string.online); return; }
+            if (last == 0) { setLabel(R.string.presence_unknown); return; }
             long minutes = Math.max(0, (now - last) / 60000);
-            if (minutes == 0) label.setText(R.string.offline_now);
-            else if (minutes < 60) label.setText(context.getString(R.string.offline_minutes, minutes));
-            else if (minutes < 1440) label.setText(context.getString(R.string.offline_hours, minutes / 60));
-            else label.setText(context.getString(R.string.offline_days, minutes / 1440));
+            if (minutes == 0) setLabel(R.string.offline_now);
+            else if (minutes < 60) setLabel(context.getString(R.string.offline_minutes, minutes));
+            else if (minutes < 1440) setLabel(context.getString(R.string.offline_hours, minutes / 60));
+            else setLabel(context.getString(R.string.offline_days, minutes / 1440));
             return;
         }
-        if (online) { label.setText(R.string.online); return; }
-        if (last == 0) { label.setText(""); return; }
+        if (online) { setLabel(R.string.online); return; }
+        if (last == 0) { setLabel(""); return; }
         long minutes = Math.max(0, (now - last) / 60000);
-        if (minutes == 0) label.setText(R.string.last_seen_now);
-        else if (minutes < 60) label.setText(context.getString(R.string.last_seen_minutes, minutes));
-        else if (minutes < 1440) label.setText(context.getString(R.string.last_seen_hours, minutes / 60));
-        else label.setText(context.getString(R.string.last_seen_date, android.text.format.DateFormat.format("dd/MM/yyyy HH:mm", last)));
+        if (minutes == 0) setLabel(R.string.last_seen_now);
+        else if (minutes < 60) setLabel(context.getString(R.string.last_seen_minutes, minutes));
+        else if (minutes < 1440) setLabel(context.getString(R.string.last_seen_hours, minutes / 60));
+        else setLabel(context.getString(R.string.last_seen_date, android.text.format.DateFormat.format("dd/MM/yyyy HH:mm", last)));
+    }
+    private void setLabel(int resource) { setLabel(context.getText(resource)); }
+    private void setLabel(CharSequence text) {
+        if (!TextUtils.equals(label.getText(), text)) label.setText(text);
     }
 }
