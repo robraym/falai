@@ -154,8 +154,8 @@ A rotina Cron pode demorar alguns minutos para propagar após a publicação. O 
 
 ### Atualizações do APK
 
-Em **Ajustes → Atualização do aplicativo → Verificar atualização**, o app consulta a última versão estável no GitHub Releases. O botão **Baixar APK** aparece quando a versão publicada é mais nova que a instalada. O navegador baixa o arquivo e o usuário confirma a instalação no Android.
+Em **Ajustes → Atualização do aplicativo → Verificar atualização**, o app consulta a última versão estável no GitHub Releases. A partir da versão 1.2.4, compara o horário de geração registrado no APK, mesmo que o nome da versão continue igual. O Gradle gera o `versionCode` automaticamente a partir do horário UTC do build. O navegador baixa o arquivo e o usuário confirma a instalação no Android.
 
-Para distribuir uma versão, aumente o `versionCode` e assine o APK com o mesmo certificado da versão instalada pelos destinatários. Publique uma release estável em `robraym/falei` com a tag no formato `v<versionName>-apk.<versionCode>` e anexe o APK com o nome `falai.apk`. Por exemplo, use a tag `v1.2-apk.3` para a versão 1.2 de código 3. Marque a release como a mais recente ao publicá-la.
+Para distribuir, assine o APK com o mesmo certificado da versão instalada pelos destinatários. Leia o `versionName` e o `versionCode` do APK já gerado e use a tag `v<versionName>-apk.<versionCode>` na release de `robraym/falei`. Anexe o arquivo com o nome `falai.apk` e marque a release como a mais recente. Versões anteriores à mudança identificam a primeira atualização pelo código maior.
 
 Compilação e testes locais não confirmam aparência, login Google no aparelho ou entrega real com o app fechado. Esse teste final exige autorização para usar os aparelhos.

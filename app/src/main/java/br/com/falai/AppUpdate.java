@@ -29,6 +29,18 @@ final class AppUpdate {
         this.download = download;
     }
 
+    static long buildTimeMillis(long versionCode) {
+        return versionCode >= BuildConfig.APK_FIRST_DATED_CODE
+                ? (BuildConfig.APK_BUILD_EPOCH_SECONDS + versionCode) * 1000L : 0;
+    }
+
+    boolean isNewerThanInstalled() {
+        long installed = buildTimeMillis(BuildConfig.VERSION_CODE);
+        long offered = buildTimeMillis(versionCode);
+        if (installed == 0) return versionCode > BuildConfig.VERSION_CODE;
+        return offered > installed;
+    }
+
     static Task<AppUpdate> check() {
         return Tasks.call(ContactsRepository.IO, () -> {
             URL endpoint = new URL("https://api.github.com/repos/" + REPOSITORY + "/releases/latest");

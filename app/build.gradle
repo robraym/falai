@@ -1,6 +1,14 @@
 plugins { id 'com.android.application' }
 if (file('google-services.json').exists()) { apply plugin: 'com.google.gms.google-services' }
 
+// Reserve the old sequential codes for existing APKs. New codes grow with UTC build time.
+def apkBuildEpochSeconds = 1577836800L
+def apkFirstDatedCode = 100000000
+def apkVersionCode = Math.floorDiv(System.currentTimeMillis(), 1000L) - apkBuildEpochSeconds
+if (apkVersionCode < apkFirstDatedCode || apkVersionCode > Integer.MAX_VALUE) {
+    throw new GradleException('A data deste computador está fora do intervalo de versionCode do APK.')
+}
+
 android {
     namespace 'br.com.falai'
     compileSdk 36
@@ -8,8 +16,10 @@ android {
         applicationId 'br.com.falai'
         minSdk 24
         targetSdk 36
-        versionCode 6
-        versionName '1.2.3'
+        versionCode(apkVersionCode.intValue())
+        versionName '1.2.4'
+        buildConfigField 'long', 'APK_BUILD_EPOCH_SECONDS', "${apkBuildEpochSeconds}L"
+        buildConfigField 'int', 'APK_FIRST_DATED_CODE', "${apkFirstDatedCode}"
         buildConfigField 'String', 'WORKER_URL', '"https://falai-notificacoes.robraym-studio.workers.dev"'
         if (!file('google-services.json').exists()) { resValue 'string', 'default_web_client_id', '' }
     }

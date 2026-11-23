@@ -200,6 +200,8 @@
     <string name="apk_version_unknown">Versão não informada</string>
     <string name="app_update">Atualização do aplicativo</string>
     <string name="installed_app_version">Versão instalada: %1$s</string>
+    <string name="apk_build_date">Gerado em %1$s</string>
+    <string name="apk_version_with_build_date">%1$s (gerada em %2$s)</string>
     <string name="check_apk_update">Verificar atualização</string>
     <string name="checking_apk_update">Verificando atualizações…</string>
     <string name="apk_update_check_failed">Não foi possível verificar a atualização. Tente novamente.</string>

@@ -490,7 +490,7 @@ public final class MainActivity extends FalaiActivity {
     private void showAppUpdate() {
         AlertDialog about = new AlertDialog.Builder(this)
                 .setTitle(R.string.app_update)
-                .setMessage(getString(R.string.apk_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
+                .setMessage(installedApkDetails())
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.check_apk_update, null)
                 .create();
@@ -514,11 +514,15 @@ public final class MainActivity extends FalaiActivity {
                 about.setMessage(getString(R.string.apk_update_unpublished));
                 return;
             }
-            if (update.versionCode <= BuildConfig.VERSION_CODE) {
-                about.setMessage(getString(R.string.apk_up_to_date, BuildConfig.VERSION_NAME));
+            if (!update.isNewerThanInstalled()) {
+                about.setMessage(getString(R.string.apk_up_to_date, BuildConfig.VERSION_NAME)
+                        + "\n\n" + installedApkDetails());
                 return;
             }
-            about.setMessage(getString(R.string.apk_update_available, update.versionName));
+            long buildTime = AppUpdate.buildTimeMillis(update.versionCode);
+            String available = buildTime == 0 ? update.versionName
+                    : getString(R.string.apk_version_with_build_date, update.versionName, formatApkDate(buildTime));
+            about.setMessage(installedApkDetails() + "\n\n" + getString(R.string.apk_update_available, available));
             check.setText(R.string.download_apk);
             check.setOnClickListener(view -> {
                 try {
@@ -529,6 +533,16 @@ public final class MainActivity extends FalaiActivity {
                 }
             });
         });
+    }
+    private String installedApkDetails() {
+        String installed = getString(R.string.installed_app_version, BuildConfig.VERSION_NAME);
+        long buildTime = AppUpdate.buildTimeMillis(BuildConfig.VERSION_CODE);
+        return buildTime == 0 ? installed : installed + "\n" + getString(R.string.apk_build_date, formatApkDate(buildTime));
+    }
+    private String formatApkDate(long millis) {
+        java.util.Date date = new java.util.Date(millis);
+        return android.text.format.DateFormat.getDateFormat(this).format(date) + " "
+                + android.text.format.DateFormat.getTimeFormat(this).format(date);
     }
     @Override protected void onHistoryRetentionChanged() {
         if (home && profileLoaded && tab == 0 && retentionRefresh != null) retentionRefresh.run();
