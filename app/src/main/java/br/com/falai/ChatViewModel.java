@@ -10,6 +10,7 @@ import java.util.UUID;
 public final class ChatViewModel extends AndroidViewModel {
     final MutableLiveData<Integer> changes = new MutableLiveData<>(0);
     String chatId, draft = "", pendingId, pendingText;
+    android.os.Bundle reply;
     boolean busy, failed;
     boolean nudgeBusy;
     String nudgeId;
@@ -26,10 +27,12 @@ public final class ChatViewModel extends AndroidViewModel {
     private void send() {
         if (!owner.equals(Backend.uid())) { failed = true; changed(); return; }
         busy = true; failed = false; changed();
-        Backend.call("sendMessage", Backend.data("chatId", chatId, "messageId", pendingId, "text", pendingText))
+        java.util.Map<String, Object> data = Backend.data("chatId", chatId, "messageId", pendingId, "text", pendingText);
+        if (reply != null) data.put("replyToId", reply.getString("id"));
+        Backend.call("sendMessage", data)
                 .addOnCompleteListener(task -> {
                     busy = false;
-                    if (task.isSuccessful()) { draft = ""; discard(); }
+                    if (task.isSuccessful()) { draft = ""; reply = null; discard(); }
                     else { failed = true; changed(); }
                 });
     }

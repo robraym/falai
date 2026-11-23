@@ -23,7 +23,10 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
     }
     private static final class Item {
         final DocumentSnapshot message; final Notice notice;
-        Item(DocumentSnapshot message, Notice notice) { this.message = message; this.notice = notice; }
+        final DocumentSnapshot original;
+        Item(DocumentSnapshot message, Notice notice, DocumentSnapshot original) {
+            this.message = message; this.notice = notice; this.original = original;
+        }
         String key() { return message != null ? "message:" + message.getId() : notice.key; }
         Timestamp time() { return message != null ? message.getTimestamp("createdAt") : new Timestamp(new java.util.Date(notice.time)); }
     }
@@ -33,7 +36,15 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
     private boolean includeNotices = true;
     private final String uid;
     private final java.util.function.Consumer<DocumentSnapshot> actions;
-    MessageAdapter(String uid, java.util.function.Consumer<DocumentSnapshot> actions) { this.uid = uid; this.actions = actions; }
+    private final java.util.function.Function<String, DocumentSnapshot> findMessage;
+    private final java.util.function.Supplier<String> contactName;
+    private final java.util.function.Consumer<String> openQuote;
+    MessageAdapter(String uid, java.util.function.Consumer<DocumentSnapshot> actions,
+            java.util.function.Function<String, DocumentSnapshot> findMessage,
+            java.util.function.Supplier<String> contactName, java.util.function.Consumer<String> openQuote) {
+        this.uid = uid; this.actions = actions; this.findMessage = findMessage;
+        this.contactName = contactName; this.openQuote = openQuote;
+    }
     void submit(List<DocumentSnapshot> docs) {
         submit(docs, includeNotices);
     }
@@ -41,8 +52,11 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
     void submit(List<DocumentSnapshot> docs, boolean includeNotices) {
         this.includeNotices = includeNotices;
         List<Item> before = new ArrayList<>(items), next = new ArrayList<>();
-        for (DocumentSnapshot doc : docs) next.add(new Item(doc, null));
-        if (includeNotices) for (Notice notice : notices) next.add(new Item(null, notice));
+        for (DocumentSnapshot doc : docs) {
+            String id = doc.getString("reply.messageId");
+            next.add(new Item(doc, null, id == null ? null : findMessage.apply(id)));
+        }
+        if (includeNotices) for (Notice notice : notices) next.add(new Item(null, notice, null));
         next.sort(java.util.Comparator.comparing(Item::time, java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())).thenComparing(Item::key));
         DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
             public int getOldListSize() { return before.size(); }
@@ -52,6 +66,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
                 Item old = before.get(oldPosition), value = next.get(newPosition);
                 if (old.notice != null || value.notice != null) return old.notice != null && old.notice.same(value.notice);
                 return java.util.Objects.equals(old.message.getData(), value.message.getData())
+                        && java.util.Objects.equals(old.original, value.original)
                         && startsDay(before, oldPosition) == startsDay(next, newPosition);
             }
         });
@@ -78,6 +93,21 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         }
         LinearLayout bubble = Ui.column(c); bubble.setPadding(Ui.dp(c, mine ? 11 : 17), Ui.dp(c, 7), Ui.dp(c, mine ? 17 : 11), Ui.dp(c, 7)); bubble.setBackground(new MessageBubble(c, mine));
         boolean deleted = Boolean.TRUE.equals(doc.getBoolean("deletedForAll"));
+        String replyId = doc.getString("reply.messageId");
+        if (!deleted && replyId != null) {
+            boolean quotedMine = uid.equals(doc.getString("reply.senderId"));
+            String quoteBody = item.original == null ? doc.getString("reply.text") : item.original.getString("text");
+            Timestamp expiry = doc.getTimestamp("reply.expiresAt");
+            String label = expiry != null && expiry.toDate().getTime() <= System.currentTimeMillis()
+                    ? c.getString(R.string.reply_unavailable)
+                    : quoteText(c, doc.getString("reply.kind"), quoteBody, quotedMine, item.original);
+            LinearLayout quote = quoteView(c, quotedMine ? c.getString(R.string.reply_you) : contactName.get(), label);
+            quote.setOnClickListener(view -> openQuote.accept(replyId));
+            quote.setOnLongClickListener(view -> { actions.accept(doc); return true; });
+            LinearLayout.LayoutParams quoteParams = new LinearLayout.LayoutParams(-1, -2);
+            quoteParams.bottomMargin = Ui.dp(c, 5);
+            bubble.addView(quote, quoteParams);
+        }
         String content = deleted ? c.getString(R.string.message_deleted) : doc.getString("text");
         if (!deleted && "nudge".equals(doc.getString("kind"))) content = c.getString(mine ? R.string.nudge_sent : R.string.nudge_received);
         TextView message = Ui.text(c, "", 16, false); message.setTextColor(c.getColor(deleted ? R.color.text_secondary : R.color.text_primary));
@@ -88,7 +118,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         int status = mine ? doc.getTimestamp("readAt") != null ? 3 : doc.getTimestamp("deliveredAt") != null ? 2 : 1 : 0;
         text.setSpan(new MessageMetaSpan(c, time, status), text.length() - 1, text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); message.setText(text); bubble.addView(message);
         message.setContentDescription(content + " " + time + (mine ? " " + c.getString(status == 3 ? R.string.message_read : status == 2 ? R.string.message_delivered : R.string.message_sent) : ""));
-        if (mine) {
+        if (mine || !deleted) {
             android.view.View.OnLongClickListener hold = view -> { actions.accept(doc); return true; };
             message.setOnLongClickListener(hold); bubble.setOnLongClickListener(hold);
         }
@@ -96,6 +126,59 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         bubbleParams.gravity = mine ? Gravity.END : Gravity.START;
         if (mine) bubbleParams.leftMargin = Ui.dp(c, 40); else bubbleParams.rightMargin = Ui.dp(c, 40);
         root.addView(bubble, bubbleParams);
+        if (!deleted && doc.get("reactions") instanceof java.util.Map) {
+            java.util.Map<?, ?> reactions = (java.util.Map<?, ?>) doc.get("reactions");
+            java.util.Map<String, Integer> counts = new java.util.TreeMap<>();
+            for (Object value : reactions.values()) {
+                if (value instanceof String) counts.merge((String) value, 1, Integer::sum);
+            }
+            if (!counts.isEmpty()) {
+                List<String> labels = new ArrayList<>();
+                for (java.util.Map.Entry<String, Integer> reaction : counts.entrySet()) {
+                    labels.add(reaction.getKey() + (reaction.getValue() > 1 ? " " + reaction.getValue() : ""));
+                }
+                String label = String.join("  ", labels);
+                TextView badge = Ui.text(c, label, 13, false);
+                badge.setPadding(Ui.dp(c, 8), Ui.dp(c, 3), Ui.dp(c, 8), Ui.dp(c, 3));
+                badge.setBackground(new android.graphics.drawable.RippleDrawable(
+                        android.content.res.ColorStateList.valueOf(Appearance.ripple(c)),
+                        Ui.shape(c, reactions.containsKey(uid) ? R.color.action_green_soft : R.color.card, 14), null));
+                badge.setContentDescription(c.getString(R.string.message_reactions, label));
+                badge.setOnClickListener(view -> actions.accept(doc));
+                LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(-2, -2);
+                badgeParams.gravity = bubbleParams.gravity;
+                badgeParams.setMarginStart(Ui.dp(c, mine ? 0 : 8));
+                badgeParams.setMarginEnd(Ui.dp(c, mine ? 8 : 0));
+                root.addView(badge, badgeParams);
+            }
+        }
+    }
+    static String quoteText(android.content.Context context, String kind, String text, boolean mine, DocumentSnapshot original) {
+        if (original != null && (HistoryRetention.expired(original) || Boolean.TRUE.equals(original.getBoolean("deletedForAll")))) {
+            return context.getString(R.string.reply_unavailable);
+        }
+        if ("nudge".equals(kind)) return context.getString(mine ? R.string.nudge_sent : R.string.nudge_received);
+        return text == null || text.isEmpty() ? context.getString(R.string.reply_unavailable) : text;
+    }
+    static LinearLayout quoteView(android.content.Context context, String author, String excerpt) {
+        LinearLayout quote = Ui.row(context);
+        quote.setBackground(Ui.shape(context, R.color.action_green_soft, 8));
+        quote.setPadding(Ui.dp(context, 6), Ui.dp(context, 5), Ui.dp(context, 8), Ui.dp(context, 5));
+        android.view.View rule = new android.view.View(context);
+        rule.setBackground(Ui.shape(context, R.color.action_green, 2));
+        quote.addView(rule, new LinearLayout.LayoutParams(Ui.dp(context, 3), -1));
+        LinearLayout copy = Ui.column(context);
+        copy.setPadding(Ui.dp(context, 7), 0, 0, 0);
+        TextView title = Ui.text(context, author, 12, true);
+        title.setMaxLines(1);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        TextView preview = Ui.text(context, excerpt, 12, false);
+        preview.setMaxLines(2);
+        preview.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(title);
+        copy.addView(preview);
+        quote.addView(copy);
+        return quote;
     }
     private void bindNotice(LinearLayout root, Notice notice) {
         android.content.Context context = root.getContext(); root.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -133,5 +216,15 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         return DateFormat.getDateInstance(DateFormat.MEDIUM).format(timestamp.toDate());
     }
     @Override public int getItemCount() { return items.size(); }
+    boolean scrollToMessage(RecyclerView list, String id) {
+        for (int position = 0; position < items.size(); position++) {
+            DocumentSnapshot doc = items.get(position).message;
+            if (doc != null && id.equals(doc.getId())) {
+                list.scrollToPosition(position);
+                return true;
+            }
+        }
+        return false;
+    }
     DocumentSnapshot at(int position) { return position >= 0 && position < items.size() ? items.get(position).message : null; }
 }

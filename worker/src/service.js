@@ -83,6 +83,8 @@ export async function openChat(db, user, data) {
 }
 export async function persistMessage(db, uid, data) {
   const message = normalizeMessage(data);
+  const replyToId = data.replyToId ?? null;
+  requireValue(replyToId === null || (validMessageId(replyToId) && replyToId !== data.messageId));
   const jobId = data.chatId + "_" + data.messageId;
   const created = await db.transaction(async tx => {
     const path = `chats/${data.chatId}/messages/${data.messageId}`;
@@ -90,14 +92,26 @@ export async function persistMessage(db, uid, data) {
     if (!chat || !chat.data.members.includes(uid)) throw new ApiError(403, "permission-denied");
     if (existing) {
       if (existing.data.expired) throw new ApiError(404, "not-found");
-      if (existing.data.senderId !== uid || existing.data.text !== message.text) throw new ApiError(409, "already-exists");
+      if (existing.data.senderId !== uid || existing.data.text !== message.text
+          || (existing.data.reply?.messageId ?? null) !== replyToId) throw new ApiError(409, "already-exists");
       return false;
     }
     const recipientId = chat.data.members.find(member => member !== uid);
     const now = new Date();
     const expiresAt = expiration(chat.data, now);
+    let reply;
+    if (replyToId) {
+      const original = (await tx.get(`chats/${data.chatId}/messages/${replyToId}`))?.data;
+      const clearedBefore = chat.data.clearedBefore?.[uid];
+      if (!original || original.deletedForAll || original.expired || original.hiddenFor?.includes(uid)
+          || (original.expiresAt && original.expiresAt <= now) || (clearedBefore && original.createdAt <= clearedBefore)) {
+        throw new ApiError(404, "not-found");
+      }
+      reply = {messageId: replyToId, senderId: original.senderId, kind: original.kind || "message",
+        expiresAt: original.expiresAt ?? null, ...(original.expiresAt ? {} : {text: original.text.slice(0, 220)})};
+    }
     addUnread(chat.data, recipientId, expiresAt);
-    tx.set(path, {...message, senderId: uid, createdAt: now, expiresAt, expired: false, unreadTracked: true}, false);
+    tx.set(path, {...message, ...(reply ? {reply} : {}), senderId: uid, createdAt: now, expiresAt, expired: false, unreadTracked: true}, false);
     tx.set(`chats/${data.chatId}`, {...chat.data, lastText: message.text, updatedAt: now, lastMessageId: data.messageId,
       lastSenderId: uid, lastKind: "message", lastExpiresAt: expiresAt, lastExpired: false, lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
     tx.set(`notificationOutbox/${jobId}`, {chatId: data.chatId, messageId: data.messageId, recipientId,

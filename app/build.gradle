@@ -8,8 +8,8 @@ android {
         applicationId 'br.com.falai'
         minSdk 24
         targetSdk 36
-        versionCode 2
-        versionName '1.1'
+        versionCode 4
+        versionName '1.2.1'
         buildConfigField 'String', 'WORKER_URL', '"https://falai-notificacoes.robraym-studio.workers.dev"'
         if (!file('google-services.json').exists()) { resValue 'string', 'default_web_client_id', '' }
     }

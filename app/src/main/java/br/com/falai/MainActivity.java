@@ -31,14 +31,19 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.MetadataChanges;
 import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.Source;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 
 public final class MainActivity extends FalaiActivity {
+    private static final long LOADING_INDICATOR_DELAY_MS = 1000;
+    private static final long CONVERSATIONS_SPLASH_TIMEOUT_MS = 2500;
     private LinearLayout root, body;
+    private View conversationsSplash;
     private TextView messageSoundSummary;
     private ListenerRegistration chatsListener;
     private ListenerRegistration defaultTimerListener;
@@ -114,6 +119,7 @@ public final class MainActivity extends FalaiActivity {
         ContactsRepository.clear(); contacts = null; contactsAt = 0; if (home && tab == 1) showHome(1);
     }
     private void page(String title) {
+        dismissConversationsSplash();
         detach(); generation++; root = Ui.root(this); root.addView(Ui.heading(this, title));
         body = Ui.column(this); int inset = getResources().getDimensionPixelSize(R.dimen.navigation_content_inset);
         body.setPadding(inset, getResources().getDimensionPixelSize(R.dimen.screen_header_content_gap), inset, 0);
@@ -150,21 +156,82 @@ public final class MainActivity extends FalaiActivity {
     }
     private void loadProfile() {
         loadingProfile = true;
-        home = false; page(getString(R.string.app_name)); TextView loading = Ui.text(this, getString(R.string.loading), 15, false); body.addView(loading);
-        Backend.db().collection("users").document(Backend.uid()).get().addOnCompleteListener(this, task -> {
+        home = false;
+        detach();
+        generation++;
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        setContentView(R.layout.view_startup_splash);
+        String owner = Backend.uid();
+        Backend.db().collection("users").document(owner).get(Source.CACHE).addOnCompleteListener(this, cached -> {
+            if (!owner.equals(Backend.uid())) return;
+            boolean openedFromCache = cached.isSuccessful() && cached.getResult().exists();
+            if (openedFromCache) {
+                loadingProfile = false;
+                openHomeWithProfile(cached.getResult());
+            }
+            refreshProfile(owner, openedFromCache);
+        });
+    }
+    private void showLoadingAfterDelay(TextView indicator) {
+        indicator.postDelayed(() -> {
+            if (indicator.isAttachedToWindow() && getText(R.string.loading).equals(indicator.getText())) {
+                indicator.setVisibility(View.VISIBLE);
+            }
+        }, LOADING_INDICATOR_DELAY_MS);
+    }
+    private void refreshProfile(String owner, boolean openedFromCache) {
+        Backend.db().collection("users").document(owner).get().addOnCompleteListener(this, task -> {
+            if (!owner.equals(Backend.uid())) return;
             loadingProfile = false;
-            if (!task.isSuccessful()) { body.removeAllViews(); info(R.string.profile, R.string.error_connection).addView(Ui.button(this, R.string.retry, v -> loadProfile())); return; }
+            if (!task.isSuccessful()) {
+                if (!openedFromCache) {
+                    page(getString(R.string.app_name));
+                    info(R.string.profile, R.string.error_connection).addView(Ui.button(this, R.string.retry, v -> loadProfile()));
+                }
+                return;
+            }
             DocumentSnapshot profile = task.getResult();
-            if (!profile.exists()) { showProfileForm(); return; }
-            profileName = profile.getString("name"); email = profile.getString("email"); profileLoaded = true; listenDefaultTimer();
-            Backend.registerDevice().addOnFailureListener(this, error -> {
-                DeviceRegistrationWorker.schedule(); toast(getString(R.string.notifications_registration_error));
-            }); showHome(tab); openNotificationIntent(getIntent());
-            if (Build.VERSION.SDK_INT >= 33 && !getPreferences(MODE_PRIVATE).getBoolean("notification_prompted", false)) {
-                getPreferences(MODE_PRIVATE).edit().putBoolean("notification_prompted", true).apply();
-                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);
+            if (!profile.exists()) {
+                home = false;
+                profileLoaded = false;
+                showProfileForm();
+            } else if (openedFromCache) {
+                profileName = profile.getString("name");
+                email = profile.getString("email");
+            } else {
+                openHomeWithProfile(profile);
             }
         });
+    }
+    private void openHomeWithProfile(DocumentSnapshot profile) {
+        profileName = profile.getString("name"); email = profile.getString("email"); profileLoaded = true; listenDefaultTimer();
+        Backend.registerDevice().addOnFailureListener(this, error -> {
+            DeviceRegistrationWorker.schedule(); toast(getString(R.string.notifications_registration_error));
+        });
+        View splash = findViewById(R.id.startup_splash);
+        showHome(tab);
+        if (splash != null && tab == 0 && !selectingContact && cachedChats.isEmpty() && !getIntent().hasExtra("chatId")) {
+            TextView status = splash.findViewById(R.id.startup_status);
+            status.setText(R.string.startup_loading_conversations);
+            conversationsSplash = splash;
+            addContentView(splash, new FrameLayout.LayoutParams(-1, -1));
+            splash.postDelayed(() -> {
+                if (conversationsSplash == splash) dismissConversationsSplash();
+            }, CONVERSATIONS_SPLASH_TIMEOUT_MS);
+        }
+        openNotificationIntent(getIntent());
+        if (Build.VERSION.SDK_INT >= 33 && !getPreferences(MODE_PRIVATE).getBoolean("notification_prompted", false)) {
+            getPreferences(MODE_PRIVATE).edit().putBoolean("notification_prompted", true).apply();
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);
+        }
+    }
+    private void dismissConversationsSplash() {
+        if (conversationsSplash == null) return;
+        android.view.ViewParent parent = conversationsSplash.getParent();
+        if (parent instanceof android.view.ViewGroup) {
+            ((android.view.ViewGroup) parent).removeView(conversationsSplash);
+        }
+        conversationsSplash = null;
     }
     private void showProfileForm() {
         page(getString(R.string.profile_title)); LinearLayout card = Ui.card(this); scrollBody().addView(card);
@@ -227,6 +294,7 @@ public final class MainActivity extends FalaiActivity {
         area.setId(R.id.floating_search_content_area);
         LinearLayout content = Ui.column(this); area.addView(content, new FrameLayout.LayoutParams(-1, -1));
         int current = generation; TextView state = Ui.text(this, getString(R.string.loading), 14, false); state.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), 0, Ui.dp(this, 12)); content.addView(state);
+        state.setVisibility(View.GONE);
         RowsAdapter adapter = new RowsAdapter(); RecyclerView conversations = list(content, adapter);
         conversations.setPadding(conversations.getPaddingLeft(), conversations.getPaddingTop(), conversations.getPaddingRight(), Ui.dp(this, 88));
         ImageButton start = new ImageButton(this); start.setImageResource(R.drawable.ic_new_chat);
@@ -288,12 +356,19 @@ public final class MainActivity extends FalaiActivity {
         retentionRefresh = () -> display.accept(cachedChats);
         if (!cachedChats.isEmpty()) display.accept(cachedChats);
         chatsListener = Backend.db().collection("chats").whereArrayContains("members", Backend.uid()).orderBy("updatedAt", Query.Direction.DESCENDING).limit(100)
-                .addSnapshotListener(this, (snap, error) -> {
+                .addSnapshotListener(this, MetadataChanges.INCLUDE, (snap, error) -> {
                     if (generation != current) return;
-                    if (error != null) { state.setVisibility(View.VISIBLE); state.setText(R.string.error_connection); return; }
+                    if (error != null) { dismissConversationsSplash(); state.setVisibility(View.VISIBLE); state.setText(R.string.error_connection); return; }
                     if (snap == null) return;
-                    if (snap.isEmpty() && snap.getMetadata().isFromCache()) return;
+                    if (snap.isEmpty() && snap.getMetadata().isFromCache()) {
+                        if (cachedChats.isEmpty()) {
+                            state.setText(R.string.loading);
+                            showLoadingAfterDelay(state);
+                        }
+                        return;
+                    }
                     cachedChats.clear(); cachedChats.addAll(snap.getDocuments()); display.accept(cachedChats);
+                    dismissConversationsSplash();
                 });
     }
     private EditText attachSearch(FrameLayout area, View dismiss, String key) {
@@ -408,6 +483,9 @@ public final class MainActivity extends FalaiActivity {
         soundRow.setOnClickListener(view -> messageSounds.show(() -> {
             if (messageSoundSummary != null) messageSoundSummary.setText(MessageSounds.label(this, MessageSounds.selected(this)));
         })); soundRow.setFocusable(true); general.addView(soundRow);
+        general.addView(Ui.optionRow(this, R.drawable.ic_settings, getString(R.string.app_update),
+                getString(R.string.apk_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                true, view -> showAppUpdate()));
         general.addView(Ui.optionRow(this, R.drawable.ic_logout, getString(R.string.sign_out), getString(R.string.sign_out_summary), true, v -> new AlertDialog.Builder(this).setMessage(R.string.sign_out_question).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.sign_out, (dialog, which) -> {
             Backend.signOut().addOnCompleteListener(this, task -> {
                 if (!task.isSuccessful() && !Backend.uid().isEmpty()) { toast(Backend.error(this, task.getException())); return; }
@@ -415,6 +493,49 @@ public final class MainActivity extends FalaiActivity {
                 getSystemService(android.app.NotificationManager.class).cancelAll();
             });
         }).show()));
+    }
+    private void showAppUpdate() {
+        AlertDialog about = new AlertDialog.Builder(this)
+                .setTitle(R.string.app_update)
+                .setMessage(getString(R.string.apk_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.check_apk_update, null)
+                .create();
+        about.setOnShowListener(dialog -> about.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> checkAppUpdate(about)));
+        about.show();
+    }
+    private void checkAppUpdate(AlertDialog about) {
+        Button check = about.getButton(AlertDialog.BUTTON_POSITIVE);
+        check.setEnabled(false);
+        about.setMessage(getString(R.string.checking_apk_update));
+        AppUpdate.check().addOnCompleteListener(task -> {
+            if (isFinishing() || isDestroyed() || !about.isShowing()) return;
+            check.setEnabled(true);
+            if (!task.isSuccessful()) {
+                about.setMessage(getString(R.string.apk_update_check_failed));
+                return;
+            }
+            AppUpdate update = task.getResult();
+            if (update == null) {
+                about.setMessage(getString(R.string.apk_update_unpublished));
+                return;
+            }
+            if (update.versionCode <= BuildConfig.VERSION_CODE) {
+                about.setMessage(getString(R.string.apk_up_to_date, BuildConfig.VERSION_NAME));
+                return;
+            }
+            about.setMessage(getString(R.string.apk_update_available, update.versionName));
+            check.setText(R.string.download_apk);
+            check.setOnClickListener(view -> {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, update.download));
+                    about.dismiss();
+                } catch (android.content.ActivityNotFoundException error) {
+                    about.setMessage(getString(R.string.apk_update_no_browser));
+                }
+            });
+        });
     }
     @Override protected void onHistoryRetentionChanged() {
         if (home && profileLoaded && tab == 0 && retentionRefresh != null) retentionRefresh.run();

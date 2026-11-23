@@ -152,4 +152,10 @@ O endpoint público `GET /health` verifica OAuth, leitura do Firestore e `valida
 
 A rotina Cron pode demorar alguns minutos para propagar após a publicação. O envio imediato usa o Worker da requisição e não espera o Cron.
 
+### Atualizações do APK
+
+Em **Ajustes → Atualização do aplicativo → Verificar atualização**, o app consulta a última versão estável no GitHub Releases. O botão **Baixar APK** aparece quando a versão publicada é mais nova que a instalada. O navegador baixa o arquivo e o usuário confirma a instalação no Android.
+
+Para distribuir uma versão, aumente o `versionCode` e assine o APK com o mesmo certificado da versão instalada pelos destinatários. Publique uma release estável em `robraym/falei` com a tag no formato `v<versionName>-apk.<versionCode>` e anexe o APK com o nome `falai.apk`. Por exemplo, use a tag `v1.2-apk.3` para a versão 1.2 de código 3. Marque a release como a mais recente ao publicá-la.
+
 Compilação e testes locais não confirmam aparência, login Google no aparelho ou entrega real com o app fechado. Esse teste final exige autorização para usar os aparelhos.

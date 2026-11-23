@@ -20,6 +20,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.MetadataChanges;
 import com.google.firebase.firestore.Query;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -28,11 +29,14 @@ import java.util.List;
 import java.util.Map;
 
 public final class ChatActivity extends FalaiActivity {
+    private static final String[] REACTIONS = {"👍", "❤️", "😂", "😮", "😢", "🙏"};
+    private static final int[] REACTION_NAMES = {R.string.reaction_like, R.string.reaction_love,
+            R.string.reaction_laugh, R.string.reaction_surprised, R.string.reaction_sad, R.string.reaction_thanks};
     static volatile String visibleChat;
     private String chatId, name, otherUid = "";
     private ChatViewModel model;
     private EditText composer;
-    private LinearLayout composerRow, retryRow;
+    private LinearLayout composerRow, retryRow, replyPreview;
     private TextView status, title, searchSummary;
     private FloatingSearchController floatingSearch;
     private String messageQuery = "";
@@ -50,11 +54,12 @@ public final class ChatActivity extends FalaiActivity {
     private DocumentSnapshot oldest;
     private boolean loadingOlder, historyExhausted;
     private boolean chatReady;
-    private List<DocumentSnapshot> pendingDocs;
     private com.google.firebase.Timestamp clearedBefore;
     private long localHistoryCutoff;
     private int timerHours;
     private DocumentSnapshot historyCursor;
+    private DocumentSnapshot liveHistoryEnd;
+    private final java.util.Set<String> reacting = new java.util.HashSet<>();
     private com.google.firebase.Timestamp timerFormatSince, listenerFormatSince;
     private final java.util.Set<String> deliveryQueued = new java.util.HashSet<>(), readQueued = new java.util.HashSet<>();
     static void open(Context context, String id, String name) {
@@ -70,6 +75,7 @@ public final class ChatActivity extends FalaiActivity {
         if (freshModel && state != null) {
             model.draft = state.getString("draft", ""); model.pendingId = state.getString("pendingId");
             model.pendingText = state.getString("pendingText"); model.failed = model.pendingId != null;
+            model.reply = state.getBundle("reply");
         }
         LinearLayout root = Ui.root(this);
         NavigationSurface.attachCard(root);
@@ -89,7 +95,8 @@ public final class ChatActivity extends FalaiActivity {
         searchSummary = Ui.text(this, "", 12, false); searchSummary.setVisibility(View.GONE); root.addView(searchSummary);
         older = Ui.button(this, R.string.older_messages, v -> loadOlder()); older.setVisibility(View.GONE); root.addView(older);
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
-        messages.setLayoutManager(layoutManager); adapter = new MessageAdapter(Backend.uid(), this::messageActions); messages.setAdapter(adapter);
+        messages.setLayoutManager(layoutManager); adapter = new MessageAdapter(Backend.uid(), this::messageActions,
+                loaded::get, () -> name, this::jumpToMessage); messages.setAdapter(adapter);
         retentionNotice = new RetentionNoticeController(this, notices -> {
             boolean bottom = layoutManager.findLastVisibleItemPosition() >= adapter.getItemCount() - 3;
             adapter.setNotices(notices);
@@ -107,6 +114,10 @@ public final class ChatActivity extends FalaiActivity {
         retryRow.addView(Ui.button(this, R.string.retry, v -> model.retry()), new LinearLayout.LayoutParams(0, -2, 1));
         retryRow.addView(Ui.button(this, R.string.discard, v -> model.discard()), new LinearLayout.LayoutParams(0, -2, 1));
         retryRow.setVisibility(View.GONE); root.addView(retryRow);
+        replyPreview = Ui.row(this);
+        replyPreview.setGravity(Gravity.CENTER_VERTICAL);
+        replyPreview.setVisibility(View.GONE);
+        root.addView(replyPreview);
         composerRow = Ui.row(this); composerRow.setGravity(Gravity.BOTTOM); composerRow.setBaselineAligned(false);
         composerRow.setPadding(Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 8));
         LinearLayout inputBar = Ui.row(this); inputBar.setGravity(Gravity.BOTTOM); inputBar.setBaselineAligned(false);
@@ -155,15 +166,19 @@ public final class ChatActivity extends FalaiActivity {
         super.onStart(); if (model == null) return;
         loadingOlder = false; older.setEnabled(true);
         if (Backend.uid().isEmpty()) { finish(); return; }
-        chatReady = false; pendingDocs = null;
-        chatListener = Backend.db().collection("chats").document(chatId).addSnapshotListener(this, (doc, error) -> {
-            if (error != null || doc == null || !doc.exists()) { status.setVisibility(View.VISIBLE); status.setText(R.string.error_chat_loading); return; }
+        chatReady = false;
+        chatListener = Backend.db().collection("chats").document(chatId).addSnapshotListener(this, MetadataChanges.INCLUDE, (doc, error) -> {
+            if (error != null || doc == null || (!doc.exists() && !doc.getMetadata().isFromCache())) {
+                showLoadError("Conversation metadata", error);
+                return;
+            }
+            if (!doc.exists()) return;
             com.google.firebase.Timestamp previousCutoff = clearedBefore;
             boolean initial = !chatReady;
             clearedBefore = (com.google.firebase.Timestamp) doc.get("clearedBefore." + Backend.uid()); chatReady = true;
             Long hours = doc.getLong("timerHours"); timerHours = hours == null ? 0 : hours.intValue();
             timerFormatSince = doc.getTimestamp("timerFormatSince");
-            if (!java.util.Objects.equals(listenerFormatSince, timerFormatSince)) startMessageListener();
+            if (listener == null || !java.util.Objects.equals(listenerFormatSince, timerFormatSince)) startMessageListener();
             @SuppressWarnings("unchecked") List<String> members = (List<String>) doc.get("members");
             if (members != null) for (String member : members) if (!member.equals(Backend.uid())) { otherUid = member; avatar.load(member, name); presence.listen(member); }
             @SuppressWarnings("unchecked") Map<String, String> names = (Map<String, String>) doc.get("names");
@@ -172,30 +187,28 @@ public final class ChatActivity extends FalaiActivity {
             ((ProfileNameView) title).bind(otherUid, fallbackName, resolved -> {
                 name = resolved; avatar.load(otherUid, resolved); retentionNotice.setContactName(resolved);
             });
-            if (pendingDocs != null) {
-                merge(pendingDocs); older.setVisibility(!historyExhausted && pendingDocs.size() >= 50 && oldest != null ? View.VISIBLE : View.GONE);
-                if (adapter.getItemCount() > 0) messages.scrollToPosition(adapter.getItemCount() - 1); pendingDocs = null;
-                if (!model.busy && !model.failed) { status.setText(R.string.new_conversation); status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); }
-            }
-            else if (initial || !java.util.Objects.equals(previousCutoff, clearedBefore)) {
+            if (initial || !java.util.Objects.equals(previousCutoff, clearedBefore)) {
                 merge(java.util.Collections.emptyList());
-                if (!model.busy && !model.failed) { status.setText(R.string.new_conversation); status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); }
             }
         });
-        startMessageListener();
     }
     private void startMessageListener() {
         if (listener != null) listener.remove(); listenerFormatSince = timerFormatSince;
-        listener = query().limit(50).addSnapshotListener(this, (snapshot, error) -> {
-            if (error != null) { status.setVisibility(View.VISIBLE); status.setText(R.string.error_chat_loading); return; }
+        Query history = liveHistoryEnd == null ? query().limit(50) : query().endAt(liveHistoryEnd);
+        listener = history.addSnapshotListener(this, (snapshot, error) -> {
+            if (error != null) { showLoadError("Message history", error); return; }
             if (snapshot == null) return;
-            if (!chatReady) { pendingDocs = snapshot.getDocuments(); return; }
             boolean bottom = loaded.isEmpty() || layoutManager.findLastVisibleItemPosition() >= adapter.getItemCount() - 3;
             merge(snapshot.getDocuments());
             if (bottom && adapter.getItemCount() > 0) messages.scrollToPosition(adapter.getItemCount() - 1);
             older.setVisibility(!historyExhausted && (snapshot.size() >= 50 || loaded.size() > 50) ? View.VISIBLE : View.GONE);
             if (!model.busy && !model.failed) { status.setText(R.string.new_conversation); status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); }
         });
+    }
+    private void showLoadError(String source, com.google.firebase.firestore.FirebaseFirestoreException error) {
+        if (error != null) android.util.Log.w("ChatActivity", source + ": " + error.getCode());
+        status.setVisibility(View.VISIBLE);
+        status.setText(R.string.error_chat_loading);
     }
     @Override protected void onResume() { super.onResume(); visibleChat = chatId; if (presence != null) presence.resume(); if (messages != null) messages.post(this::acknowledgeVisible); }
     @Override public void onWindowFocusChanged(boolean focused) { super.onWindowFocusChanged(focused); if (focused && messages != null) messages.post(this::acknowledgeVisible); }
@@ -268,13 +281,36 @@ public final class ChatActivity extends FalaiActivity {
         }
     }
     private void messageActions(DocumentSnapshot doc) {
-        if (!Backend.uid().equals(doc.getString("senderId"))) return;
         if (doc.getId().equals(model.pendingId)) { toast(model.busy ? R.string.sending : R.string.error_send); return; }
+        if (HistoryRetention.expired(doc)) return;
+        boolean mine = Backend.uid().equals(doc.getString("senderId"));
         boolean deleted = Boolean.TRUE.equals(doc.getBoolean("deletedForAll"));
         boolean nudge = "nudge".equals(doc.getString("kind"));
-        String[] choices = deleted ? new String[]{getString(R.string.delete_for_me), getString(R.string.cancel)} : nudge ? new String[]{getString(R.string.delete_for_all), getString(R.string.delete_for_me), getString(R.string.cancel)} : new String[]{getString(R.string.edit_message), getString(R.string.delete_for_all), getString(R.string.delete_for_me), getString(R.string.cancel)};
-        new AlertDialog.Builder(this).setItems(choices, (menu, selected) -> {
-            if (selected == choices.length - 1) return;
+        if (!mine && deleted) return;
+        AlertDialog.Builder menuBuilder = new AlertDialog.Builder(this);
+        LinearLayout picker = Ui.row(this);
+        if (!deleted) {
+            picker.setGravity(Gravity.CENTER);
+            picker.setPadding(Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14));
+            menuBuilder.setCustomTitle(picker);
+        }
+        if (!mine) menuBuilder.setNegativeButton(R.string.cancel, null);
+        String currentReaction = currentReaction(doc);
+        if (!deleted && currentReaction != null) {
+            menuBuilder.setNeutralButton(R.string.remove_reaction, (menu, selected) -> saveReaction(doc, null));
+        }
+        java.util.List<String> choices = new ArrayList<>();
+        if (!deleted) choices.add(getString(R.string.reply_message));
+        if (mine) {
+            if (!deleted && !nudge) choices.add(getString(R.string.edit_message));
+            if (!deleted) choices.add(getString(R.string.delete_for_all));
+            choices.add(getString(R.string.delete_for_me));
+            choices.add(getString(R.string.cancel));
+        }
+        menuBuilder.setItems(choices.toArray(new String[0]), (menu, item) -> {
+            if (!deleted && item == 0) { beginReply(doc); return; }
+            if (item == choices.size() - 1) return;
+            int selected = deleted ? item : item - 1;
             if (!deleted && !nudge && selected == 0) {
                 EditText field = Ui.input(this, R.string.message_hint); field.setSingleLine(false); field.setText(doc.getString("text"));
                 AlertDialog edit = new AlertDialog.Builder(this).setTitle(R.string.edit_message).setView(field).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create();
@@ -291,7 +327,98 @@ public final class ChatActivity extends FalaiActivity {
                         if (!task.isSuccessful()) Toast.makeText(this, Backend.error(this, task.getException()), Toast.LENGTH_LONG).show();
                     })).show();
             }
-        }).show();
+        });
+        AlertDialog dialog = menuBuilder.create();
+        if (!deleted) populateReactionPicker(picker, doc, currentReaction, dialog);
+        dialog.show();
+    }
+    private void beginReply(DocumentSnapshot doc) {
+        if (model.pendingId != null || HistoryRetention.expired(doc)) return;
+        Bundle reply = new Bundle();
+        reply.putString("id", doc.getId());
+        reply.putString("sender", doc.getString("senderId"));
+        reply.putString("kind", doc.getString("kind"));
+        if (doc.getTimestamp("expiresAt") == null) reply.putString("text", doc.getString("text"));
+        model.reply = reply;
+        model.changed();
+        composer.requestFocus();
+        composer.post(() -> ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
+                .showSoftInput(composer, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT));
+    }
+    private void renderReplyPreview() {
+        replyPreview.removeAllViews();
+        Bundle reply = model.reply;
+        replyPreview.setVisibility(reply == null ? View.GONE : View.VISIBLE);
+        if (reply == null) return;
+        String id = reply.getString("id");
+        DocumentSnapshot original = loaded.get(id);
+        String text = original == null ? reply.getString("text") : original.getString("text");
+        boolean mine = Backend.uid().equals(reply.getString("sender"));
+        LinearLayout quote = MessageAdapter.quoteView(this, mine ? getString(R.string.reply_you) : name,
+                MessageAdapter.quoteText(this, reply.getString("kind"), text, mine, original));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1);
+        params.setMarginStart(Ui.dp(this, 4));
+        replyPreview.addView(quote, params);
+        TextView close = Ui.text(this, "×", 24, true);
+        close.setGravity(Gravity.CENTER);
+        close.setContentDescription(getString(R.string.cancel_reply));
+        close.setEnabled(model.pendingId == null);
+        close.setOnClickListener(view -> { model.reply = null; model.changed(); });
+        replyPreview.addView(close, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)));
+    }
+    private void jumpToMessage(String id) {
+        if (adapter.scrollToMessage(messages, id)) return;
+        if (loaded.containsKey(id) && !messageQuery.isEmpty() && floatingSearch != null) {
+            floatingSearch.getInput().setText("");
+            if (adapter.scrollToMessage(messages, id)) return;
+        }
+        toast(older.getVisibility() == View.VISIBLE ? R.string.reply_load_older : R.string.reply_unavailable);
+    }
+    private String currentReaction(DocumentSnapshot doc) {
+        Object values = doc.get("reactions");
+        Object current = values instanceof java.util.Map ? ((java.util.Map<?, ?>) values).get(Backend.uid()) : null;
+        return current instanceof String ? (String) current : null;
+    }
+    private void populateReactionPicker(LinearLayout picker, DocumentSnapshot doc, String current, AlertDialog dialog) {
+        for (int index = 0; index < REACTIONS.length; index++) {
+            String emoji = REACTIONS[index];
+            boolean selected = emoji.equals(current);
+            TextView option = Ui.text(this, emoji, 23, false);
+            option.setGravity(Gravity.CENTER);
+            option.setBackground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(Appearance.ripple(this)),
+                    Ui.shape(this, selected ? R.color.action_green_soft : R.color.card, 24), null));
+            option.setSelected(selected);
+            option.setFocusable(true);
+            option.setContentDescription(getString(REACTION_NAMES[index]));
+            option.setOnClickListener(view -> {
+                dialog.dismiss();
+                saveReaction(doc, selected ? null : emoji);
+            });
+            picker.addView(option, new LinearLayout.LayoutParams(0, Ui.dp(this, 48), 1));
+        }
+        TextView more = Ui.text(this, "+", 23, true);
+        more.setGravity(Gravity.CENTER);
+        more.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Appearance.ripple(this)),
+                Ui.shape(this, R.color.action_green_soft, 24), null));
+        more.setFocusable(true);
+        more.setContentDescription(getString(R.string.more_reactions));
+        more.setOnClickListener(view -> {
+            dialog.dismiss();
+            EmojiPicker.show(this, emoji -> saveReaction(doc, emoji.equals(current) ? null : emoji));
+        });
+        picker.addView(more, new LinearLayout.LayoutParams(0, Ui.dp(this, 48), 1));
+    }
+    private void saveReaction(DocumentSnapshot doc, String emoji) {
+        if (!reacting.add(doc.getId())) return;
+        Backend.call("setMessageReaction", Backend.data("chatId", chatId, "messageId", doc.getId(),
+                "emoji", emoji == null ? org.json.JSONObject.NULL : emoji)).addOnCompleteListener(task -> {
+            reacting.remove(doc.getId());
+            if (!task.isSuccessful() && getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                Toast.makeText(this, Backend.error(this, task.getException()), Toast.LENGTH_LONG).show();
+            }
+        });
     }
     private void acknowledgeVisible() {
         if (!chatId.equals(visibleChat) || !hasWindowFocus() || !getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return;
@@ -311,6 +438,10 @@ public final class ChatActivity extends FalaiActivity {
             loadingOlder = false; older.setEnabled(true);
             if (!task.isSuccessful()) { toast(R.string.error_connection); return; }
             merge(task.getResult().getDocuments());
+            if (historyCursor != null && !java.util.Objects.equals(historyCursor, liveHistoryEnd)) {
+                liveHistoryEnd = historyCursor;
+                startMessageListener();
+            }
             layoutManager.scrollToPositionWithOffset(Math.max(0, position + adapter.getItemCount() - before), 0);
             historyExhausted = task.getResult().size() < 50; older.setVisibility(historyExhausted ? View.GONE : View.VISIBLE);
         });
@@ -320,6 +451,7 @@ public final class ChatActivity extends FalaiActivity {
         if (model.nudgeNotice != 0) { toast(model.nudgeNotice); model.nudgeNotice = 0; }
         Ui.enable(composerRow, !model.busy && model.pendingId == null); retryRow.setVisibility(model.failed ? View.VISIBLE : View.GONE);
         if (!composer.getText().toString().equals(model.draft)) composer.setText(model.draft);
+        renderReplyPreview();
         if (model.busy) { status.setVisibility(View.VISIBLE); status.setText(R.string.sending); }
         else if (model.failed) { status.setVisibility(View.VISIBLE); status.setText(R.string.error_send); }
         else { status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); status.setText(R.string.new_conversation); }
@@ -340,6 +472,7 @@ public final class ChatActivity extends FalaiActivity {
     @Override protected void onSaveInstanceState(@NonNull Bundle out) {
         super.onSaveInstanceState(out); if (model == null) return;
         out.putString("messageQuery", messageQuery); out.putString("draft", model.draft); out.putString("pendingId", model.pendingId); out.putString("pendingText", model.pendingText);
+        out.putBundle("reply", model.reply);
     }
     private void toast(int message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
 }
