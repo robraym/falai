@@ -36,3 +36,22 @@ test("streamed Firestore errors are decoded instead of being mistaken for empty 
   const db = new Firestore({FIREBASE_PROJECT_ID: "demo-falai"}, "http://emulator/v1");
   await assert.rejects(db.query("notificationOutbox"), {code: "database-failed-precondition"});
 });
+
+test("transaction conflicts retry with the previous token and permanent errors do not retry", async context => {
+  const db = new Firestore({FIREBASE_PROJECT_ID: "demo-falai"}, "http://emulator/v1");
+  const starts = []; let commits = 0, rollbacks = 0;
+  context.mock.method(db, "request", async (path, body) => {
+    if (path === ":beginTransaction") { starts.push(body.options.readWrite); return {transaction: "tx-" + starts.length}; }
+    if (path === ":rollback") { rollbacks++; return {}; }
+    if (path === ":commit") {
+      commits++;
+      if (commits === 1) throw Object.assign(new Error("conflict"), {retryable: true});
+      return {};
+    }
+    assert.fail(path);
+  });
+  assert.equal(await db.transaction(async tx => { tx.set("items/one", {ok: true}); return "done"; }), "done");
+  assert.deepEqual(starts, [{}, {retryTransaction: "tx-1"}]); assert.equal(commits, 2); assert.equal(rollbacks, 1);
+  await assert.rejects(db.transaction(async () => { throw new Error("permission-denied"); }), /permission-denied/);
+  assert.equal(starts.length, 3); assert.equal(rollbacks, 2);
+});

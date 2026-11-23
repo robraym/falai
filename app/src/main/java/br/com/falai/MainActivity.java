@@ -37,7 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 
-public final class MainActivity extends AppCompatActivity {
+public final class MainActivity extends FalaiActivity {
     private LinearLayout root, body;
     private ListenerRegistration chatsListener;
     private String email = "", profileName = "";
@@ -47,11 +47,25 @@ public final class MainActivity extends AppCompatActivity {
     private ContactsRepository.Result contacts;
     private long contactsAt;
     private android.os.CancellationSignal googleCancellation;
+    private FloatingSearchController floatingSearch;
+    private String chatQuery = "", contactQuery = "";
+    public static final class ConversationState extends androidx.lifecycle.ViewModel {
+        final List<DocumentSnapshot> documents = new ArrayList<>();
+        final Map<String, com.google.firebase.Timestamp> locallyCleared = new java.util.HashMap<>(); String owner = "";
+    }
+    private ConversationState chatState;
+    private List<DocumentSnapshot> cachedChats;
+    private boolean observingContacts;
+    private final android.os.Handler contactsHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable refreshContacts = this::reloadContacts;
+    private final android.database.ContentObserver contactsObserver = new android.database.ContentObserver(contactsHandler) {
+        @Override public void onChange(boolean selfChange) { contactsHandler.removeCallbacks(refreshContacts); contactsHandler.postDelayed(refreshContacts, 500); }
+    };
     private final com.google.firebase.auth.FirebaseAuth.AuthStateListener authListener = auth -> {
         if (!Backend.uid().isEmpty() && !home && !loadingProfile) loadProfile();
     };
     private final ActivityResultLauncher<String> contactsPermission = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
-        if (granted) { contactsAt = 0; showHome(1); } else showContactsPermission(true);
+        if (granted) { observeContacts(); contactsAt = 0; showHome(1); } else showContactsPermission(true);
     });
     private final ActivityResultLauncher<String> notificationPermission = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
         if (granted) Backend.registerDevice();
@@ -59,26 +73,39 @@ public final class MainActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        chatState = new androidx.lifecycle.ViewModelProvider(this).get(ConversationState.class); cachedChats = chatState.documents;
         selectingContact = getIntent().getBooleanExtra("selectContact", false);
-        if (state != null) tab = state.getInt("tab");
+        if (state != null) { tab = state.getInt("tab"); chatQuery = state.getString("chatQuery", ""); contactQuery = state.getString("contactQuery", ""); }
         if (!Backend.ready()) { page(getString(R.string.app_name)); info(R.string.not_ready_title, R.string.not_ready_body); return; }
         if (Backend.uid().isEmpty()) showLogin(); else loadProfile();
     }
-    @Override protected void onSaveInstanceState(@NonNull Bundle out) { super.onSaveInstanceState(out); out.putInt("tab", tab); }
+    @Override protected void onSaveInstanceState(@NonNull Bundle out) { super.onSaveInstanceState(out); out.putInt("tab", tab); out.putString("chatQuery", chatQuery); out.putString("contactQuery", contactQuery); }
     @Override protected void onStart() {
         super.onStart(); if (!Backend.ready()) return;
+        observeContacts();
         if (home && profileLoaded) showHome(tab);
         Backend.auth().addAuthStateListener(authListener);
     }
     @Override protected void onStop() {
         detach(); contactsBusy = false; loadingProfile = false;
+        if (observingContacts) { getContentResolver().unregisterContentObserver(contactsObserver); observingContacts = false; }
+        contactsHandler.removeCallbacks(refreshContacts);
         if (Backend.ready()) Backend.auth().removeAuthStateListener(authListener);
         super.onStop();
     }
     @Override protected void onDestroy() {
         if (googleCancellation != null) googleCancellation.cancel(); super.onDestroy();
     }
-    private void detach() { if (chatsListener != null) { chatsListener.remove(); chatsListener = null; } }
+    private void detach() { if (chatsListener != null) { chatsListener.remove(); chatsListener = null; } if (floatingSearch != null) { floatingSearch.dispose(); floatingSearch = null; } }
+    private void observeContacts() {
+        if (!observingContacts && ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            getContentResolver().registerContentObserver(android.provider.ContactsContract.Data.CONTENT_URI, true, contactsObserver); observingContacts = true;
+        }
+    }
+    private void reloadContacts() {
+        if (contactsBusy) { contactsHandler.postDelayed(refreshContacts, 500); return; }
+        ContactsRepository.clear(); contacts = null; contactsAt = 0; if (home && tab == 1) showHome(1);
+    }
     private void page(String title) {
         detach(); generation++; root = Ui.root(this); root.addView(Ui.heading(this, title));
         body = Ui.column(this); int inset = getResources().getDimensionPixelSize(R.dimen.navigation_content_inset);
@@ -147,7 +174,7 @@ public final class MainActivity extends AppCompatActivity {
     private void showHome(int selected) {
         if (Backend.uid().isEmpty()) { showLogin(); return; }
         home = true; tab = selectingContact ? 1 : selected;
-        page(getString(selectingContact ? R.string.select_contact : R.string.app_name));
+        page(getString(selectingContact ? R.string.contacts : selected == 0 ? R.string.conversations : selected == 1 ? R.string.contacts : R.string.settings));
         if (selectingContact) {
             View heading = root.getChildAt(0); root.removeViewAt(0);
             LinearLayout header = Ui.row(this);
@@ -155,6 +182,9 @@ public final class MainActivity extends AppCompatActivity {
             header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1)); root.addView(header, 0);
             showContacts(); return;
         }
+        View profileButton = root.findViewById(R.id.button_profile);
+        profileButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.action_green_soft, 21), null));
+        profileButton.setVisibility(View.VISIBLE); profileButton.setOnClickListener(v -> startActivity(new Intent(this, ProfileActivity.class)));
         LinearLayout nav = Ui.row(this); nav.setBaselineAligned(false); View selectedView = null;
         int[] titles = {R.string.conversations, R.string.contacts, R.string.settings}; int[] icons = {R.drawable.ic_chat, R.drawable.ic_contacts, R.drawable.ic_settings};
         for (int i = 0; i < 3; i++) {
@@ -162,9 +192,9 @@ public final class MainActivity extends AppCompatActivity {
             item.setContentDescription(getString(titles[i])); item.setOnClickListener(v -> showHome(index));
             View indicator = new View(this); indicator.setBackground(Ui.shape(this, R.color.action_green, 2)); indicator.setVisibility(i == selected ? View.VISIBLE : View.INVISIBLE);
             item.addView(indicator, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 3)));
-            ImageView icon = new ImageView(this); icon.setScaleType(ImageView.ScaleType.FIT_CENTER); icon.setImageResource(icons[i]); icon.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(i == selected ? R.color.action_green : R.color.text_secondary)));
+            ImageView icon = new ImageView(this); icon.setScaleType(ImageView.ScaleType.FIT_CENTER); icon.setImageResource(icons[i]); icon.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.color(this, i == selected ? R.color.action_green : R.color.text_secondary)));
             item.addView(icon, new LinearLayout.LayoutParams(Ui.dp(this, 25), Ui.dp(this, 25)));
-            TextView label = Ui.text(this, getString(titles[i]), 12, false); label.setTextColor(getColor(i == selected ? R.color.action_green : R.color.text_secondary));
+            TextView label = Ui.text(this, getString(titles[i]), 12, false); label.setTextColor(Ui.color(this, i == selected ? R.color.action_green : R.color.text_secondary));
             label.setGravity(Gravity.CENTER); label.setIncludeFontPadding(false); label.setSingleLine(true); label.setPadding(0, Ui.dp(this, 4), 0, 0);
             item.addView(label, new LinearLayout.LayoutParams(-1, Ui.dp(this, 24)));
             nav.addView(item, new LinearLayout.LayoutParams(0, -1, 1)); if (i == selected) selectedView = item;
@@ -174,10 +204,12 @@ public final class MainActivity extends AppCompatActivity {
     }
     private RecyclerView list(LinearLayout parent, RowsAdapter adapter) {
         RecyclerView list = new RecyclerView(this); list.setLayoutManager(new LinearLayoutManager(this)); list.setAdapter(adapter);
-        list.setClipToPadding(false); list.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 9)); parent.addView(list, new LinearLayout.LayoutParams(-1, 0, 1)); return list;
+        list.setClipToPadding(false); list.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 9)); parent.addView(list, new LinearLayout.LayoutParams(-1, 0, 1)); return list;
     }
     private void showChats() {
+        if (!chatState.owner.equals(Backend.uid())) { cachedChats.clear(); chatState.locallyCleared.clear(); chatState.owner = Backend.uid(); }
         FrameLayout area = new FrameLayout(this); body.addView(area, new LinearLayout.LayoutParams(-1, -1));
+        area.setId(R.id.floating_search_content_area);
         LinearLayout content = Ui.column(this); area.addView(content, new FrameLayout.LayoutParams(-1, -1));
         int current = generation; TextView state = Ui.text(this, getString(R.string.loading), 14, false); state.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), 0, Ui.dp(this, 12)); content.addView(state);
         RowsAdapter adapter = new RowsAdapter(); RecyclerView conversations = list(content, adapter);
@@ -191,24 +223,67 @@ public final class MainActivity extends AppCompatActivity {
         FrameLayout.LayoutParams floating = new FrameLayout.LayoutParams(Ui.dp(this, 56), Ui.dp(this, 56), Gravity.BOTTOM | Gravity.END);
         floating.setMargins(Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 16)); area.addView(start, floating);
         start.setOnClickListener(v -> startActivity(new Intent(this, MainActivity.class).putExtra("selectContact", true)));
+        EditText search = attachSearch(area, conversations, "conversations"); search.setText(chatQuery);
+        List<RowsAdapter.Row> allRows = new ArrayList<>();
+        Runnable filter = () -> {
+            List<RowsAdapter.Row> filtered = new ArrayList<>(); String value = searchable(search.getText().toString());
+            for (RowsAdapter.Row row : allRows) if (searchable(row.name + " " + row.detail).contains(value)) filtered.add(row);
+            adapter.submit(filtered); state.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
+            state.setText(value.isEmpty() ? R.string.empty_chats_body : R.string.no_search_results);
+        };
+        java.util.function.Consumer<List<DocumentSnapshot>> display = docs -> {
+            allRows.clear();
+            for (DocumentSnapshot chat : docs) {
+                @SuppressWarnings("unchecked") List<String> members = (List<String>) chat.get("members");
+                @SuppressWarnings("unchecked") Map<String, String> names = (Map<String, String>) chat.get("names");
+                if (members == null || names == null) continue;
+                com.google.firebase.Timestamp locallyCleared = chatState.locallyCleared.get(chat.getId());
+                if (locallyCleared != null) {
+                    if (chat.getTimestamp("updatedAt") == null || chat.getTimestamp("updatedAt").compareTo(locallyCleared) <= 0) continue;
+                    chatState.locallyCleared.remove(chat.getId());
+                }
+                com.google.firebase.Timestamp cutoff = (com.google.firebase.Timestamp) chat.get("clearedBefore." + Backend.uid());
+                if (cutoff != null && chat.getTimestamp("updatedAt") != null && chat.getTimestamp("updatedAt").compareTo(cutoff) <= 0) continue;
+                String other = members.get(0).equals(Backend.uid()) ? members.get(1) : members.get(0), name = contactName(other, names.get(other));
+                String preview = chat.getString("lastText"); com.google.firebase.Timestamp updated = chat.getTimestamp("updatedAt");
+                @SuppressWarnings("unchecked") List<String> previewHidden = (List<String>) chat.get("previewHiddenFor");
+                if (Boolean.TRUE.equals(chat.getBoolean("lastDeleted")) || (previewHidden != null && previewHidden.contains(Backend.uid()))) preview = getString(R.string.message_deleted);
+                String dateTime = updated == null || preview == null || preview.isEmpty() ? "" : lastMessageDateTime(updated.toDate());
+                int checks = Backend.uid().equals(chat.getString("lastSenderId")) ? chat.getTimestamp("lastReadAt") != null ? 3 : chat.getTimestamp("lastDeliveredAt") != null ? 2 : 1 : 0;
+                allRows.add(new RowsAdapter.Row(chat.getId(), name, preview == null || preview.isEmpty() ? getString(R.string.new_conversation) : preview, dateTime, other, () -> ChatActivity.open(this, chat.getId(), name), () -> chatActions(chat.getId()), checks));
+            }
+            filter.run();
+        };
+        search.addTextChangedListener(new TextWatcher() { public void beforeTextChanged(CharSequence s, int start, int count, int after) { } public void onTextChanged(CharSequence s, int start, int before, int count) { chatQuery = s.toString(); filter.run(); } public void afterTextChanged(Editable e) { } });
+        if (!cachedChats.isEmpty()) display.accept(cachedChats);
         chatsListener = Backend.db().collection("chats").whereArrayContains("members", Backend.uid()).orderBy("updatedAt", Query.Direction.DESCENDING).limit(100)
                 .addSnapshotListener(this, (snap, error) -> {
                     if (generation != current) return;
                     if (error != null) { state.setVisibility(View.VISIBLE); state.setText(R.string.error_connection); return; }
                     if (snap == null) return;
-                    List<RowsAdapter.Row> rows = new ArrayList<>();
-                    for (DocumentSnapshot chat : snap.getDocuments()) {
-                        @SuppressWarnings("unchecked") List<String> members = (List<String>) chat.get("members");
-                        @SuppressWarnings("unchecked") Map<String, String> names = (Map<String, String>) chat.get("names");
-                        if (members == null || names == null) continue;
-                        String other = members.get(0).equals(Backend.uid()) ? members.get(1) : members.get(0); String name = contactName(other, names.get(other));
-                        String preview = chat.getString("lastText");
-                        com.google.firebase.Timestamp updated = chat.getTimestamp("updatedAt");
-                        String dateTime = updated == null || preview == null || preview.isEmpty() ? "" : lastMessageDateTime(updated.toDate());
-                        rows.add(new RowsAdapter.Row(chat.getId(), name, preview == null || preview.isEmpty() ? getString(R.string.new_conversation) : preview, dateTime, () -> ChatActivity.open(this, chat.getId(), name)));
-                    }
-                    adapter.submit(rows); state.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE); state.setText(R.string.empty_chats_body);
+                    if (snap.isEmpty() && snap.getMetadata().isFromCache()) return;
+                    cachedChats.clear(); cachedChats.addAll(snap.getDocuments()); display.accept(cachedChats);
                 });
+    }
+    private EditText attachSearch(FrameLayout area, View dismiss, String key) {
+        area.setId(R.id.floating_search_content_area); dismiss.setId(R.id.search_dismiss_surface);
+        View bar = getLayoutInflater().inflate(R.layout.view_floating_search, area, false);
+        bar.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.action_green_soft, 24), null));
+        area.addView(bar); floatingSearch = FloatingSearchController.attach(this, key, R.id.search_dismiss_surface); return floatingSearch.getInput();
+    }
+    private static String searchable(String value) { return java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}+", "").toLowerCase(java.util.Locale.ROOT); }
+    private void chatActions(String id) {
+        com.google.firebase.Timestamp previous = null;
+        for (DocumentSnapshot doc : cachedChats) if (doc.getId().equals(id)) previous = doc.getTimestamp("updatedAt");
+        final com.google.firebase.Timestamp lastMessage = previous;
+        new AlertDialog.Builder(this).setItems(new String[]{getString(R.string.delete_chat), getString(R.string.cancel)}, (dialog, choice) -> {
+            if (choice != 0) return;
+            new AlertDialog.Builder(this).setMessage(R.string.delete_chat_question).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.delete_chat, (confirmation, button) ->
+                Backend.call("deleteConversation", Backend.data("chatId", id)).addOnCompleteListener(this, task -> {
+                    if (task.isSuccessful()) { if (lastMessage != null) chatState.locallyCleared.put(id, lastMessage); cachedChats.removeIf(doc -> doc.getId().equals(id)); showHome(0); }
+                    else toast(Backend.error(this, task.getException()));
+                })).show();
+        }).show();
     }
     private String contactName(String uid, String fallback) {
         if (contacts != null) for (ContactsRepository.Contact contact : contacts.contacts) if (contact.uid.equals(uid)) return contact.name;
@@ -234,7 +309,7 @@ public final class MainActivity extends AppCompatActivity {
         return a.get(java.util.Calendar.YEAR) == b.get(java.util.Calendar.YEAR) && a.get(java.util.Calendar.DAY_OF_YEAR) == b.get(java.util.Calendar.DAY_OF_YEAR);
     }
     private void showContactsPermission(boolean denied) {
-        body.removeAllViews(); body.addView(Ui.button(this, R.string.find_by_email, v -> findByEmail())); LinearLayout card = info(R.string.contacts_title, denied ? R.string.contacts_denied : R.string.contacts_consent);
+        body.removeAllViews(); LinearLayout card = info(R.string.contacts_title, denied ? R.string.contacts_denied : R.string.contacts_consent);
         card.addView(Ui.button(this, denied ? R.string.open_app_settings : R.string.allow_contacts, v -> {
             if (denied) startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
             else contactsPermission.launch(Manifest.permission.READ_CONTACTS);
@@ -255,33 +330,21 @@ public final class MainActivity extends AppCompatActivity {
         });
     }
     private void renderContacts() {
-        body.removeAllViews(); body.addView(Ui.button(this, R.string.find_by_email, v -> findByEmail())); RowsAdapter adapter = new RowsAdapter(); EditText search = Ui.input(this, R.string.search_contacts); body.addView(search);
-        TextView empty = Ui.text(this, getString(R.string.no_contacts_body), 14, false); body.addView(empty); list(body, adapter);
+        TextView count = root.findViewById(R.id.page_subtitle); count.setText(getResources().getQuantityString(R.plurals.contact_count, contacts.contacts.size(), contacts.contacts.size())); count.setVisibility(View.VISIBLE);
+        View titleBox = root.findViewById(R.id.page_title_box); android.view.ViewGroup.LayoutParams titleParams = titleBox.getLayoutParams(); titleParams.height = Ui.dp(this, 60); titleBox.setLayoutParams(titleParams);
+        body.removeAllViews(); RowsAdapter adapter = new RowsAdapter();
+        FrameLayout area = new FrameLayout(this); body.addView(area, new LinearLayout.LayoutParams(-1, -1));
+        LinearLayout content = Ui.column(this); area.addView(content, new FrameLayout.LayoutParams(-1, -1));
+        TextView empty = Ui.text(this, getString(R.string.no_contacts_body), 14, false); content.addView(empty); RecyclerView people = list(content, adapter);
+        people.setPadding(people.getPaddingLeft(), people.getPaddingTop(), people.getPaddingRight(), Ui.dp(this, 68));
+        EditText search = attachSearch(area, people, "contacts"); search.setText(contactQuery);
         Runnable filter = () -> {
-            String query = search.getText().toString().toLowerCase(java.util.Locale.ROOT); List<RowsAdapter.Row> rows = new ArrayList<>();
-            for (ContactsRepository.Contact c : contacts.contacts) if (c.name.toLowerCase(java.util.Locale.ROOT).contains(query) || c.email.contains(query)) rows.add(new RowsAdapter.Row(c.uid, c.name, c.email, () -> openContact(c)));
+            String query = searchable(search.getText().toString()); List<RowsAdapter.Row> rows = new ArrayList<>();
+            for (ContactsRepository.Contact c : contacts.contacts) if (searchable(c.name + " " + c.email).contains(query)) rows.add(new RowsAdapter.Row(c.uid, c.name, c.email, () -> openContact(c)));
             adapter.submit(rows); empty.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE); empty.setText(query.isEmpty() ? R.string.no_contacts_body : R.string.no_search_results);
         };
-        search.addTextChangedListener(new TextWatcher() { public void beforeTextChanged(CharSequence s, int start, int count, int after) { } public void onTextChanged(CharSequence s, int start, int before, int count) { filter.run(); } public void afterTextChanged(Editable e) { } }); filter.run();
-        if (contacts.truncated) body.addView(Ui.text(this, getString(R.string.contacts_partial), 12, false));
-    }
-    private void findByEmail() {
-        EditText input = Ui.input(this, R.string.email_hint); input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(R.string.find_by_email).setView(input)
-                .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.search, null).create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            String value = ContactsRepository.normalize(input.getText().toString());
-            if (value == null) { input.setError(getString(R.string.invalid_email)); return; }
-            v.setEnabled(false); int current = generation;
-            Backend.call("discoverContacts", Backend.data("emails", java.util.Collections.singletonList(value))).addOnCompleteListener(this, task -> {
-                v.setEnabled(true); if (current != generation || !dialog.isShowing()) return;
-                if (!task.isSuccessful()) { toast(Backend.error(this, task.getException())); return; }
-                @SuppressWarnings("unchecked") List<Map<String, Object>> found = (List<Map<String, Object>>) task.getResult().get("contacts");
-                if (found == null || found.isEmpty()) { input.setError(getString(R.string.contact_not_found)); return; }
-                Map<String, Object> contact = found.get(0); dialog.dismiss();
-                openContact(new ContactsRepository.Contact((String) contact.get("uid"), (String) contact.get("name"), value));
-            });
-        })); dialog.show();
+        search.addTextChangedListener(new TextWatcher() { public void beforeTextChanged(CharSequence s, int start, int count, int after) { } public void onTextChanged(CharSequence s, int start, int before, int count) { contactQuery = s.toString(); filter.run(); } public void afterTextChanged(Editable e) { } }); filter.run();
+        if (contacts.truncated) content.addView(Ui.text(this, getString(R.string.contacts_partial), 12, false));
     }
     private void openContact(ContactsRepository.Contact contact) {
         Ui.enable(body, false); int current = generation;
@@ -295,30 +358,61 @@ public final class MainActivity extends AppCompatActivity {
         });
     }
     private void showSettings() {
-        LinearLayout contents = scrollBody(); LinearLayout profile = Ui.card(this); contents.addView(profile);
-        profile.addView(Ui.contactRow(this, profileName, email)); profile.addView(Ui.button(this, R.string.edit_name, v -> editName()));
-        LinearLayout notifications = Ui.card(this); contents.addView(notifications); notifications.addView(Ui.text(this, getString(R.string.notifications), 18, true));
-        notifications.addView(Ui.text(this, getString(R.string.notifications_body), 14, false)); notifications.addView(Ui.button(this, R.string.enable_notifications, v -> {
-            if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);
-            else {
-                Backend.registerDevice();
-                if (Build.VERSION.SDK_INT >= 26) startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
-                else startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
-            }
-        }));
-        LinearLayout privacy = Ui.card(this); contents.addView(privacy); privacy.addView(Ui.text(this, getString(R.string.privacy), 18, true)); Ui.gap(privacy, 8); privacy.addView(Ui.text(this, getString(R.string.privacy_body), 14, false));
-        contents.addView(Ui.button(this, R.string.sign_out, v -> new AlertDialog.Builder(this).setMessage(R.string.sign_out_question).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.sign_out, (dialog, which) -> {
+        LinearLayout contents = scrollBody();
+        LinearLayout appearance = Ui.card(this); appearance.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0); contents.addView(appearance);
+        LinearLayout options = Ui.column(this);
+        boolean expanded = Appearance.prefs(this).getBoolean("expanded", true); options.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        LinearLayout heading = Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.appearance), getString(R.string.appearance_summary), true, v -> {
+            boolean show = options.getVisibility() != View.VISIBLE; options.setVisibility(show ? View.VISIBLE : View.GONE);
+            Appearance.prefs(this).edit().putBoolean("expanded", show).apply();
+            ((LinearLayout) v).getChildAt(2).setRotation(show ? 90 : 0);
+        });
+        heading.getChildAt(2).setRotation(expanded ? 90 : 0); appearance.addView(heading); appearance.addView(options);
+        options.addView(Ui.divider(this));
+        options.addView(Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.app_color), getString(Appearance.LABELS[Appearance.selected(this)]), false, v -> chooseColor()));
+        options.addView(Ui.divider(this));
+        options.addView(Ui.optionRow(this, R.drawable.ic_font, getString(R.string.text_size), getString(R.string.text_size_value, Appearance.percent(this)), false, v -> chooseTextSize()));
+        LinearLayout general = Ui.card(this); general.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0); contents.addView(general);
+        general.addView(Ui.optionRow(this, R.drawable.ic_bell, getString(R.string.notifications), getString(R.string.notifications_summary), true, v -> new AlertDialog.Builder(this)
+                .setTitle(R.string.notifications).setMessage(R.string.notifications_body).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.enable_notifications, (dialog, which) -> {
+                    if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);
+                    else {
+                        Backend.registerDevice();
+                        if (Build.VERSION.SDK_INT >= 26) startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+                        else startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
+                    }
+                }).show()));
+        general.addView(Ui.divider(this));
+        general.addView(Ui.optionRow(this, R.drawable.ic_lock, getString(R.string.privacy), getString(R.string.privacy_summary), true,
+                v -> new AlertDialog.Builder(this).setTitle(R.string.privacy).setMessage(R.string.privacy_body).setPositiveButton(android.R.string.ok, null).show()));
+        general.addView(Ui.divider(this));
+        general.addView(Ui.optionRow(this, R.drawable.ic_logout, getString(R.string.sign_out), getString(R.string.sign_out_summary), true, v -> new AlertDialog.Builder(this).setMessage(R.string.sign_out_question).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.sign_out, (dialog, which) -> {
             Backend.signOut().addOnCompleteListener(this, task -> {
                 if (!task.isSuccessful() && !Backend.uid().isEmpty()) { toast(Backend.error(this, task.getException())); return; }
-                GoogleLogin.clear(this); ContactsRepository.clear(); contacts = null; profileLoaded = false; profileName = ""; email = ""; getIntent().removeExtra("chatId"); showLogin();
+                GoogleLogin.clear(this); ContactsRepository.clear(); cachedChats.clear(); chatState.locallyCleared.clear(); chatState.owner = ""; contacts = null; profileLoaded = false; profileName = ""; email = ""; getIntent().removeExtra("chatId"); showLogin();
                 getSystemService(android.app.NotificationManager.class).cancelAll();
             });
         }).show()));
     }
-    private void editName() {
-        EditText field = Ui.input(this, R.string.name_hint); field.setText(profileName);
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(R.string.edit_name).setView(field).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create();
-        dialog.setOnShowListener(v -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(click -> saveName(field, () -> { dialog.dismiss(); showHome(2); }, dialog.getButton(AlertDialog.BUTTON_POSITIVE)))); dialog.show();
+    private void chooseColor() {
+        String[] names = new String[Appearance.LABELS.length]; for (int i = 0; i < names.length; i++) names[i] = getString(Appearance.LABELS[i]);
+        new AlertDialog.Builder(this).setTitle(R.string.app_color).setSingleChoiceItems(names, Appearance.selected(this), (dialog, which) -> {
+            Appearance.prefs(this).edit().putInt("color", which).apply(); dialog.dismiss(); recreate();
+        }).setNegativeButton(R.string.cancel, null).show();
+    }
+    private void chooseTextSize() {
+        LinearLayout content = Ui.column(this); content.setPadding(Ui.dp(this, 24), Ui.dp(this, 16), Ui.dp(this, 24), Ui.dp(this, 8));
+        TextView value = Ui.text(this, getString(R.string.text_size_value, Appearance.percent(this)), 18, true); content.addView(value);
+        TextView preview = Ui.text(this, getString(R.string.text_size_preview), 16, false); content.addView(preview);
+        android.widget.SeekBar slider = new android.widget.SeekBar(this); slider.setMax(80); slider.setProgress(Appearance.percent(this) - 70); content.addView(slider);
+        slider.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) { value.setText(getString(R.string.text_size_value, progress + 70)); preview.setTextSize(16f * (progress + 70) / Appearance.percent(MainActivity.this)); }
+            public void onStartTrackingTouch(android.widget.SeekBar bar) { }
+            public void onStopTrackingTouch(android.widget.SeekBar bar) { }
+        });
+        new AlertDialog.Builder(this).setTitle(R.string.text_size).setView(content).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, (dialog, which) -> {
+            Appearance.prefs(this).edit().putInt("text", slider.getProgress() + 70).apply(); recreate();
+        }).show();
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); if (profileLoaded) openNotificationIntent(intent); }
     private void openNotificationIntent(Intent intent) {

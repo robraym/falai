@@ -64,8 +64,9 @@ export class Firestore {
   remove(path) { return {delete: this.root + "/" + path}; }
   async commit(writes, transaction) { return this.request(":commit", {writes, ...(transaction ? {transaction} : {})}); }
   async transaction(action) {
+    let retryTransaction;
     for (let attempt = 0; attempt < 5; attempt++) {
-      const started = await this.request(":beginTransaction", {options: {readWrite: {}}});
+      const started = await this.request(":beginTransaction", {options: {readWrite: retryTransaction ? {retryTransaction} : {}}});
       try {
         const pending = [];
         const result = await action({get: path => this.get(path, started.transaction),
@@ -78,6 +79,9 @@ export class Firestore {
       } catch (error) {
         await this.request(":rollback", {transaction: started.transaction}).catch(() => {});
         if (!error.retryable || attempt === 4) throw error;
+        retryTransaction = started.transaction;
+        // Separate simultaneous contenders instead of restarting in lockstep.
+        await new Promise(resolve => setTimeout(resolve, Math.min(400, 50 * 2 ** attempt) + Math.floor(Math.random() * 150)));
       }
     }
   }

@@ -5,7 +5,8 @@ import {initializeTestEnvironment, assertSucceeds, assertFails} from "@firebase/
 import {doc, setDoc, getDoc, getDocs, collection, query, where, orderBy, Timestamp} from "firebase/firestore";
 import {Firestore} from "../src/firestore.js";
 import {chatId} from "../src/validation.js";
-import {registerProfile, discoverContacts, openChat, persistMessage, quota, registerDevice, acknowledgeMessages} from "../src/service.js";
+import {registerProfile, discoverContacts, openChat, persistMessage, quota, registerDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout} from "../src/service.js";
+import {changeMessage, deleteConversation} from "../src/mutations.js";
 import {dispatchJob, drainOutbox} from "../src/push.js";
 
 let env, db, id;
@@ -103,4 +104,82 @@ test("a leased job is not dispatched concurrently and a lost lease can be recove
   await db.commit([db.write(path, {...pending.data, nextAttemptAt: new Date(0)})]);
   let count = 0; await dispatchJob(db, {}, path, async () => { count++; return "sent"; });
   assert.equal(count, 3); assert.equal(await db.get(path), null);
+});
+
+test("profile photos are owned by the authenticated account and visible without exposing private profiles", async () => {
+  const photo = readFileSync(new URL("./fixtures/avatar.jpg", import.meta.url)).toString("base64");
+  await updateProfilePhoto(db, user, {uid: "bob", photo});
+  assert.equal((await db.get("profilePhotos/alice")).data.photo, photo);
+  assert.equal(await db.get("profilePhotos/bob"), null);
+  await assertSucceeds(getDoc(doc(auth("bob"), "profilePhotos/alice")));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "profilePhotos/alice")));
+  await assertFails(getDocs(collection(auth("bob"), "profilePhotos")));
+  await assertFails(setDoc(doc(auth("bob"), "profilePhotos/alice"), {photo}));
+  await assert.rejects(updateProfilePhoto(db, user, {photo: "invalid"}), {code: "invalid-argument"});
+  await registerProfile(db, user, {name: "Álice atualizada"});
+  assert.equal((await db.get("profilePhotos/alice")).data.photo, photo);
+  await updateProfilePhoto(db, user, {photo: null}); assert.equal(await db.get("profilePhotos/alice"), null);
+});
+
+test("edit and delete are authorized, preserve receipt dates and update the last-message summary", async () => {
+  const messageId = crypto.randomUUID(), data = {chatId: id, messageId, text: "Original"};
+  await persistMessage(db, "alice", data);
+  await acknowledgeMessages(db, {uid: "bob"}, {chatId: id, messageIds: [messageId], state: "read"});
+  const before = (await db.get(`chats/${id}/messages/${messageId}`)).data;
+  const summary = (await db.get(`chats/${id}`)).data;
+  assert.ok(summary.lastReadAt instanceof Date); assert.ok(summary.lastDeliveredAt instanceof Date);
+  await assert.rejects(changeMessage(db, {uid: "bob"}, {...data, text: "forged"}, true), {code: "permission-denied"});
+  await assert.rejects(changeMessage(db, {uid: "mallory"}, {...data, scope: "self"}), {code: "permission-denied"});
+  await changeMessage(db, user, {...data, text: "Editada 😀"}, true);
+  let message = (await db.get(`chats/${id}/messages/${messageId}`)).data;
+  assert.equal(message.text, "Editada 😀"); assert.deepEqual(message.createdAt, before.createdAt); assert.deepEqual(message.readAt, before.readAt);
+  assert.equal((await db.get(`chats/${id}`)).data.lastText, "Editada 😀");
+  await changeMessage(db, user, {...data, scope: "self"});
+  message = (await db.get(`chats/${id}/messages/${messageId}`)).data;
+  assert.deepEqual(message.hiddenFor, ["alice"]); assert.equal(message.text, "Editada 😀");
+  assert.deepEqual((await db.get(`chats/${id}`)).data.previewHiddenFor, ["alice"]);
+  await assert.rejects(changeMessage(db, {uid: "bob"}, {...data, scope: "all"}), {code: "permission-denied"});
+  const deleted = await changeMessage(db, user, {...data, scope: "all"});
+  message = (await db.get(`chats/${id}/messages/${messageId}`)).data;
+  assert.equal(message.text, ""); assert.equal(message.deletedForAll, true); assert.deepEqual(message.readAt, before.readAt);
+  assert.equal((await db.get(`chats/${id}`)).data.lastDeleted, true);
+  assert.equal((await db.get("notificationOutbox/" + deleted.jobId)).data.event, "deleted");
+  await assert.rejects(changeMessage(db, user, {...data, text: "restore"}, true), {code: "already-exists"});
+  await assertFails(setDoc(doc(auth("alice"), "chats", id, "messages", messageId), {text: "bypass"}, {merge: true}));
+});
+
+test("deleting a conversation affects only that user and new messages can restore it", async () => {
+  await assert.rejects(deleteConversation(db, {uid: "mallory"}, {chatId: id}), {code: "permission-denied"});
+  await deleteConversation(db, user, {chatId: id});
+  let chat = (await db.get(`chats/${id}`)).data;
+  assert.ok(chat.clearedBefore.alice instanceof Date); assert.equal(chat.clearedBefore.bob, undefined);
+  const messageId = crypto.randomUUID(); await persistMessage(db, "bob", {chatId: id, messageId, text: "Nova conversa"});
+  chat = (await db.get(`chats/${id}`)).data;
+  assert.ok(chat.updatedAt > chat.clearedBefore.alice); assert.equal(chat.lastText, "Nova conversa"); assert.deepEqual(chat.previewHiddenFor, []);
+});
+
+test("receipts upgrade legacy last-message summaries without losing chat metadata", async () => {
+  const messageId = crypto.randomUUID(); await persistMessage(db, "alice", {chatId: id, messageId, text: "Mensagem anterior"});
+  const path = `chats/${id}`, legacy = (await db.get(path)).data;
+  delete legacy.lastMessageId; delete legacy.lastSenderId; delete legacy.lastDeliveredAt; delete legacy.lastReadAt;
+  await db.commit([db.write(path, legacy)]);
+  await acknowledgeMessages(db, {uid: "bob"}, {chatId: id, messageIds: [messageId], state: "read"});
+  const updated = (await db.get(path)).data;
+  assert.equal(updated.lastMessageId, messageId); assert.equal(updated.lastSenderId, "alice"); assert.ok(updated.lastReadAt instanceof Date);
+  assert.deepEqual(updated.clearedBefore, legacy.clearedBefore); assert.equal(updated.lastText, legacy.lastText);
+});
+
+test("about phrases are shared separately from private data and can only be changed by their owner", async () => {
+  const result = await updateProfileAbout(db, user, {uid: "bob", text: "  Disponível 😀\npara conversar  "});
+  assert.equal(result.text, "Disponível 😀 para conversar");
+  assert.equal((await db.get("profileAbout/alice")).data.text, result.text); assert.equal(await db.get("profileAbout/bob"), null);
+  await assertSucceeds(getDoc(doc(auth("bob"), "profileAbout/alice")));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "profileAbout/alice")));
+  await assertFails(getDocs(collection(auth("bob"), "profileAbout")));
+  await assertFails(setDoc(doc(auth("bob"), "profileAbout/alice"), {text: "forged"}));
+  await assertFails(getDoc(doc(auth("bob"), "users/alice")));
+  for (const invalid of [null, 23, "x".repeat(140), "a\u0000b"])
+    await assert.rejects(updateProfileAbout(db, user, {text: invalid}), {code: "invalid-argument"});
+  await registerProfile(db, user, {name: "Álice"}); assert.equal((await db.get("profileAbout/alice")).data.text, result.text);
+  await updateProfileAbout(db, user, {text: ""}); assert.equal(await db.get("profileAbout/alice"), null);
 });

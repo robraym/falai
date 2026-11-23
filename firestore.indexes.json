@@ -7,6 +7,8 @@
     {"fieldPath": "nextAttemptAt", "order": "ASCENDING"}
   ]}],
   "fieldOverrides": [
+    {"collectionGroup": "profileAbout", "fieldPath": "text", "indexes": []},
+    {"collectionGroup": "profilePhotos", "fieldPath": "photo", "indexes": []},
     {"collectionGroup": "messages", "fieldPath": "text", "indexes": []},
     {"collectionGroup": "notificationOutbox", "fieldPath": "sentDeviceIds", "indexes": []}
   ]

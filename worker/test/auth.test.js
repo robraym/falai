@@ -24,7 +24,7 @@ test("JWT signature is checked and claims cannot be changed by the caller", asyn
   await assert.rejects(verifyUser(await token({aud: "other-project"}), "falai-test"), {status: 401});
 });
 test("Worker rejects unauthenticated, unknown and inherited method names before accessing the database", async () => {
-  for (const action of ["sendMessage", "registerProfile", "discoverContacts", "registerDevice", "acknowledgeMessages"]) {
+  for (const action of ["sendMessage", "registerProfile", "discoverContacts", "registerDevice", "acknowledgeMessages", "updateProfilePhoto", "updateProfileAbout", "editMessage", "deleteMessage", "deleteConversation"]) {
     const response = await worker.fetch(new Request("https://worker/v1/" + action, {method: "POST", body: "{}"}), {FIREBASE_PROJECT_ID: "falai-test"}, {});
     assert.equal(response.status, 401);
   }

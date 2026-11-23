@@ -33,6 +33,15 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         String chatId = message.getData().get("chatId"), recipient = message.getData().get("recipientId");
         String messageId = message.getData().get("messageId");
         if (chatId == null || !chatId.matches("[a-f0-9]{64}") || !Backend.uid().equals(recipient)) return;
+        if ("deleted".equals(message.getData().get("event"))) {
+            if (messageId != null && messageId.matches("[a-f0-9-]{36}")) {
+                android.content.SharedPreferences deleted = getSharedPreferences("deleted_notices", MODE_PRIVATE);
+                android.content.SharedPreferences.Editor editor = deleted.edit(); if (deleted.getAll().size() >= 200) editor.clear();
+                editor.putBoolean(messageId, true).apply(); NotificationManagerCompat.from(this).cancel(messageId, 0);
+            }
+            return;
+        }
+        if (messageId != null && getSharedPreferences("deleted_notices", MODE_PRIVATE).getBoolean(messageId, false)) return;
         if (messageId != null && messageId.matches("[a-f0-9-]{36}"))
             ReceiptWorker.schedule(chatId, java.util.Collections.singletonList(messageId), false);
         if (chatId.equals(ChatActivity.visibleChat)) return;

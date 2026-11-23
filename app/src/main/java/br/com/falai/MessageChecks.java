@@ -15,7 +15,7 @@ final class MessageChecks extends View {
     MessageChecks(Context context, boolean delivered, boolean read) {
         super(context); two = delivered || read;
         paint.setColor(context.getColor(read ? R.color.check_read : R.color.check_pending));
-        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(Ui.dp(context, 1.6f));
+        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(1.6f);
         paint.setStrokeCap(Paint.Cap.ROUND); paint.setStrokeJoin(Paint.Join.ROUND);
         setContentDescription(context.getString(read ? R.string.message_read : delivered ? R.string.message_delivered : R.string.message_sent));
         first.moveTo(2, 8); first.lineTo(6, 12); first.lineTo(16, 2);

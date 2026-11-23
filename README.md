@@ -1,6 +1,6 @@
 # Falai
 
-Aplicativo Android nativo em **Java**, com texto e emojis, login Google, descoberta de contatos por e-mail e o visual do Alertou.
+Aplicativo Android nativo em **Java**, com texto e emojis, foto de perfil, login Google, descoberta de contatos por e-mail e o visual do Alertou.
 
 A aparência acompanha automaticamente o tema claro/escuro do aparelho, com as paletas correspondentes do Alertou. O cabeçalho respeita a barra de status, inclusive ao trocar de aba, e a lista de conversas mostra a data e a hora da última mensagem.
 
@@ -13,7 +13,7 @@ O histórico de cada conversa usa papel de parede com desenhos vetoriais discret
 - **Firebase Cloud Messaging (FCM)**: entrega notificações com o app em segundo plano ou fechado normalmente.
 - **Cloudflare Workers Free**: valida o token Firebase, executa as operações do servidor e dispara o FCM. Substitui completamente as Cloud Functions; não exige Blaze.
 
-Não há Firebase Storage, mídia, SMS nem código implantável de Cloud Functions neste projeto. O Firebase permanece no Spark e o Worker no Free. As cotas desses planos continuam se aplicando; esgotá-las pode interromper o serviço. Não existe garantia de disponibilidade ou uso ilimitado.
+Não há Firebase Storage, envio de mídia nas conversas, SMS nem código implantável de Cloud Functions neste projeto. Fotos de perfil são miniaturas no Firestore. O Firebase permanece no Spark e o Worker no Free. As cotas desses planos continuam se aplicando; esgotá-las pode interromper o serviço. Não existe garantia de disponibilidade ou uso ilimitado.
 
 ## Configuração usada
 
@@ -34,9 +34,19 @@ Quem instala apenas entra com Google, confirma o nome e escolhe se autoriza agen
 
 Em Conversas, o botão flutuante verde abre a tela de seleção de contato; escolher alguém inicia ou reabre a conversa e volta diretamente à lista ao sair do chat. Não há botão textual “Encontrar contatos”. O cabeçalho e o contorno integrado às três abas seguem as medidas do Alertou. Emoji, campo de texto e envio ficam na mesma linha, com o campo crescendo até cinco linhas.
 
-**A agenda agora é cruzada pelos e-mails, não pelos números de telefone.** O e-mail salvo no contato precisa corresponder à conta Google usada no Falai. Quem tiver somente telefone pode usar a busca manual pelo e-mail. Apenas e-mails são enviados na descoberta; nomes da agenda permanecem no aparelho. A leitura é opcional e a busca manual continua disponível sem permissão para a agenda.
+**A agenda é cruzada pelos e-mails, não pelos números de telefone.** O e-mail salvo no contato precisa corresponder à conta Google usada no Falai. Contatos com apenas telefone precisam ter esse e-mail adicionado na agenda. Apenas e-mails são enviados na descoberta; nomes da agenda permanecem no aparelho. Não há botão de busca manual por e-mail. A permissão de leitura da agenda é necessária para a descoberta automática.
 
-Os resultados ficam em memória por dez minutos; ao abrir a aba após esse prazo, a agenda é consultada novamente. Não há botão de atualização. Há um limite de 3.000 e-mails por consulta e lotes de 100. Os textos da interface mostram essas condições.
+Os resultados ficam em memória por dez minutos; ao abrir a aba após esse prazo, a agenda é consultada novamente. Alterações na agenda invalidam esse cache automaticamente. Não há botão de atualização. Há um limite de 3.000 e-mails por consulta e lotes de 100. A contagem no cabeçalho é de pessoas encontradas no Falai, não o total bruto de contatos do aparelho.
+
+O ícone no cabeçalho abre **Perfil**, com foto, nome editável e e-mail Google somente para leitura. Em **Ajustes**, o card Aparência oferece seis cores e tamanho dos textos de 70% a 150%, além das linhas compactas de notificações, privacidade e saída. O tema claro/escuro continua seguindo o aparelho. A pesquisa flutuante reutiliza o controlador do Alertou: arraste, posição relativa salva, expansão, teclado, recolhimento ao tocar fora/voltar e filtro sem diferença de acentos.
+
+O Perfil também oferece **Recado**, uma frase editável de até 139 unidades UTF-16, com contador. Salvar vazio remove o recado. Ele aparece em tempo real abaixo do nome na lista de contatos e no painel aberto ao tocar no nome/foto do chat. Apenas a frase e sua data de alteração ficam na coleção compartilhada `profileAbout`; o e-mail e os demais dados privados não são expostos. Usuários autenticados podem ler um recado individual, mas não listar a coleção nem gravá-la diretamente. Há limite de 20 alterações por usuário/hora.
+
+As fotos são recortadas ao centro, orientadas, reduzidas a 192 × 192 e comprimidas em JPEG de até 16 KiB. O servidor valida tamanho e dimensões (máximo 256 × 256), salva somente na conta autenticada e não permite listagem da coleção. Fotos de perfil podem ser lidas por usuários autenticados e aparecem em tempo real nos avatares; os perfis privados continuam restritos ao titular. Não se usa Storage ou link público externo.
+
+A lista de conversas preserva os documentos em um ViewModel ao trocar de tela e não troca dados existentes por um snapshot inicial vazio de cache. Os checks aparecem antes da prévia apenas para mensagens próprias. As listas usam linhas compactas sem cards por usuário.
+
+Segurar uma mensagem própria abre editar/apagar para todos/apagar para mim/cancelar. Edições mantêm criação e recibos e mostram indicação de edição. Apagar para todos remove o texto, deixa um marcador e tenta cancelar o aviso nos aparelhos por um evento FCM. Apagar para mim oculta apenas para aquela conta. Excluir conversa na lista registra um corte de histórico por usuário; não elimina o histórico do outro participante. Uma nova mensagem faz a conversa reaparecer. Essas ocultações são de apresentação, não apagamento físico dos documentos; apagamento para todos remove o conteúdo textual do documento no servidor.
 
 ## Envio e notificações
 
@@ -58,13 +68,14 @@ Sem rede, com avisos desativados, após "Forçar parada" ou sob restrições do 
 
 ## Proteção e limites
 
-- Regras do Firestore permitem leitura somente dos participantes autenticados por Google e do próprio perfil.
+- Regras do Firestore permitem leitura de conversas somente aos participantes autenticados por Google e do perfil privado somente ao titular. Miniaturas de perfil podem ser lidas por usuários autenticados, sem listagem da coleção.
 - Clientes não podem escrever diretamente em nenhuma coleção. Diretório, dispositivos, quotas e fila são acessíveis apenas pelo servidor.
 - O diretório usa hash do e-mail como chave privada de busca. Hash não equivale a anonimização.
 - Cache das conversas somente em memória; backup/transferência automática Android desativados.
 - Não há criptografia de ponta a ponta nesta versão; isso é informado em Ajustes.
 - Até 4.000 unidades UTF-16 por mensagem. Histórico em lotes de 50 e até 100 conversas recentes na lista.
 - Quotas por usuário/hora: 600 envios/tentativas, 6.000 e-mails consultados, 100 aberturas de conversa, 20 alterações de perfil e 120 registros de dispositivo.
+- Foto: 20 alterações/hora. Edição/exclusão de mensagens: 600 ações/hora. Exclusão de conversa: 100 ações/hora. Confirmações: até 12.000 IDs/hora.
 - App Check permanece disponível no Android (debug provider em debug e Play Integrity em release), mas ainda não é exigido pelo Worker. Ativar enforcement só após cadastrar e testar os ambientes; autenticação Google, autorização e quotas já são exigidas no servidor.
 - Não há grupos, chamadas, mídia, bloqueio/denúncia, exclusão de conta ou publicação em loja. São pendências de produto para uma distribuição pública.
 

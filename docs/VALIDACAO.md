@@ -6,13 +6,13 @@ Conferência em 22/11/2026.
 
 - `compileDebugJavaWithJavac`: passou.
 - `compileReleaseJavaWithJavac`: passou.
-- `lintDebug`: passou, com 0 erros e 8 avisos de versões de dependências.
+- `lintDebug`: passou, com 0 erros e 22 avisos (versões de dependências, recursos antigos sem uso e sugestões de ícone/layout/acessibilidade).
 - JSON Firebase atualizado, cliente OAuth Web presente e pacote `br.com.falai`.
 - Não foi gerado APK e não houve instalação, execução ou captura de tela em Android.
 
 ## Testes locais
 
-**15 testes passaram:** 8 de autenticação/validação/protocolo e 7 de integração com o emulador local do Firestore.
+**25 testes atuais passaram:** 12 de autenticação/validação/protocolo e 13 de integração com o emulador local do Firestore.
 
 Cobertura relevante: assinatura JWT, projeto e provedor Google corretos, e-mail verificado, validação de texto e emoji, privacidade das conversas, bloqueio de escrita direta, diretório privado, limites de uso, envio concorrente com o mesmo UUID, gravação atômica do aviso pendente, falha parcial de push, retomada sem repetir os dispositivos já confirmados e recuperação de lease vencido.
 
@@ -22,7 +22,7 @@ Os erros de permissão exibidos durante os testes são esperados nos casos em qu
 
 - Regras e índices publicados no Firestore do projeto `falai-4d04c`.
 - Worker publicado em `https://falai-notificacoes.robraym-studio.workers.dev`.
-- Versão Cloudflare: `73f115a9-4c6b-4fc7-844e-6e5bacce53c4`.
+- Versão Cloudflare: `7642c02e-e1a9-4ec0-90c2-e03235c60870`.
 - Secret existente preservado no Worker; chave privada não foi copiada para o projeto ou o APK.
 - `/health` retornou HTTP 200, `database: ok` e `fcmValidation: ok`.
 - A conferência do FCM usa `validateOnly`: verifica a credencial sem enviar uma notificação.
@@ -33,6 +33,31 @@ Os erros de permissão exibidos durante os testes são esperados nos casos em qu
 - Nenhum comando de upgrade, ativação de faturamento ou publicação em Git foi executado.
 
 ## Limites da conferência
+
+### Recado público do perfil
+
+- Campo Recado editável no Perfil com limite de 139 unidades UTF-16 e contador; salvar vazio remove a frase.
+- Exibição em tempo real na lista de contatos e no painel de foto/nome aberto pelo cabeçalho do chat, sem publicar e-mail ou perfil privado.
+- `profileAbout`: leitura individual autenticada, sem listagem ou escrita direta. A API grava sempre no UID autenticado e limita a 20 alterações por hora.
+- Testados: gravação, normalização, leitura por outro usuário, bloqueio de não autenticados/listagem/escrita direta, rejeição de texto inválido/longo, preservação ao alterar nome e remoção.
+- A execução inicial encontrou conflito de transação no teste concorrente de envio; a segunda falha era consequência da ausência da mensagem criada por esse teste. O adaptador foi corrigido para reutilizar o token da transação abortada e aplicar espera variável entre tentativas. O teste unitário de retomada e a suíte completa passaram após a correção.
+- Compilação debug/release e lint sem erros. Sem envio de recado real nem execução em aparelhos durante a validação.
+- Worker, regras e índices do recado publicados; `/health` retornou HTTP 200 e o novo endpoint sem autenticação retornou HTTP 401.
+
+### Perfil, Aparência, pesquisa e ações de conversa
+
+- Ajuste posterior do Perfil: foto de 112dp centralizada; tocar nela permite escolher/remover; nome editável e e-mail aparecem uma única vez abaixo, sem card ou linha “Foto do perfil”. Essa alteração visual foi revisada no código, sem novo build ou execução em aparelho.
+
+- Ícone de perfil no cabeçalho seguindo o Alertou; tela separada com foto, nome e e-mail somente para leitura. Ajustes permanece ao lado de Contatos, com Aparência e itens de cor/tamanho, notificações, privacidade e saída.
+- Seis cores, tamanho de texto 70–150%, tema do aparelho e aplicação nas três atividades. Layout de opções inspirado diretamente nos recursos do perfil do Alertou (ícones circulares, títulos/resumos, divisores e medidas).
+- Foto da galeria recortada, orientada com AndroidX ExifInterface, comprimida a JPEG de 192px e até 16 KiB. Servidor valida formato, bytes e dimensões; grava apenas na conta autenticada. Testados: leitura autenticada da foto, bloqueio de listagem e de escrita direta, rejeição de fotos inválidas e preservação após alteração de nome.
+- Avatares de perfil, contatos, lista de conversas e cabeçalho do chat usam listeners de documento enquanto visíveis, com cache limitado em memória.
+- Pesquisa flutuante reaproveitada do Alertou: arraste, posição salva, expansão/recolhimento, teclado e filtro. Listas sem cards individuais, contagem real de contatos, títulos por tela e ausência de busca manual por e-mail.
+- Conversas mantidas em ViewModel por conta; snapshot inicial vazio de cache não apaga a lista. Exclusão local da conversa não volta por causa de cache atrasado e novas mensagens podem fazê-la reaparecer.
+- Balões com ponta e rodapé de horário/checks junto do texto. Checks também antes da prévia de mensagens próprias na lista.
+- Menus de mensagem: editar, apagar para todos, apagar para mim e cancelar. Menus de conversa: excluir e cancelar, com confirmação. Servidor verifica autoria/participação; edição preserva recibos/criação, exclusão para todos remove texto, exclusão para mim e corte de conversa preservam o histórico do outro usuário. Recibos atualizam o resumo da conversa e há cobertura da migração do resumo antigo.
+- Worker/regras/índices publicados. Saúde online retornou HTTP 200 e os quatro novos endpoints recusaram chamadas sem autenticação com HTTP 401. Não foi enviada mensagem ou foto real durante a validação.
+- Não houve instalação, abertura ou captura em aparelho; galeria, aparência, gestos, fonte e sincronização real entre S7/S23 ainda precisam de conferência em dispositivos com a versão atualizada.
 
 ### Papel de parede e últimos ajustes
 

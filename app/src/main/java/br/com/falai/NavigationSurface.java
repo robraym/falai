@@ -35,7 +35,7 @@ final class NavigationSurface extends Drawable {
     private NavigationSurface(ViewGroup root, View navigation, View selected) {
         this.root = root; this.navigation = navigation; this.selected = selected;
         fill.setColor(ColorUtils.blendARGB(root.getContext().getColor(R.color.background), root.getContext().getColor(R.color.icon_surface), .28f));
-        outline.setStyle(Paint.Style.STROKE); outline.setStrokeWidth(dp(1)); outline.setColor(ColorUtils.setAlphaComponent(root.getContext().getColor(R.color.action_green), 80));
+        outline.setStyle(Paint.Style.STROKE); outline.setStrokeWidth(dp(1)); outline.setColor(ColorUtils.setAlphaComponent(Appearance.primary(root.getContext()), 80));
     }
     private float dp(float value) { return value * root.getResources().getDisplayMetrics().density; }
     private int sideInset() { return Math.round(dp(10) + outline.getStrokeWidth() / 2); }

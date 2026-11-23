@@ -17,7 +17,8 @@ import java.util.List;
 final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
     private final List<DocumentSnapshot> messages = new ArrayList<>();
     private final String uid;
-    MessageAdapter(String uid) { this.uid = uid; }
+    private final java.util.function.Consumer<DocumentSnapshot> actions;
+    MessageAdapter(String uid, java.util.function.Consumer<DocumentSnapshot> actions) { this.uid = uid; this.actions = actions; }
     void submit(List<DocumentSnapshot> docs) {
         List<DocumentSnapshot> before = new ArrayList<>(messages);
         DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
@@ -48,16 +49,21 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
             dateParams.gravity = Gravity.CENTER_HORIZONTAL; dateParams.topMargin = Ui.dp(c, 10); dateParams.bottomMargin = Ui.dp(c, 10);
             root.addView(day, dateParams);
         }
-        LinearLayout bubble = Ui.column(c); bubble.setPadding(Ui.dp(c, 14), Ui.dp(c, 10), Ui.dp(c, 14), Ui.dp(c, 10)); bubble.setBackground(Ui.shape(c, mine ? R.color.action_green_soft : R.color.card, 18));
-        TextView message = Ui.text(c, doc.getString("text"), 16, true); message.setTypeface(android.graphics.Typeface.DEFAULT); message.setTextIsSelectable(true); bubble.addView(message);
+        LinearLayout bubble = Ui.column(c); bubble.setPadding(Ui.dp(c, mine ? 11 : 17), Ui.dp(c, 7), Ui.dp(c, mine ? 17 : 11), Ui.dp(c, 7)); bubble.setBackground(new MessageBubble(c, mine));
+        boolean deleted = Boolean.TRUE.equals(doc.getBoolean("deletedForAll"));
+        String content = deleted ? c.getString(R.string.message_deleted) : doc.getString("text");
+        TextView message = Ui.text(c, "", 16, false); message.setTextColor(c.getColor(deleted ? R.color.text_secondary : R.color.text_primary));
+        message.setTypeface(android.graphics.Typeface.DEFAULT, deleted ? android.graphics.Typeface.ITALIC : android.graphics.Typeface.NORMAL);
         String time = timestamp == null ? "" : android.text.format.DateFormat.getTimeFormat(c).format(timestamp.toDate());
-        LinearLayout footer = Ui.row(c); footer.setGravity(Gravity.END | Gravity.CENTER_VERTICAL); footer.setPadding(0, Ui.dp(c, 4), 0, 0);
-        TextView label = Ui.text(c, time, 11, false); footer.addView(label);
+        if (!deleted && doc.getTimestamp("editedAt") != null) time = c.getString(R.string.message_edited) + " · " + time;
+        android.text.SpannableString text = new android.text.SpannableString(content + "  \uFFFC");
+        int status = mine ? doc.getTimestamp("readAt") != null ? 3 : doc.getTimestamp("deliveredAt") != null ? 2 : 1 : 0;
+        text.setSpan(new MessageMetaSpan(c, time, status), text.length() - 1, text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); message.setText(text); bubble.addView(message);
+        message.setContentDescription(content + " " + time + (mine ? " " + c.getString(status == 3 ? R.string.message_read : status == 2 ? R.string.message_delivered : R.string.message_sent) : ""));
         if (mine) {
-            MessageChecks checks = new MessageChecks(c, doc.getTimestamp("deliveredAt") != null, doc.getTimestamp("readAt") != null);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(Ui.dp(c, 26), Ui.dp(c, 18)); params.leftMargin = Ui.dp(c, 4); footer.addView(checks, params);
+            android.view.View.OnLongClickListener hold = view -> { actions.accept(doc); return true; };
+            message.setOnLongClickListener(hold); bubble.setOnLongClickListener(hold);
         }
-        bubble.addView(footer);
         LinearLayout.LayoutParams bubbleParams = new LinearLayout.LayoutParams(-2, -2);
         bubbleParams.gravity = mine ? Gravity.END : Gravity.START;
         if (mine) bubbleParams.leftMargin = Ui.dp(c, 40); else bubbleParams.rightMargin = Ui.dp(c, 40);

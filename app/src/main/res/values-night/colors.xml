@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="bubble_sent">#144D37</color><color name="bubble_received">#202C33</color>
     <color name="chat_wallpaper">#0B141A</color>
     <color name="chat_wallpaper_ink">#1D2A31</color>
     <color name="background">#090A0C</color>

@@ -11,6 +11,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.activity.ComponentActivity;
@@ -22,7 +23,12 @@ final class Ui {
     private Ui() { }
     static int dp(Context c, float n) { return Math.round(n * c.getResources().getDisplayMetrics().density); }
     static GradientDrawable shape(Context c, int color, int radius) {
-        GradientDrawable d = new GradientDrawable(); d.setColor(c.getColor(color)); d.setCornerRadius(dp(c, radius)); return d;
+        GradientDrawable d = new GradientDrawable(); d.setColor(color(c, color)); d.setCornerRadius(dp(c, radius)); return d;
+    }
+    static int color(Context c, int resource) {
+        if (resource == R.color.action_green) return Appearance.primary(c);
+        if (resource == R.color.action_green_soft) return Appearance.soft(c);
+        return c.getColor(resource);
     }
     static LinearLayout column(Context c) { LinearLayout v = new LinearLayout(c); v.setOrientation(LinearLayout.VERTICAL); return v; }
     static LinearLayout row(Context c) { LinearLayout v = new LinearLayout(c); v.setGravity(Gravity.CENTER_VERTICAL); return v; }
@@ -65,7 +71,10 @@ final class Ui {
     }
     static LinearLayout heading(Context c, CharSequence title) {
         LinearLayout header = (LinearLayout) android.view.LayoutInflater.from(c).inflate(R.layout.view_page_header, new LinearLayout(c), false);
-        ((TextView) header.findViewById(R.id.page_title)).setText(title); return header;
+        TextView label = header.findViewById(R.id.page_title); label.setText(title);
+        View box = header.findViewById(R.id.page_title_box); ViewGroup.LayoutParams size = box.getLayoutParams();
+        android.graphics.Paint.FontMetricsInt metrics = label.getPaint().getFontMetricsInt(); size.height = Math.max(dp(c, 40), metrics.bottom - metrics.top + dp(c, 4)); box.setLayoutParams(size);
+        return header;
     }
     static LinearLayout card(Context c) {
         LinearLayout v = column(c); v.setPadding(dp(c, 16), dp(c, 18), dp(c, 16), dp(c, 18)); v.setBackground(shape(c, R.color.card, 20));
@@ -77,14 +86,14 @@ final class Ui {
     static void gap(LinearLayout parent, int height) { parent.addView(new View(parent.getContext()), new LinearLayout.LayoutParams(1, dp(parent.getContext(), height))); }
     static Button button(Context c, int label, View.OnClickListener listener) {
         Button b = new Button(c); b.setText(label); b.setAllCaps(false); b.setTextSize(15); b.setTextColor(c.getColor(R.color.text_primary)); b.setMinHeight(dp(c, 48));
-        b.setBackground(new RippleDrawable(ColorStateList.valueOf(0x3345C98A), shape(c, R.color.action_green_soft, 14), null));
+        b.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), shape(c, R.color.action_green_soft, 14), null));
         b.setPadding(dp(c, 12), dp(c, 8), dp(c, 12), dp(c, 8));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.topMargin = dp(c, 12); b.setLayoutParams(lp); b.setOnClickListener(listener); return b;
     }
     static ImageButton icon(Context c, int drawable, int description, View.OnClickListener click) {
-        ImageButton b = new ImageButton(c); b.setImageResource(drawable); b.setImageTintList(ColorStateList.valueOf(c.getColor(R.color.action_green)));
+        ImageButton b = new ImageButton(c); b.setImageResource(drawable); b.setImageTintList(ColorStateList.valueOf(Appearance.primary(c)));
         b.setContentDescription(c.getString(description)); b.setPadding(dp(c, 12), dp(c, 12), dp(c, 12), dp(c, 12));
-        b.setBackground(new RippleDrawable(ColorStateList.valueOf(0x3345C98A), shape(c, R.color.action_green_soft, 24), null));
+        b.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), shape(c, R.color.action_green_soft, 24), null));
         b.setLayoutParams(new LinearLayout.LayoutParams(dp(c, 48), dp(c, 48))); b.setOnClickListener(click); return b;
     }
     static EditText input(Context c, int hint) {
@@ -97,25 +106,58 @@ final class Ui {
         return contactRow(c, name, detail, "");
     }
     static LinearLayout contactRow(Context c, String name, String detail, String dateTime) {
-        LinearLayout row = row(c); row.setPadding(dp(c, 12), dp(c, 14), dp(c, 12), dp(c, 14)); row.setMinimumHeight(dp(c, 80));
-        row.setBackground(new RippleDrawable(ColorStateList.valueOf(0x3345C98A), shape(c, R.color.card, 18), null));
-        TextView circle = text(c, name.isEmpty() ? "?" : name.substring(0, name.offsetByCodePoints(0, 1)).toUpperCase(java.util.Locale.ROOT), 19, true);
-        circle.setGravity(Gravity.CENTER); circle.setTextColor(c.getColor(R.color.action_green)); circle.setBackground(shape(c, R.color.action_green_soft, 24));
+        return contactRow(c, name, detail, dateTime, "");
+    }
+    static LinearLayout contactRow(Context c, String name, String detail, String dateTime, String uid) {
+        return contactRow(c, name, detail, dateTime, uid, 0);
+    }
+    static LinearLayout contactRow(Context c, String name, String detail, String dateTime, String uid, int status) {
+        return contactRow(c, name, detail, dateTime, uid, status, false);
+    }
+    static LinearLayout contactRow(Context c, String name, String detail, String dateTime, String uid, int status, boolean showAbout) {
+        LinearLayout row = row(c); row.setPadding(dp(c, 8), dp(c, 10), dp(c, 8), dp(c, 10)); row.setMinimumHeight(dp(c, 72));
+        row.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
+        AvatarView circle = new AvatarView(c); circle.load(uid, name);
         row.addView(circle, new LinearLayout.LayoutParams(dp(c, 46), dp(c, 46)));
         LinearLayout labels = column(c); labels.setPadding(dp(c, 14), 0, dp(c, 6), 0);
         LinearLayout headline = row(c);
         TextView title = text(c, name, 16, true); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         headline.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
         labels.addView(headline, new LinearLayout.LayoutParams(-1, -2));
-        TextView sub = text(c, detail, 13, false); sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        TextView sub;
+        if (showAbout) {
+            AboutTextView phrase = new AboutTextView(c); phrase.setTextSize(13); phrase.setTextColor(c.getColor(R.color.text_secondary)); phrase.setLineSpacing(dp(c, 2), 1); phrase.bind(uid, detail); sub = phrase;
+        } else sub = text(c, detail, 13, false);
+        sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
         if (!dateTime.isEmpty()) {
             LinearLayout preview = row(c); preview.setBaselineAligned(true);
+            if (status > 0) {
+                MessageChecks checks = new MessageChecks(c, status >= 2, status == 3);
+                LinearLayout.LayoutParams checksParams = new LinearLayout.LayoutParams(dp(c, 24), dp(c, 18)); checksParams.rightMargin = dp(c, 3); preview.addView(checks, checksParams);
+            }
             sub.setSingleLine(true); preview.addView(sub, new LinearLayout.LayoutParams(0, -2, 1));
             TextView when = text(c, dateTime, 11, false); when.setSingleLine(true); when.setGravity(Gravity.END);
             when.setPadding(dp(c, 8), 0, 0, 0); preview.addView(when, new LinearLayout.LayoutParams(-2, -2));
             labels.addView(preview, new LinearLayout.LayoutParams(-1, -2));
         } else { sub.setMaxLines(2); labels.addView(sub); }
         row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1)); return row;
+    }
+    static LinearLayout optionRow(Context c, int icon, String title, String summary, boolean section, View.OnClickListener action) {
+        LinearLayout row = row(c); row.setBaselineAligned(false); row.setMinimumHeight(dp(c, section ? 80 : 60)); row.setPadding(dp(c, 8), dp(c, 10), dp(c, 8), dp(c, 10));
+        ImageView image = new ImageView(c); image.setImageResource(icon); image.setImageTintList(ColorStateList.valueOf(Appearance.primary(c)));
+        image.setPadding(dp(c, 8), dp(c, 8), dp(c, 8), dp(c, 8)); image.setBackground(shape(c, R.color.action_green_soft, 24));
+        row.addView(image, new LinearLayout.LayoutParams(dp(c, section ? 44 : 40), dp(c, section ? 44 : 40)));
+        LinearLayout labels = column(c); labels.setPadding(dp(c, 12), 0, dp(c, 4), 0);
+        TextView heading = text(c, title, section ? 18 : 14, false); heading.setMaxLines(2); labels.addView(heading);
+        TextView detail = text(c, summary, 13, false); detail.setMaxLines(2); detail.setEllipsize(android.text.TextUtils.TruncateAt.END); labels.addView(detail);
+        row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+        if (action != null) {
+            ImageView arrow = new ImageView(c); arrow.setImageResource(R.drawable.ic_chevron_right); arrow.setImageTintList(ColorStateList.valueOf(c.getColor(R.color.text_secondary)));
+            arrow.setPadding(dp(c, 8), dp(c, 8), dp(c, 8), dp(c, 8)); row.addView(arrow, new LinearLayout.LayoutParams(dp(c, 34), dp(c, 34)));
+            row.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), shape(c, R.color.card, 14), null));
+            row.setClickable(true); row.setFocusable(true); row.setOnClickListener(action);
+        }
+        return row;
     }
     static void enable(View v, boolean enabled) {
         v.setEnabled(enabled); if (v instanceof ViewGroup) { ViewGroup group = (ViewGroup) v; for (int i = 0; i < group.getChildCount(); i++) enable(group.getChildAt(i), enabled); }

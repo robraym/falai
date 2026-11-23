@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent_blue">#4DA3FF</color>
+    <color name="accent_purple">#A88BFF</color>
+    <color name="accent_orange">#FF9A5A</color>
+    <color name="accent_pink">#FF78A8</color>
+    <color name="accent_teal">#47C6CA</color>
+</resources>

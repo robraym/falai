@@ -26,7 +26,7 @@ test("message push wakes the Android sound handler without an automatic system n
   const job = {chatId: "a".repeat(64), messageId: crypto.randomUUID(), recipientId: "bob"};
   assert.equal(await sendPush(env, "device-token", job), "sent");
   assert.equal(payload.validateOnly, false);
-  assert.deepEqual(payload.message.data, {...job, senderName: "Falai", text: ""});
+  assert.deepEqual(payload.message.data, {...job, senderName: "Falai", text: "", event: "message"});
   assert.equal(payload.message.android.priority, "high");
   assert.equal(payload.message.android.ttl, "2419200s");
   assert.equal(payload.message.notification, undefined);

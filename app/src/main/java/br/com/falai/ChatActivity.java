@@ -26,21 +26,26 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public final class ChatActivity extends AppCompatActivity {
+public final class ChatActivity extends FalaiActivity {
     static volatile String visibleChat;
-    private String chatId, name;
+    private String chatId, name, otherUid = "";
     private ChatViewModel model;
     private EditText composer;
     private LinearLayout composerRow, retryRow;
     private TextView status, title;
+    private AvatarView avatar;
     private Button older;
     private RecyclerView messages;
     private LinearLayoutManager layoutManager;
     private MessageAdapter adapter;
     private ListenerRegistration listener;
+    private ListenerRegistration chatListener;
     private final Map<String, DocumentSnapshot> loaded = new HashMap<>();
     private DocumentSnapshot oldest;
     private boolean loadingOlder, historyExhausted;
+    private boolean chatReady;
+    private List<DocumentSnapshot> pendingDocs;
+    private com.google.firebase.Timestamp clearedBefore;
     private final java.util.Set<String> deliveryQueued = new java.util.HashSet<>(), readQueued = new java.util.HashSet<>();
     static void open(Context context, String id, String name) {
         context.startActivity(new Intent(context, ChatActivity.class).putExtra("chatId", id).putExtra("name", name));
@@ -59,12 +64,14 @@ public final class ChatActivity extends AppCompatActivity {
         LinearLayout root = Ui.root(this);
         LinearLayout header = Ui.row(this); header.setPadding(Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12));
         header.addView(Ui.icon(this, R.drawable.ic_back, R.string.back, v -> leave()));
+        avatar = new AvatarView(this); avatar.load("", name); avatar.setContentDescription(getString(R.string.profile)); avatar.setOnClickListener(v -> contactInfo()); header.addView(avatar, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40)));
         title = Ui.text(this, name, 20, true); title.setPadding(Ui.dp(this, 14), 0, 0, 0); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        title.setOnClickListener(v -> contactInfo()); title.setFocusable(true);
         header.addView(title, new LinearLayout.LayoutParams(0, -2, 1)); root.addView(header);
         older = Ui.button(this, R.string.older_messages, v -> loadOlder()); older.setVisibility(View.GONE); root.addView(older);
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
         messages.setBackground(new ChatWallpaper(this));
-        messages.setLayoutManager(layoutManager); adapter = new MessageAdapter(Backend.uid()); messages.setAdapter(adapter);
+        messages.setLayoutManager(layoutManager); adapter = new MessageAdapter(Backend.uid(), this::messageActions); messages.setAdapter(adapter);
         messages.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override public void onScrolled(@NonNull RecyclerView view, int dx, int dy) { acknowledgeVisible(); }
         });
@@ -81,7 +88,7 @@ public final class ChatActivity extends AppCompatActivity {
         composerRow.addView(inputBar, new LinearLayout.LayoutParams(0, -2, 1));
         android.widget.ImageButton emojiButton = Ui.icon(this, R.drawable.ic_emoji, R.string.emoji, v -> emoji());
         emojiButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.text_secondary)));
-        emojiButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3345C98A), Ui.shape(this, R.color.card, 24), null));
+        emojiButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.card, 24), null));
         inputBar.addView(emojiButton);
         composer = Ui.input(this, R.string.message_hint); composer.setSingleLine(false); composer.setMaxLines(5);
         composer.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
@@ -112,15 +119,32 @@ public final class ChatActivity extends AppCompatActivity {
         super.onStart(); if (model == null) return;
         loadingOlder = false; older.setEnabled(true);
         if (Backend.uid().isEmpty()) { finish(); return; }
-        Backend.db().collection("chats").document(chatId).get().addOnSuccessListener(this, doc -> {
+        chatReady = false; pendingDocs = null;
+        chatListener = Backend.db().collection("chats").document(chatId).addSnapshotListener(this, (doc, error) -> {
+            if (error != null || doc == null || !doc.exists()) { status.setVisibility(View.VISIBLE); status.setText(R.string.error_chat_loading); return; }
+            com.google.firebase.Timestamp previousCutoff = clearedBefore;
+            boolean initial = !chatReady;
+            clearedBefore = (com.google.firebase.Timestamp) doc.get("clearedBefore." + Backend.uid()); chatReady = true;
+            @SuppressWarnings("unchecked") List<String> members = (List<String>) doc.get("members");
+            if (members != null) for (String member : members) if (!member.equals(Backend.uid())) { otherUid = member; avatar.load(member, name); }
             @SuppressWarnings("unchecked") Map<String, String> names = (Map<String, String>) doc.get("names");
             if (getString(R.string.app_name).equals(name) && names != null) {
                 for (Map.Entry<String, String> entry : names.entrySet()) if (!entry.getKey().equals(Backend.uid())) { name = entry.getValue(); title.setText(name); }
+            }
+            if (pendingDocs != null) {
+                merge(pendingDocs); older.setVisibility(!historyExhausted && pendingDocs.size() >= 50 && adapter.getItemCount() > 0 ? View.VISIBLE : View.GONE);
+                if (adapter.getItemCount() > 0) messages.scrollToPosition(adapter.getItemCount() - 1); pendingDocs = null;
+                if (!model.busy && !model.failed) { status.setText(R.string.new_conversation); status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); }
+            }
+            else if (initial || !java.util.Objects.equals(previousCutoff, clearedBefore)) {
+                merge(java.util.Collections.emptyList());
+                if (!model.busy && !model.failed) { status.setText(R.string.new_conversation); status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); }
             }
         });
         listener = query().limit(50).addSnapshotListener(this, (snapshot, error) -> {
             if (error != null) { status.setVisibility(View.VISIBLE); status.setText(R.string.error_chat_loading); return; }
             if (snapshot == null) return;
+            if (!chatReady) { pendingDocs = snapshot.getDocuments(); return; }
             boolean bottom = loaded.isEmpty() || layoutManager.findLastVisibleItemPosition() >= adapter.getItemCount() - 3;
             merge(snapshot.getDocuments());
             if (bottom && adapter.getItemCount() > 0) messages.scrollToPosition(adapter.getItemCount() - 1);
@@ -131,21 +155,62 @@ public final class ChatActivity extends AppCompatActivity {
     @Override protected void onResume() { super.onResume(); visibleChat = chatId; if (messages != null) messages.post(this::acknowledgeVisible); }
     @Override public void onWindowFocusChanged(boolean focused) { super.onWindowFocusChanged(focused); if (focused && messages != null) messages.post(this::acknowledgeVisible); }
     @Override protected void onPause() { visibleChat = null; super.onPause(); }
-    @Override protected void onStop() { if (listener != null) { listener.remove(); listener = null; } super.onStop(); }
+    @Override protected void onStop() { if (listener != null) { listener.remove(); listener = null; } if (chatListener != null) { chatListener.remove(); chatListener = null; } super.onStop(); }
     private Query query() {
         return Backend.db().collection("chats").document(chatId).collection("messages")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .orderBy(com.google.firebase.firestore.FieldPath.documentId(), Query.Direction.DESCENDING);
     }
+    private void contactInfo() {
+        if (otherUid.isEmpty()) { toast(R.string.loading); return; }
+        LinearLayout content = Ui.column(this); content.setGravity(Gravity.CENTER_HORIZONTAL); content.setPadding(Ui.dp(this, 24), Ui.dp(this, 24), Ui.dp(this, 24), Ui.dp(this, 16));
+        AvatarView photo = new AvatarView(this); photo.load(otherUid, name); content.addView(photo, new LinearLayout.LayoutParams(Ui.dp(this, 96), Ui.dp(this, 96)));
+        TextView contactName = Ui.text(this, name, 22, false); contactName.setGravity(Gravity.CENTER); contactName.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 16)); content.addView(contactName);
+        content.addView(Ui.text(this, getString(R.string.profile_about), 13, false));
+        AboutTextView phrase = new AboutTextView(this); phrase.setTextSize(16); phrase.setTextColor(getColor(R.color.text_primary)); phrase.setGravity(Gravity.CENTER); phrase.setPadding(0, Ui.dp(this, 8), 0, 0);
+        phrase.bind(otherUid, getString(R.string.no_about)); content.addView(phrase, new LinearLayout.LayoutParams(-1, -2));
+        new AlertDialog.Builder(this).setView(content).setPositiveButton(android.R.string.ok, null).show();
+    }
     private void merge(List<DocumentSnapshot> docs) {
+        if (clearedBefore != null) for (DocumentSnapshot doc : docs) if (doc.getTimestamp("createdAt") != null && doc.getTimestamp("createdAt").compareTo(clearedBefore) <= 0) historyExhausted = true;
         List<String> delivered = new ArrayList<>();
         for (DocumentSnapshot doc : docs) if (!Backend.uid().equals(doc.getString("senderId")) && doc.getTimestamp("deliveredAt") == null && deliveryQueued.add(doc.getId())) delivered.add(doc.getId());
         ReceiptWorker.schedule(chatId, delivered, false);
-        for (DocumentSnapshot doc : docs) loaded.put(doc.getId(), doc);
+        for (DocumentSnapshot doc : docs) { if (visible(doc)) loaded.put(doc.getId(), doc); else loaded.remove(doc.getId()); }
+        loaded.values().removeIf(doc -> !visible(doc));
         List<DocumentSnapshot> sorted = new ArrayList<>(loaded.values());
         sorted.sort(Comparator.comparing((DocumentSnapshot doc) -> doc.getTimestamp("createdAt")).thenComparing(DocumentSnapshot::getId));
-        if (!sorted.isEmpty()) oldest = sorted.get(0); adapter.submit(sorted);
+        oldest = sorted.isEmpty() ? null : sorted.get(0); adapter.submit(sorted);
         messages.post(this::acknowledgeVisible);
+    }
+    private boolean visible(DocumentSnapshot doc) {
+        @SuppressWarnings("unchecked") List<String> hidden = (List<String>) doc.get("hiddenFor");
+        return (hidden == null || !hidden.contains(Backend.uid())) && (clearedBefore == null || (doc.getTimestamp("createdAt") != null && doc.getTimestamp("createdAt").compareTo(clearedBefore) > 0));
+    }
+    private void messageActions(DocumentSnapshot doc) {
+        if (!Backend.uid().equals(doc.getString("senderId"))) return;
+        if (doc.getId().equals(model.pendingId)) { toast(model.busy ? R.string.sending : R.string.error_send); return; }
+        boolean deleted = Boolean.TRUE.equals(doc.getBoolean("deletedForAll"));
+        String[] choices = deleted ? new String[]{getString(R.string.delete_for_me), getString(R.string.cancel)} : new String[]{getString(R.string.edit_message), getString(R.string.delete_for_all), getString(R.string.delete_for_me), getString(R.string.cancel)};
+        new AlertDialog.Builder(this).setItems(choices, (menu, selected) -> {
+            if (selected == choices.length - 1) return;
+            if (!deleted && selected == 0) {
+                EditText field = Ui.input(this, R.string.message_hint); field.setSingleLine(false); field.setText(doc.getString("text"));
+                AlertDialog edit = new AlertDialog.Builder(this).setTitle(R.string.edit_message).setView(field).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create();
+                edit.setOnShowListener(ignored -> edit.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                    String text = field.getText().toString().trim(); if (text.isEmpty() || text.length() > 4000) { field.setError(getString(R.string.message_too_long)); return; }
+                    view.setEnabled(false); Backend.call("editMessage", Backend.data("chatId", chatId, "messageId", doc.getId(), "text", text)).addOnCompleteListener(this, task -> {
+                        view.setEnabled(true); if (task.isSuccessful()) edit.dismiss(); else Toast.makeText(this, Backend.error(this, task.getException()), Toast.LENGTH_LONG).show();
+                    });
+                })); edit.show();
+            } else {
+                String scope = !deleted && selected == 1 ? "all" : "self";
+                new AlertDialog.Builder(this).setMessage(R.string.delete_message_question).setNegativeButton(R.string.cancel, null).setPositiveButton("all".equals(scope) ? R.string.delete_for_all : R.string.delete_for_me, (confirm, button) ->
+                    Backend.call("deleteMessage", Backend.data("chatId", chatId, "messageId", doc.getId(), "scope", scope)).addOnCompleteListener(this, task -> {
+                        if (!task.isSuccessful()) Toast.makeText(this, Backend.error(this, task.getException()), Toast.LENGTH_LONG).show();
+                    })).show();
+            }
+        }).show();
     }
     private void acknowledgeVisible() {
         if (!chatId.equals(visibleChat) || !hasWindowFocus() || !getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return;

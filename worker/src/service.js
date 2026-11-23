@@ -1,4 +1,24 @@
 import {ApiError, requireValue, hash, normalizeEmail, validUid, normalizeMessage, chatId} from "./validation.js";
+import {validatePhoto} from "./photo.js";
+
+export async function updateProfileAbout(db, user, data) {
+  requireValue(typeof data.text === "string");
+  const text = data.text.trim().replace(/\s+/g, " ");
+  requireValue(text.length <= 139 && !/[\u0000-\u001f\u007f]/.test(text));
+  await quota(db, user.uid, "about", 1, 20);
+  if (!await db.get(`users/${user.uid}`)) throw new ApiError(404, "not-found");
+  await db.commit([text ? db.write(`profileAbout/${user.uid}`, {text, updatedAt: new Date()}) : db.remove(`profileAbout/${user.uid}`)]);
+  return {text};
+}
+
+export async function updateProfilePhoto(db, user, data) {
+  const photo = data.photo === null ? null : validatePhoto(data.photo);
+  await quota(db, user.uid, "photo", 1, 20);
+  if (!await db.get(`users/${user.uid}`)) throw new ApiError(404, "not-found");
+  await db.commit([photo === null ? db.remove(`profilePhotos/${user.uid}`)
+    : db.write(`profilePhotos/${user.uid}`, {photo, updatedAt: new Date()})]);
+  return {ok: true};
+}
 
 export async function quota(db, uid, action, amount, limit) {
   await db.transaction(async tx => {
@@ -65,7 +85,8 @@ export async function persistMessage(db, uid, data) {
     const recipientId = chat.data.members.find(member => member !== uid);
     const now = new Date();
     tx.set(path, {...message, senderId: uid, createdAt: now}, false);
-    tx.set(`chats/${data.chatId}`, {...chat.data, lastText: message.text, updatedAt: now}, true);
+    tx.set(`chats/${data.chatId}`, {...chat.data, lastText: message.text, updatedAt: now, lastMessageId: data.messageId,
+      lastSenderId: uid, lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
     tx.set(`notificationOutbox/${jobId}`, {chatId: data.chatId, messageId: data.messageId, recipientId,
       createdAt: now, nextAttemptAt: now, status: "pending", attempts: 0, sentDeviceIds: []}, false);
     return true;
@@ -104,6 +125,7 @@ export async function acknowledgeMessages(db, user, data) {
     if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
     const docs = await tx.getAll(ids.map(id => `chats/${data.chatId}/messages/${id}`));
     const now = new Date();
+    const summary = {...chat.data}; let summaryChanged = false;
     for (const doc of docs) {
       if (!doc || doc.data.senderId === user.uid) continue;
       const value = {...doc.data};
@@ -111,7 +133,13 @@ export async function acknowledgeMessages(db, user, data) {
       if (!value.deliveredAt) { value.deliveredAt = now; changed = true; }
       if (data.state === "read" && !value.readAt) { value.readAt = now; changed = true; }
       if (changed) tx.set(doc.path, value, true);
+      if ((doc.path.endsWith("/" + summary.lastMessageId) || (!summary.lastMessageId && summary.updatedAt?.getTime() === value.createdAt?.getTime())) && value.senderId !== user.uid) {
+        if (!summary.lastMessageId) { summary.lastMessageId = doc.path.split("/").at(-1); summary.lastSenderId = value.senderId; summaryChanged = true; }
+        if (!summary.lastDeliveredAt) { summary.lastDeliveredAt = value.deliveredAt; summaryChanged = true; }
+        if (value.readAt && !summary.lastReadAt) { summary.lastReadAt = value.readAt; summaryChanged = true; }
+      }
     }
+    if (summaryChanged) tx.set(`chats/${data.chatId}`, summary, true);
   });
   return {ok: true};
 }
