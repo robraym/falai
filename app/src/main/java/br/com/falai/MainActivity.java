@@ -484,7 +484,7 @@ public final class MainActivity extends FalaiActivity {
             if (messageSoundSummary != null) messageSoundSummary.setText(MessageSounds.label(this, MessageSounds.selected(this)));
         })); soundRow.setFocusable(true); general.addView(soundRow);
         general.addView(Ui.optionRow(this, R.drawable.ic_settings, getString(R.string.app_update),
-                getString(R.string.apk_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                getString(R.string.installed_app_version, BuildConfig.VERSION_NAME),
                 true, view -> showAppUpdate()));
         general.addView(Ui.optionRow(this, R.drawable.ic_logout, getString(R.string.sign_out), getString(R.string.sign_out_summary), true, v -> new AlertDialog.Builder(this).setMessage(R.string.sign_out_question).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.sign_out, (dialog, which) -> {
             Backend.signOut().addOnCompleteListener(this, task -> {
