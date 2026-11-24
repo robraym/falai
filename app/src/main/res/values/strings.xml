@@ -13,6 +13,12 @@
     <string name="delete_message_question">Apagar esta mensagem?</string>
     <string name="delete_chat">Excluir conversa</string>
     <string name="clear_chat">Limpar conversa</string>
+    <string name="archived_chats">Arquivadas</string>
+    <string name="archive_chat">Arquivar conversa</string>
+    <string name="unarchive_chat">Desarquivar conversa</string>
+    <string name="chat_archived">Conversa arquivada</string>
+    <string name="chat_unarchived">Conversa desarquivada</string>
+    <string name="empty_archived_chats">Nenhuma conversa arquivada.</string>
     <string name="history_duration">Mensagens temporárias</string>
     <string name="chat_timer_title">Mensagens temporárias</string>
     <string name="timer_message_expired">Mensagem temporária expirada</string>
@@ -49,6 +55,7 @@
     <string name="color_pink">Rosa</string>
     <string name="color_teal">Turquesa</string>
     <string name="profile_photo">Foto do perfil</string>
+    <string name="view_profile_photo">Ver foto do perfil em tela cheia</string>
     <string name="profile_photo_hint">Visível nas conversas e nos contatos</string>
     <string name="choose_photo">Escolher foto</string>
     <string name="remove_photo">Remover foto</string>
@@ -204,6 +211,7 @@
     <string name="apk_version_unknown">Versão não informada</string>
     <string name="app_update">Atualização do aplicativo</string>
     <string name="installed_app_version">Versão instalada: %1$s</string>
+    <string name="installed_apk_summary">Versão %1$s · %2$s\nGerado em %3$s</string>
     <string name="apk_build_date">Gerado em %1$s</string>
     <string name="apk_version_with_build_date">%1$s (gerada em %2$s)</string>
     <string name="check_apk_update">Verificar atualização</string>
@@ -233,13 +241,13 @@
     <string name="apk_download_cancel_failed">Não foi possível remover o download. Tente novamente.</string>
     <string name="apk_download_retry_hint">Tente baixar novamente ou descarte este download para verificar outra atualização.</string>
     <string name="apk_verifying_download">Conferindo a atualização…</string>
-    <string name="apk_ready_to_install">Download concluído. A atualização está pronta para instalar.</string>
+    <string name="apk_ready_to_install">Download concluído</string>
     <string name="install_apk_update">Instalar atualização</string>
     <string name="apk_install_confirmation">Confirme a instalação na próxima tela.</string>
     <string name="apk_update_invalid_file">O arquivo baixado não corresponde à atualização esperada ou está incompleto. Baixe novamente.</string>
     <string name="apk_update_signature_mismatch">Esta atualização usa uma assinatura diferente da versão instalada. Peça ao responsável um APK compatível.</string>
     <string name="apk_install_permission_explanation">Autorize o Falai a instalar atualizações na próxima tela do Android. Depois de permitir, volte para continuar a instalação.</string>
-    <string name="apk_install_permission_needed">A instalação ainda não foi autorizada. Toque em Instalar atualização para permitir.</string>
+    <string name="apk_install_permission_needed">Autorize a instalação nas configurações do Android.</string>
     <string name="apk_install_unavailable">Não foi possível abrir a instalação. Confira a permissão para o Falai instalar aplicativos e tente novamente.</string>
     <string name="unread_messages">Mensagens não lidas</string>
     <plurals name="unread_message_count">

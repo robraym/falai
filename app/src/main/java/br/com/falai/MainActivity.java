@@ -52,15 +52,19 @@ public final class MainActivity extends FalaiActivity {
     private int tab, generation;
     private boolean home, profileLoaded, contactsBusy, loadingProfile;
     private boolean selectingContact;
+    private boolean showingArchived;
+    private final androidx.activity.OnBackPressedCallback archiveBack = new androidx.activity.OnBackPressedCallback(false) {
+        @Override public void handleOnBackPressed() { showingArchived = false; showHome(0); }
+    };
     private ContactsRepository.Result contacts;
     private long contactsAt;
     private android.os.CancellationSignal googleCancellation;
-    private FloatingSearchController floatingSearch;
     private Runnable retentionRefresh;
     private String chatQuery = "", contactQuery = "";
     public static final class ConversationState extends androidx.lifecycle.ViewModel {
         final List<DocumentSnapshot> documents = new ArrayList<>();
         final Map<String, com.google.firebase.Timestamp> locallyCleared = new java.util.HashMap<>(); String owner = "";
+        final Map<String, Boolean> archiveOverrides = new java.util.HashMap<>();
     }
     private ConversationState chatState;
     private List<DocumentSnapshot> cachedChats;
@@ -80,10 +84,13 @@ public final class MainActivity extends FalaiActivity {
         if (granted) Backend.registerDevice();
     });
     private final MessageSoundPicker messageSounds = new MessageSoundPicker(this);
+    private final ProfileController profile = new ProfileController(this);
     private AppUpdateController appUpdates;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        getOnBackPressedDispatcher().addCallback(this, archiveBack);
+        showingArchived = state != null && state.getBoolean("showingArchived", false);
         appUpdates = new AppUpdateController(this);
         if (state != null && state.getBoolean("updateDialog", false)) appUpdates.restore();
         chatState = new androidx.lifecycle.ViewModelProvider(this).get(ConversationState.class); cachedChats = chatState.documents;
@@ -92,7 +99,7 @@ public final class MainActivity extends FalaiActivity {
         if (!Backend.ready()) { page(getString(R.string.app_name)); info(R.string.not_ready_title, R.string.not_ready_body); return; }
         if (Backend.uid().isEmpty()) showLogin(); else loadProfile();
     }
-    @Override protected void onSaveInstanceState(@NonNull Bundle out) { super.onSaveInstanceState(out); out.putInt("tab", tab); out.putString("chatQuery", chatQuery); out.putString("contactQuery", contactQuery); out.putBoolean("updateDialog", appUpdates != null && appUpdates.isOpen()); }
+    @Override protected void onSaveInstanceState(@NonNull Bundle out) { super.onSaveInstanceState(out); out.putInt("tab", tab); out.putString("chatQuery", chatQuery); out.putString("contactQuery", contactQuery); out.putBoolean("showingArchived", showingArchived); out.putBoolean("updateDialog", appUpdates != null && appUpdates.isOpen()); }
     @Override protected void onStart() {
         super.onStart(); if (!Backend.ready()) return;
         listenDefaultTimer();
@@ -111,7 +118,7 @@ public final class MainActivity extends FalaiActivity {
     @Override protected void onDestroy() {
         if (googleCancellation != null) googleCancellation.cancel(); super.onDestroy();
     }
-    private void detach() { retentionRefresh = null; if (chatsListener != null) { chatsListener.remove(); chatsListener = null; } if (floatingSearch != null) { floatingSearch.dispose(); floatingSearch = null; } }
+    private void detach() { retentionRefresh = null; if (chatsListener != null) { chatsListener.remove(); chatsListener = null; } }
     private void observeContacts() {
         if (!observingContacts && ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
             getContentResolver().registerContentObserver(android.provider.ContactsContract.Data.CONTENT_URI, true, contactsObserver); observingContacts = true;
@@ -122,6 +129,7 @@ public final class MainActivity extends FalaiActivity {
         ContactsRepository.clear(); contacts = null; contactsAt = 0; if (home && tab == 1) showHome(1);
     }
     private void page(String title) {
+        archiveBack.setEnabled(false);
         dismissConversationsSplash();
         detach(); generation++; root = Ui.root(this); root.addView(Ui.heading(this, title));
         body = Ui.column(this); int inset = getResources().getDimensionPixelSize(R.dimen.navigation_content_inset);
@@ -251,8 +259,18 @@ public final class MainActivity extends FalaiActivity {
     }
     private void showHome(int selected) {
         if (Backend.uid().isEmpty()) { showLogin(); return; }
+        if (!selectingContact && selected == 1) { showHome(0); return; }
         home = true; tab = selectingContact ? 1 : selected;
-        page(getString(selectingContact ? R.string.contacts : selected == 0 ? R.string.conversations : selected == 1 ? R.string.contacts : R.string.settings));
+        if (selected != 0) showingArchived = false;
+        page(getString(selectingContact ? R.string.contacts : showingArchived ? R.string.archived_chats : selected == 0 ? R.string.conversations : selected == 3 ? R.string.profile : selected == 1 ? R.string.contacts : R.string.settings));
+        if (!selectingContact && showingArchived) {
+            archiveBack.setEnabled(true);
+            View heading = root.getChildAt(0); root.removeViewAt(0);
+            LinearLayout header = Ui.row(this);
+            header.addView(Ui.icon(this, R.drawable.ic_back, R.string.back, v -> { showingArchived = false; showHome(0); }));
+            header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1)); root.addView(header, 0);
+            showChats(); return;
+        }
         if (selectingContact) {
             View heading = root.getChildAt(0); root.removeViewAt(0);
             LinearLayout header = Ui.row(this);
@@ -260,12 +278,10 @@ public final class MainActivity extends FalaiActivity {
             header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1)); root.addView(header, 0);
             showContacts(); return;
         }
-        View profileButton = root.findViewById(R.id.button_profile);
-        profileButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.action_green_soft, 21), null));
-        profileButton.setVisibility(View.VISIBLE); profileButton.setOnClickListener(v -> startActivity(new Intent(this, ProfileActivity.class)));
         LinearLayout nav = Ui.row(this); nav.setBaselineAligned(false); View selectedView = null;
-        int[] titles = {R.string.conversations, R.string.contacts, R.string.settings}; int[] icons = {R.drawable.ic_chat, R.drawable.ic_contacts, R.drawable.ic_settings};
-        for (int i = 0; i < 3; i++) {
+        int[] titles = {R.string.conversations, R.string.contacts, R.string.settings, R.string.profile};
+        int[] icons = {R.drawable.ic_chat, R.drawable.ic_contacts, R.drawable.ic_settings, R.drawable.ic_profile};
+        for (int i : new int[]{0, 3, 2}) {
             final int index = i; LinearLayout item = Ui.column(this); item.setGravity(Gravity.CENTER); item.setBaselineAligned(false); item.setClickable(true); item.setFocusable(true);
             item.setSelected(i == selected);
             item.setContentDescription(getString(titles[i])); item.setOnClickListener(v -> showHome(index));
@@ -285,16 +301,15 @@ public final class MainActivity extends FalaiActivity {
             nav.addView(item, new LinearLayout.LayoutParams(0, -1, 1)); if (i == selected) selectedView = item;
         }
         root.addView(nav, new LinearLayout.LayoutParams(-1, Ui.dp(this, 78))); NavigationSurface.attach(root, nav, selectedView);
-        if (selected == 0) showChats(); else if (selected == 1) showContacts(); else showSettings();
+        if (selected == 0) showChats(); else if (selected == 3) profile.show(body); else if (selected == 1) showContacts(); else showSettings();
     }
     private RecyclerView list(LinearLayout parent, RowsAdapter adapter) {
         RecyclerView list = new RecyclerView(this); list.setLayoutManager(new LinearLayoutManager(this)); list.setAdapter(adapter);
         list.setClipToPadding(false); list.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 9)); parent.addView(list, new LinearLayout.LayoutParams(-1, 0, 1)); return list;
     }
     private void showChats() {
-        if (!chatState.owner.equals(Backend.uid())) { cachedChats.clear(); chatState.locallyCleared.clear(); chatState.owner = Backend.uid(); }
+        if (!chatState.owner.equals(Backend.uid())) { cachedChats.clear(); chatState.locallyCleared.clear(); chatState.archiveOverrides.clear(); chatState.owner = Backend.uid(); }
         FrameLayout area = new FrameLayout(this); body.addView(area, new LinearLayout.LayoutParams(-1, -1));
-        area.setId(R.id.floating_search_content_area);
         LinearLayout content = Ui.column(this); area.addView(content, new FrameLayout.LayoutParams(-1, -1));
         int current = generation; TextView state = Ui.text(this, getString(R.string.loading), 14, false); state.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), 0, Ui.dp(this, 12)); content.addView(state);
         state.setVisibility(View.GONE);
@@ -309,18 +324,33 @@ public final class MainActivity extends FalaiActivity {
         FrameLayout.LayoutParams floating = new FrameLayout.LayoutParams(Ui.dp(this, 56), Ui.dp(this, 56), Gravity.BOTTOM | Gravity.END);
         floating.setMargins(Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 16)); area.addView(start, floating);
         start.setOnClickListener(v -> startActivity(new Intent(this, MainActivity.class).putExtra("selectContact", true)));
-        EditText search = attachSearch(area, conversations, "conversations"); search.setText(chatQuery);
+        if (showingArchived) { start.setVisibility(View.GONE); conversations.setPadding(0, conversations.getPaddingTop(), 0, Ui.dp(this, 9)); }
+        EditText search = attachSearch(content); search.setText(showingArchived ? "" : chatQuery);
+        LinearLayout archives = Ui.row(this); archives.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), Ui.dp(this, 16), Ui.dp(this, 12));
+        ImageView archiveIcon = new ImageView(this); archiveIcon.setImageResource(R.drawable.ic_archive);
+        archiveIcon.setImageTintList(android.content.res.ColorStateList.valueOf(Appearance.primary(this)));
+        archives.addView(archiveIcon, new LinearLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24)));
+        TextView archiveLabel = Ui.text(this, getString(R.string.archived_chats), 16, false);
+        archiveLabel.setPadding(Ui.dp(this, 24), 0, 0, 0); archives.addView(archiveLabel, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView archiveCount = Ui.text(this, "", 13, true); archiveCount.setTextColor(Appearance.primary(this)); archives.addView(archiveCount);
+        archives.setFocusable(true); archives.setOnClickListener(v -> { showingArchived = true; showHome(0); });
+        content.addView(archives, 1); archives.setVisibility(View.GONE);
         List<RowsAdapter.Row> allRows = new ArrayList<>();
+        java.util.Set<String> archivedIds = new java.util.HashSet<>();
         Runnable filter = () -> {
             List<RowsAdapter.Row> filtered = new ArrayList<>(); String value = searchable(search.getText().toString());
-            for (RowsAdapter.Row row : allRows) if (searchable(ProfileNameView.current(row.avatarUid, row.name) + " " + row.detail).contains(value)) filtered.add(row);
-            adapter.submit(filtered); state.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
-            state.setText(value.isEmpty() ? R.string.empty_chats_body : R.string.no_search_results);
+            for (RowsAdapter.Row row : allRows) if ((showingArchived ? archivedIds.contains(row.key) : !value.isEmpty() || !archivedIds.contains(row.key))
+                    && searchable(ProfileNameView.current(row.avatarUid, row.name) + " " + row.detail).contains(value)) filtered.add(row);
+            archives.setVisibility(!showingArchived && value.isEmpty() && !archivedIds.isEmpty() ? View.VISIBLE : View.GONE);
+            adapter.submit(filtered); state.setVisibility(filtered.isEmpty() && (showingArchived || !value.isEmpty() || archivedIds.isEmpty()) ? View.VISIBLE : View.GONE);
+            state.setText(value.isEmpty() ? showingArchived ? R.string.empty_archived_chats : R.string.empty_chats_body : R.string.no_search_results);
         };
         java.util.function.Consumer<List<DocumentSnapshot>> display = docs -> {
             long retentionCutoff = HistoryRetention.cutoff(this);
-            allRows.clear();
+            allRows.clear(); archivedIds.clear(); int unreadArchived = 0;
             for (DocumentSnapshot chat : docs) {
+                boolean archived = isArchived(chat);
+                ArchivedChats.save(this, Backend.uid(), chat.getId(), archived);
                 @SuppressWarnings("unchecked") List<String> members = (List<String>) chat.get("members");
                 @SuppressWarnings("unchecked") Map<String, String> names = (Map<String, String>) chat.get("names");
                 if (members == null || names == null) continue;
@@ -352,10 +382,12 @@ public final class MainActivity extends FalaiActivity {
                     preview = getString(R.string.timer_message_expired); dateTime = ""; checks = 0;
                 }
                 allRows.add(new RowsAdapter.Row(chat.getId(), name, preview == null || preview.isEmpty() ? getString(R.string.new_conversation) : preview, dateTime, other, () -> ChatActivity.open(this, chat.getId(), name), () -> chatActions(chat.getId()), checks, false, unread));
+                if (archived) { archivedIds.add(chat.getId()); if (unread != 0) unreadArchived++; }
             }
+            archiveCount.setText(unreadArchived == 0 ? "" : String.valueOf(unreadArchived));
             filter.run();
         };
-        search.addTextChangedListener(new TextWatcher() { public void beforeTextChanged(CharSequence s, int start, int count, int after) { } public void onTextChanged(CharSequence s, int start, int before, int count) { chatQuery = s.toString(); filter.run(); } public void afterTextChanged(Editable e) { } });
+        search.addTextChangedListener(new TextWatcher() { public void beforeTextChanged(CharSequence s, int start, int count, int after) { } public void onTextChanged(CharSequence s, int start, int before, int count) { if (!showingArchived) chatQuery = s.toString(); filter.run(); } public void afterTextChanged(Editable e) { } });
         retentionRefresh = () -> display.accept(cachedChats);
         if (!cachedChats.isEmpty()) display.accept(cachedChats);
         chatsListener = Backend.db().collection("chats").whereArrayContains("members", Backend.uid()).orderBy("updatedAt", Query.Direction.DESCENDING).limit(100)
@@ -374,19 +406,37 @@ public final class MainActivity extends FalaiActivity {
                     dismissConversationsSplash();
                 });
     }
-    private EditText attachSearch(FrameLayout area, View dismiss, String key) {
-        area.setId(R.id.floating_search_content_area); dismiss.setId(R.id.search_dismiss_surface);
-        View bar = getLayoutInflater().inflate(R.layout.view_floating_search, area, false);
-        bar.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.action_green_soft, 24), null));
-        area.addView(bar); floatingSearch = FloatingSearchController.attach(this, key, R.id.search_dismiss_surface); return floatingSearch.getInput();
+    private EditText attachSearch(LinearLayout content) {
+        content.setFocusableInTouchMode(true);
+        content.requestFocus();
+        EditText search = (EditText) getLayoutInflater().inflate(R.layout.view_inline_search, content, false);
+        content.addView(search, 0);
+        search.setOnEditorActionListener((view, action, event) -> {
+            if (action != android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) return false;
+            ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(search.getWindowToken(), 0);
+            content.requestFocus();
+            return true;
+        });
+        return search;
     }
     private static String searchable(String value) { return java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}+", "").toLowerCase(java.util.Locale.ROOT); }
     private void chatActions(String id) {
         com.google.firebase.Timestamp previous = null;
         for (DocumentSnapshot doc : cachedChats) if (doc.getId().equals(id)) previous = doc.getTimestamp("updatedAt");
         final com.google.firebase.Timestamp lastMessage = previous;
-        new AlertDialog.Builder(this).setItems(new String[]{getString(R.string.delete_chat), getString(R.string.clear_chat), getString(R.string.cancel)}, (dialog, choice) -> {
-            if (choice == 2) return;
+        boolean archived = ArchivedChats.contains(this, Backend.uid(), id);
+        new AlertDialog.Builder(this).setItems(new String[]{getString(R.string.delete_chat), getString(R.string.clear_chat), getString(archived ? R.string.unarchive_chat : R.string.archive_chat), getString(R.string.cancel)}, (dialog, choice) -> {
+            if (choice == 3) return;
+            if (choice == 2) {
+                String owner = Backend.uid();
+                Backend.call("archiveConversation", Backend.data("chatId", id, "archived", !archived)).addOnCompleteListener(this, task -> {
+                    if (!owner.equals(Backend.uid())) return;
+                    if (task.isSuccessful()) {
+                        chatState.archiveOverrides.put(id, !archived); ArchivedChats.save(this, owner, id, !archived);
+                        if (home && tab == 0) showHome(0);
+                    } else toast(Backend.error(this, task.getException()));
+                }); return;
+            }
             boolean clear = choice == 1;
             new AlertDialog.Builder(this).setMessage(clear ? R.string.clear_chat_question : R.string.delete_chat_question).setNegativeButton(R.string.cancel, null).setPositiveButton(clear ? R.string.clear_chat : R.string.delete_chat, (confirmation, button) ->
                 Backend.call(clear ? "clearConversation" : "deleteConversation", Backend.data("chatId", id)).addOnCompleteListener(this, task -> {
@@ -397,6 +447,13 @@ public final class MainActivity extends FalaiActivity {
                     else toast(Backend.error(this, task.getException()));
                 })).show();
         }).show();
+    }
+    private boolean isArchived(DocumentSnapshot chat) {
+        Object value = chat.get("archivedFor");
+        boolean server = value instanceof List && ((List<?>) value).contains(Backend.uid());
+        Boolean pending = chatState.archiveOverrides.get(chat.getId());
+        if (pending != null && pending == server) { chatState.archiveOverrides.remove(chat.getId()); pending = null; }
+        return pending == null ? server : pending;
     }
     private String contactName(String uid, String fallback) {
         return ProfileNameView.current(uid, fallback == null ? getString(R.string.app_name) : fallback);
@@ -454,8 +511,7 @@ public final class MainActivity extends FalaiActivity {
         FrameLayout area = new FrameLayout(this); body.addView(area, new LinearLayout.LayoutParams(-1, -1));
         LinearLayout content = Ui.column(this); area.addView(content, new FrameLayout.LayoutParams(-1, -1));
         TextView empty = Ui.text(this, getString(R.string.no_contacts_body), 14, false); content.addView(empty); RecyclerView people = list(content, adapter);
-        people.setPadding(people.getPaddingLeft(), people.getPaddingTop(), people.getPaddingRight(), Ui.dp(this, 68));
-        EditText search = attachSearch(area, people, "contacts"); search.setText(contactQuery);
+        EditText search = attachSearch(content); search.setText(contactQuery);
         Runnable filter = () -> {
             String query = searchable(search.getText().toString()); List<RowsAdapter.Row> rows = new ArrayList<>();
             for (ContactsRepository.Contact c : contacts.contacts) if (searchable(ProfileNameView.current(c.uid, c.name) + " " + c.email).contains(query)) rows.add(new RowsAdapter.Row(c.uid, c.name, c.email, () -> openContact(c)));
@@ -487,7 +543,7 @@ public final class MainActivity extends FalaiActivity {
             if (messageSoundSummary != null) messageSoundSummary.setText(MessageSounds.label(this, MessageSounds.selected(this)));
         })); soundRow.setFocusable(true); general.addView(soundRow);
         general.addView(Ui.optionRow(this, R.drawable.ic_settings, getString(R.string.app_update),
-                getString(R.string.installed_app_version, BuildConfig.VERSION_NAME),
+                installedApkSummary(),
                 true, view -> showAppUpdate()));
     }
     private void showAppUpdate() {
@@ -527,6 +583,12 @@ public final class MainActivity extends FalaiActivity {
     }
     String installedApkDetails() {
         return BuildConfig.VERSION_NAME;
+    }
+    private String installedApkSummary() {
+        long bytes = new java.io.File(getApplicationInfo().sourceDir).length();
+        String size = android.text.format.Formatter.formatShortFileSize(this, bytes);
+        return getString(R.string.installed_apk_summary, BuildConfig.VERSION_NAME, size,
+                formatApkDate(AppUpdate.buildTimeMillis(BuildConfig.VERSION_CODE)));
     }
     String availableApkDetails(AppUpdate update) {
         return update.versionName + " · " + android.text.format.Formatter.formatShortFileSize(this, update.size);

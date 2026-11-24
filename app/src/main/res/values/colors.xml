@@ -15,6 +15,7 @@
     <color name="text_primary">#1F2329</color>
     <color name="text_secondary">#6C727C</color>
     <color name="input_background">#F0F2F5</color>
+    <color name="search_surface">#ECEFF1</color>
     <color name="divider">#D8DCE2</color>
     <color name="icon_surface">#CDD5DF</color>
 </resources>

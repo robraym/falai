@@ -38,7 +38,7 @@ public final class ChatActivity extends FalaiActivity {
     private EditText composer;
     private LinearLayout composerRow, retryRow, replyPreview;
     private TextView status, title, searchSummary;
-    private FloatingSearchController floatingSearch;
+    private EditText messageSearch;
     private String messageQuery = "";
     private ChatPresence presence;
     private AvatarView avatar;
@@ -100,6 +100,16 @@ public final class ChatActivity extends FalaiActivity {
         header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
         header.addView(Ui.icon(this, R.drawable.ic_more, R.string.chat_options, this::showChatOptions));
         root.addView(header);
+        messageSearch = (EditText) getLayoutInflater().inflate(R.layout.view_inline_search, root, false);
+        messageSearch.setHint(R.string.search_messages);
+        root.addView(messageSearch);
+        root.setFocusableInTouchMode(true); root.requestFocus();
+        messageSearch.setOnEditorActionListener((view, action, event) -> {
+            if (action != android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) return false;
+            ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
+                    .hideSoftInputFromWindow(messageSearch.getWindowToken(), 0);
+            root.requestFocus(); return true;
+        });
         searchSummary = Ui.text(this, "", 12, false); searchSummary.setVisibility(View.GONE); root.addView(searchSummary);
         older = Ui.button(this, R.string.older_messages, v -> loadOlder()); older.setVisibility(View.GONE); root.addView(older);
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
@@ -115,9 +125,7 @@ public final class ChatActivity extends FalaiActivity {
         messages.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override public void onScrolled(@NonNull RecyclerView view, int dx, int dy) { acknowledgeVisible(); }
         });
-        FrameLayout searchArea = new FrameLayout(this); searchArea.setId(R.id.floating_search_content_area);
-        messages.setId(R.id.search_dismiss_surface); searchArea.addView(messages, new FrameLayout.LayoutParams(-1, -1));
-        root.addView(searchArea, new LinearLayout.LayoutParams(-1, 0, 1));
+        root.addView(messages, new LinearLayout.LayoutParams(-1, 0, 1));
         status = Ui.text(this, getString(R.string.loading), 13, false); status.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6)); root.addView(status);
         retryRow = Ui.row(this);
         retryRow.addView(Ui.button(this, R.string.retry, v -> model.retry()), new LinearLayout.LayoutParams(0, -2, 1));
@@ -160,10 +168,7 @@ public final class ChatActivity extends FalaiActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() { leave(); }
         });
-        View searchBar = getLayoutInflater().inflate(R.layout.view_floating_search, searchArea, false);
-        searchBar.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.action_green_soft, 24), null));
-        searchArea.addView(searchBar); floatingSearch = FloatingSearchController.attach(this, "messages", R.id.search_dismiss_surface);
-        EditText search = floatingSearch.getInput(); search.setHint(R.string.search_messages);
+        EditText search = messageSearch;
         search.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             public void onTextChanged(CharSequence s, int start, int before, int count) { messageQuery = s.toString(); renderMessages(); }
@@ -222,7 +227,7 @@ public final class ChatActivity extends FalaiActivity {
     }
     @Override protected void onResume() { super.onResume(); visibleChat = chatId; if (presence != null) presence.resume(); if (messages != null) messages.post(this::acknowledgeVisible); }
     @Override public void onWindowFocusChanged(boolean focused) { super.onWindowFocusChanged(focused); if (focused && messages != null) messages.post(this::acknowledgeVisible); }
-    @Override protected void onPause() { visibleChat = null; if (presence != null) presence.pause(); if (floatingSearch != null) floatingSearch.collapse(false); super.onPause(); }
+    @Override protected void onPause() { visibleChat = null; if (presence != null) presence.pause(); super.onPause(); }
     @Override protected void onStop() { if (listener != null) { listener.remove(); listener = null; } if (chatListener != null) { chatListener.remove(); chatListener = null; } super.onStop(); }
     private Query query() {
         Query query = Backend.db().collection("chats").document(chatId).collection("messages")
@@ -305,7 +310,6 @@ public final class ChatActivity extends FalaiActivity {
         return java.text.Normalizer.normalize(text == null ? "" : text, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}+", "").toLowerCase(java.util.Locale.ROOT);
     }
     @Override protected void onDestroy() {
-        if (floatingSearch != null) floatingSearch.dispose();
         if (presence != null) presence.pause();
         super.onDestroy();
     }
@@ -416,8 +420,8 @@ public final class ChatActivity extends FalaiActivity {
     }
     private void jumpToMessage(String id) {
         if (adapter.scrollToMessage(messages, id)) return;
-        if (loaded.containsKey(id) && !messageQuery.isEmpty() && floatingSearch != null) {
-            floatingSearch.getInput().setText("");
+        if (loaded.containsKey(id) && !messageQuery.isEmpty() && messageSearch != null) {
+            messageSearch.setText("");
             if (adapter.scrollToMessage(messages, id)) return;
         }
         toast(older.getVisibility() == View.VISIBLE ? R.string.reply_load_older : R.string.reply_unavailable);

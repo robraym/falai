@@ -68,6 +68,8 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         if (messageId != null && getSharedPreferences("deleted_notices", MODE_PRIVATE).getBoolean(messageId, false)) return;
         if (messageId != null && messageId.matches("[a-f0-9-]{36}"))
             ReceiptWorker.schedule(chatId, java.util.Collections.singletonList(messageId), false);
+        boolean directReply = recipient.equals(message.getData().get("replySenderId"));
+        if ("true".equals(message.getData().get("silent")) || (ArchivedChats.contains(this, recipient, chatId) && !directReply)) return;
         long createdAt = message.getSentTime();
         try { createdAt = Long.parseLong(message.getData().get("createdAt")); } catch (RuntimeException ignored) { }
         long historyCutoff = HistoryRetention.cutoff(this);
@@ -114,6 +116,7 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         long timestamp = createdAt > 0 ? createdAt : System.currentTimeMillis();
         android.os.Bundle historyMetadata = new android.os.Bundle(); historyMetadata.putLong("falai_createdAt", timestamp);
         historyMetadata.putLong("falai_expiresAt", messageExpiresAt);
+        historyMetadata.putString("falai_chatId", chatId);
         NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(recipientPerson)
                 .setGroupConversation(false).addMessage(text, timestamp, senderPerson);
         NotificationCompat.Builder notification = new NotificationCompat.Builder(this, nudge ? NUDGE_CHANNEL_ID : CHANNEL_ID).setSmallIcon(R.drawable.ic_chat).setContentTitle(sender).setContentText(text)

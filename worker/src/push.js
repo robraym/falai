@@ -1,5 +1,6 @@
 import {googleAccessToken, httpFetch} from "./google.js";
 import {ApiError} from "./validation.js";
+import {shouldNotifyArchived} from "./archives.js";
 
 export function notificationPreview(text) {
   let result = "", size = 0;
@@ -17,6 +18,8 @@ export async function sendPush(env, token, job, validateOnly = false) {
     : {token,
       data: {chatId: job.chatId, messageId: job.messageId, recipientId: job.recipientId,
         senderId: job.senderId || "", senderName: job.senderName || "Falai", text: notificationPreview(job.text || ""), event: job.event || "message",
+        ...(job.silent ? {silent: "true"} : {}),
+        ...(job.replySenderId ? {replySenderId: job.replySenderId} : {}),
         ...(job.createdAt instanceof Date ? {createdAt: String(job.createdAt.getTime())} : {}),
         ...(job.expiresAt instanceof Date ? {messageExpiresAt: String(job.expiresAt.getTime())} : {}),
         ...(job.event === "nudge" ? {expiresAt: String(job.createdAt.getTime() + 60000)} : {})},
@@ -59,6 +62,8 @@ export async function dispatchJob(db, env, path, push = sendPush) {
     if (message?.data.kind === "nudge") claimed.event = "nudge";
     if (message?.data.deletedForAll) claimed.event = "deleted";
     claimed.senderId = message?.data.senderId || "";
+    claimed.silent = !shouldNotifyArchived(chat?.data, claimed.recipientId, message?.data);
+    claimed.replySenderId = message?.data.reply?.senderId || "";
     const sender = claimed.senderId ? await db.get(`users/${claimed.senderId}`) : null;
     claimed.senderName = sender?.data.name || chat?.data.names?.[claimed.senderId] || "Falai";
     // Collection is indexed by uid; fixed limit bounds reads and Worker subrequests.

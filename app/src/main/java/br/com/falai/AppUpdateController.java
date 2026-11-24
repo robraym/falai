@@ -39,14 +39,17 @@ final class AppUpdateController implements DefaultLifecycleObserver {
             if (destroyed || !ApkDownload.pending(app)) return;
             openExisting();
             if (canInstall()) { installRequested = true; refresh(); }
-            else if (status != null) status.setText(R.string.apk_install_permission_needed);
+            else {
+                installRequested = false;
+                if (status != null) status.setText(R.string.apk_install_permission_needed);
+            }
         });
         activity.getLifecycle().addObserver(this);
         Tasks.call(ContactsRepository.IO, () -> { ApkDownload.clearInstalled(app); return null; });
     }
     boolean openExisting() {
         if (!ApkDownload.pending(app)) return false;
-        update = ApkDownload.saved(app); showDialog(); refresh(); return true;
+        update = ApkDownload.saved(app); installRequested = foreground; showDialog(); refresh(); return true;
     }
     boolean isOpen() { return showing(); }
     void restore() { restoreOnStart = true; }
@@ -60,9 +63,8 @@ final class AppUpdateController implements DefaultLifecycleObserver {
         dialog = new AppUpdateDialog(activity);
         status = dialog.message; detail = dialog.detail;
         dialog.setInstalledDetails(activity.installedApkDetails());
-        if (update != null) dialog.setAvailableDetails(activity.availableApkDetails(update));
         status.setText(R.string.apk_preparing_download);
-        detail.setText(R.string.apk_download_background);
+        detail.setVisibility(View.GONE);
         dialog.setProgressState(true, 0, "");
         dialog.setOnShowListener(ignored -> {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
@@ -77,10 +79,11 @@ final class AppUpdateController implements DefaultLifecycleObserver {
     private void buttons(boolean ready, boolean active) {
         if (!showing()) return;
         android.widget.Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-        positive.setVisibility(ready || failure != 0 ? View.VISIBLE : View.GONE);
-        positive.setText(failure != 0 ? R.string.retry : R.string.install_apk_update);
+        positive.setVisibility(failure != 0 ? View.VISIBLE : View.GONE);
+        positive.setText(R.string.retry);
         positive.setEnabled(!busy && !verifying);
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setText(active ? R.string.cancel_apk_download : R.string.discard_apk_download);
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setVisibility(active ? View.VISIBLE : View.GONE);
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setText(R.string.cancel_apk_download);
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(!busy);
 
     }
@@ -116,8 +119,8 @@ final class AppUpdateController implements DefaultLifecycleObserver {
             if (state.status == DownloadManager.STATUS_SUCCESSFUL) {
                 if (verifiedId != state.id || !ApkDownload.installerFile(app, state.id).isFile()) verify(state);
                 else {
-                    dialog.setProgressState(false, 100, android.text.format.Formatter.formatShortFileSize(app, update.size)); status.setText(R.string.apk_ready_to_install);
-                    detail.setText(R.string.apk_install_confirmation); buttons(true, false);
+                    dialog.hideProgress(); status.setText(R.string.apk_ready_to_install);
+                    detail.setVisibility(View.GONE); buttons(true, false);
                     if (installRequested) attemptInstall();
                 }
                 return;
@@ -128,7 +131,7 @@ final class AppUpdateController implements DefaultLifecycleObserver {
             dialog.setProgressState(total <= 0, percent, activity.getString(R.string.apk_update_transfer_size,
                 android.text.format.Formatter.formatShortFileSize(app, Math.max(0, state.downloaded)), android.text.format.Formatter.formatShortFileSize(app, Math.max(0, total))));
             status.setText(state.status == DownloadManager.STATUS_PAUSED ? R.string.apk_download_waiting : R.string.apk_update_downloading);
-            detail.setText(R.string.apk_download_background); buttons(false, true); handler.postDelayed(poll, 700);
+            detail.setVisibility(View.GONE); buttons(false, true); handler.postDelayed(poll, 700);
         });
     }
     private void verify(ApkDownload.State state) {
@@ -151,7 +154,7 @@ final class AppUpdateController implements DefaultLifecycleObserver {
     }
     private void showFailure(int text) {
         failure = text; installRequested = false; dialog.hideProgress(); status.setText(text);
-        detail.setText(R.string.apk_download_retry_hint); buttons(false, false);
+        detail.setText(R.string.apk_download_retry_hint); detail.setVisibility(View.VISIBLE); buttons(false, false);
     }
     private boolean canInstall() { return Build.VERSION.SDK_INT < 26 || activity.getPackageManager().canRequestPackageInstalls(); }
     private void attemptInstall() {
@@ -162,6 +165,7 @@ final class AppUpdateController implements DefaultLifecycleObserver {
             if (!canInstall()) {
                 status.setText(R.string.apk_install_permission_needed);
                 detail.setText(R.string.apk_install_permission_explanation);
+                detail.setVisibility(View.VISIBLE);
                 installPermission.launch(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + activity.getPackageName())));
                 return;
             }
@@ -169,6 +173,7 @@ final class AppUpdateController implements DefaultLifecycleObserver {
             Intent install = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, ApkDownload.MIME).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             install.setClipData(android.content.ClipData.newRawUri("Falai", uri));
             activity.startActivity(install);
+            dialog.dismiss();
         } catch (RuntimeException error) { status.setText(R.string.apk_install_unavailable); }
     }
     @Override public void onStart(LifecycleOwner owner) {

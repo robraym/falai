@@ -135,7 +135,10 @@ final class AppUpdateDialog extends Dialog {
         message.setText(text); message.setVisibility(text == null || text.length() == 0 ? View.GONE : View.VISIBLE);
     }
     void setInstalledDetails(String text) { artwork.setVersion(text); }
-    void setAvailableDetails(String text) { available.setText(text); available.setVisibility(View.VISIBLE); }
+    void setAvailableDetails(String text) {
+        available.setText(text);
+        available.setVisibility(text == null || text.isEmpty() ? View.GONE : View.VISIBLE);
+    }
     void setProgressState(boolean indeterminate, int percent, CharSequence size) {
         progressGroup.setVisibility(View.VISIBLE); progress.setIndeterminate(indeterminate); progress.setProgress(percent);
         percentage.setText(indeterminate ? "" : activity.getString(R.string.apk_update_percent, percent));
