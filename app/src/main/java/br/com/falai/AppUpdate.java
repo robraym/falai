@@ -16,17 +16,20 @@ import org.json.JSONObject;
 
 final class AppUpdate {
     private static final String REPOSITORY = "robraym/falei";
-    private static final String APK_NAME = "falai.apk";
+    private static final String APK_NAME = "Falai.apk";
     private static final Pattern VERSION_TAG = Pattern.compile("v([0-9]+(?:\\.[0-9]+){1,3})-apk\\.([1-9][0-9]{0,9})");
 
     final String versionName;
     final long versionCode;
     final Uri download;
+    final long size;
+    final String sha256;
 
-    private AppUpdate(String versionName, long versionCode, Uri download) {
+    AppUpdate(String versionName, long versionCode, Uri download, long size, String sha256) {
         this.versionName = versionName;
         this.versionCode = versionCode;
         this.download = download;
+        this.size = size; this.sha256 = sha256;
     }
 
     static long buildTimeMillis(long versionCode) {
@@ -78,11 +81,12 @@ final class AppUpdate {
         if (code > Integer.MAX_VALUE) return null;
         for (int index = 0; index < assets.length(); index++) {
             JSONObject asset = assets.optJSONObject(index);
-            if (asset == null || !APK_NAME.equals(asset.optString("name"))
-                    || !"uploaded".equals(asset.optString("state")) || asset.optLong("size") <= 0) continue;
+            if (asset == null || !(APK_NAME.equals(asset.optString("name")) || "falai.apk".equals(asset.optString("name")))
+                    || !"uploaded".equals(asset.optString("state")) || asset.optLong("size") <= 0 || asset.optLong("size") > ApkUpdatePolicy.MAX_BYTES) continue;
             Uri download = Uri.parse("https://github.com/" + REPOSITORY + "/releases/download/")
-                    .buildUpon().appendPath(tag).appendPath(APK_NAME).build();
-            return new AppUpdate(version.group(1), code, download);
+                    .buildUpon().appendPath(tag).appendPath(asset.optString("name")).build();
+            String digest = asset.isNull("digest") ? "" : asset.optString("digest", "");
+            return new AppUpdate(version.group(1), code, download, asset.optLong("size"), ApkUpdatePolicy.normalizeDigest(digest));
         }
         return null;
     }

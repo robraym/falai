@@ -58,7 +58,7 @@ Não há Firebase Storage, envio de mídia nas conversas, SMS nem código implan
 - Segredo do Worker: `FIREBASE_SERVICE_ACCOUNT`, com o JSON da conta de serviço `falai-worker`. A chave privada nunca entra no APK, no repositório ou na resposta da API.
 - Papéis da conta de serviço: `roles/firebasecloudmessaging.admin` e `roles/datastore.user`.
 
-Google Authentication, SHA-1 do debug e o JSON com o cliente OAuth Web foram configurados pelo responsável pelo app. A assinatura release ainda deve ser definida antes da distribuição e seu certificado precisa ser cadastrado no Firebase.
+Google Authentication, SHA-1 da chave existente e o JSON com o cliente OAuth Web foram configurados pelo responsável pelo app. O release preserva essa chave local para atualizar as instalações existentes; o certificado continua sendo o Android Debug original. A variante release desativa depuração e usa R8. Uma nova identidade de assinatura exige planejar a migração e cadastrar o novo certificado no Firebase.
 
 ## Fluxo do aplicativo
 
@@ -154,7 +154,21 @@ A rotina Cron pode demorar alguns minutos para propagar após a publicação. O 
 
 ### Atualizações do APK
 
-Em **Ajustes → Atualização do aplicativo → Verificar atualização**, o app consulta a última versão estável no GitHub Releases. A partir da versão 1.2.4, compara o horário de geração registrado no APK, mesmo que o nome da versão continue igual. O Gradle gera o `versionCode` automaticamente a partir do horário UTC do build. O navegador baixa o arquivo e o usuário confirma a instalação no Android.
+#### Publicar pelo Android Studio (Windows)
+
+Após sincronizar o Gradle, selecione **Publicar atualização** na lista de configurações ao lado do botão Executar e execute. Alternativamente, use **Gradle → app → Tasks → publicacao → publicarAtualizacao**. Essa ação publica uma atualização real no GitHub Releases.
+
+A tarefa verifica o login existente do Git Credential Manager e a permissão de escrita, gera `app/build/outputs/apk/release/Falai.apk`, lê a versão/código de dentro do APK, confere os metadados e cria a tag automaticamente. Recusa APK debug e certificado diferente do já distribuído. O release mantém a chave local original para permitir atualizar as instalações existentes. Envia o arquivo como `falai.apk` para manter compatibilidade com os apps antigos, embora o arquivo local se chame `Falai.apk`. Primeiro cria um rascunho; só marca a Release como mais recente depois de confirmar o upload. Uma falha deixa o rascunho para conferência e não substitui releases existentes. O commit de referência precisa existir no GitHub; a tarefa não faz commit/push do código. Alterações locais não commitadas podem integrar o APK.
+
+Não salva credenciais no projeto. Para conferir apenas o acesso, execute **verificarLoginPublicacao**. Em outro computador, autentique o Git Credential Manager com uma conta que possa escrever no repositório e use o mesmo certificado da instalação existente. O arquivo `app/google-services.json` também precisa estar presente.
+
+As versões públicas usam somente dois números separados por ponto: `1.2`, `1.3`, `2.0`. O `versionCode` continua independente e crescente para permitir atualizar os APKs já instalados.
+
+A atualização abre em tela inteira, com Falai centralizado, brilho suave na cor configurada e ação principal na parte inferior. Versão, estado e progresso aparecem sem cartões internos. Respeita o tema claro/escuro e a cor escolhida no aplicativo.
+
+Em **Ajustes → Atualização do aplicativo → Verificar atualização**, o app consulta a última versão estável no GitHub Releases. A partir da versão 1.2.4, compara o horário de geração registrado no APK, mesmo que o nome da versão continue igual. O Gradle gera o `versionCode` automaticamente a partir do horário UTC do build. O download ocorre dentro do Falai, pelo gerenciador do Android, com porcentagem, tamanho, cancelamento e nova tentativa. Fechar a janela mantém o download; abrir Atualização do aplicativo retoma o acompanhamento, inclusive após reabrir o app. O botão Instalar atualização só fica disponível após a validação do arquivo. Não é aberto um navegador.
+
+O tamanho precisa corresponder ao asset publicado; quando fornecido pelo GitHub, o SHA-256 também é conferido. O APK é copiado para armazenamento interno privado e verificado quanto a pacote, nome/código da versão e certificado compatível com o instalado, incluindo rotação comprovada no Android compatível. Somente essa cópia verificada recebe URI temporária de leitura para o instalador. Não há permissão de armazenamento ampla. Na primeira instalação pelo Falai, o Android 8 ou superior pode exigir autorização para essa origem; o fluxo volta à instalação ao retornar autorizado. O Android pede a confirmação final. Arquivos cancelados ou de uma atualização já instalada são removidos do armazenamento de atualização, sem apagar conversas/configurações.
 
 Para distribuir, assine o APK com o mesmo certificado da versão instalada pelos destinatários. Leia o `versionName` e o `versionCode` do APK já gerado e use a tag `v<versionName>-apk.<versionCode>` na release de `robraym/falei`. Anexe o arquivo com o nome `falai.apk` e marque a release como a mais recente. Versões anteriores à mudança identificam a primeira atualização pelo código maior.
 

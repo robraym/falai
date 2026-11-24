@@ -2,6 +2,24 @@
 
 ## Atualização em 23/11/2026
 
+### Release e revisão do Play Protect
+
+- Fluxo `publicarAtualizacao` alterado de debug para release; assinatura original mantida para atualização das instalações anteriores. Depuração desativada, R8/redução de recursos ativos e publicação com conferência de assinatura/certificado. Certificado permanece sendo o Android Debug original, conforme explicado em `REVISAO_PLAY_PROTECT.md`.
+- `assembleRelease`, `lintRelease` (zero erros, 51 avisos), assinatura, alinhamento, prévia do script e sequência Gradle validados. Release 1.3 gerado, sem instalar, publicar ou enviar ao Git. Revisão estática detalhada em `REVISAO_PLAY_PROTECT.md`; causa do bloqueio não confirmada.
+
+### Publicação pelo Android Studio
+
+- Adicionadas a configuração de execução `Publicar atualização` e as tarefas Gradle `publicarAtualizacao`/`verificarLoginPublicacao`. O script usa o Git Credential Manager em memória, lê a versão real pelo aapt, confere metadados e só publica após o upload do APK em rascunho. Não substitui assets nem faz push do código.
+- Verificados o login e a permissão de escrita no repositório real, a prévia com o APK existente e a sequência completa com `--dry-run`. Nenhuma Release/tag criada, nenhum APK novo gerado e nenhuma instalação/envio ao Git nesta configuração. O upload e a publicação final não foram executados.
+
+### Atualização com download interno
+
+- Interface de verificação/download/instalação unificada em painel inferior inspirado na One UI: cartões de versão, porcentagem destacada, barra arredondada e botões largos. Conteúdo rolável com altura limitada, respeitando tema e cor do aplicativo; a janela se adapta às mudanças de estado. Compilação Java, nove testes JVM e lint concluídos (zero erros, 41 avisos). Aparência ainda não validada em aparelho/emulador; sem instalação e sem envio ao Git.
+- Substituído o link aberto no navegador por `DownloadManager`, com progresso/tamanho, cancelamento, descarte, nova tentativa, download em segundo plano e retomada pela tela de atualização. O identificador/metadados são persistidos; a janela é restaurada ao recriar a Activity. Consultas e validação rodam fora da thread da interface.
+- Integridade: tamanho do asset, SHA-256 quando publicado, pacote, nome/código da versão e assinatura compatível. A cópia para o instalador é privada, distinta do arquivo externo do download; `FileProvider` não exportado compartilha somente a pasta interna de atualizações e concede leitura temporária para a URI escolhida. Falta de espaço e assinatura diferente têm mensagens próprias.
+- `REQUEST_INSTALL_PACKAGES` e autorização por origem a partir do Android 8, com retorno pelo Activity Result; instalação só é aberta após ação do usuário e com tela em primeiro plano. A confirmação final continua no Android. Não há desinstalação ou limpeza de dados do app.
+- Compilação Java debug, nove testes JVM de integridade/identidade/assinatura e lint aprovados após a última alteração (zero erros, 40 avisos). Testes cobrem corrupção de mesmo tamanho, arquivo truncado, hash ausente/inválido, pacote/versão incorretos, certificado incompatível e rotação/múltiplos signatários. Não foi gerado/instalado APK, nem realizado download ou instalação em aparelho/emulador. Sem envio ao Git.
+
 ### Mensagens temporárias compartilhadas — substitui a limpeza local descrita nas etapas anteriores
 
 - Prazo padrão por conta para novas conversas e prazo compartilhado por conversa, alterável por qualquer participante. A escolha do criador é usada ao abrir uma conversa; se desativada, é utilizada a da outra pessoa. Reabrir uma conversa não reaplica o padrão. Alterações recebem UUID idempotente e geram eventos privados dos participantes. O aviso abre diretamente a seleção, com explicação e gravação ao tocar na opção; o perfil do cabeçalho permite abrir as opções mesmo sem aviso.

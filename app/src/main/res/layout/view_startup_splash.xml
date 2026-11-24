@@ -15,21 +15,10 @@
         android:paddingStart="32dp"
         android:paddingEnd="32dp">
 
-        <ImageView
-            android:layout_width="124dp"
-            android:layout_height="124dp"
-            android:importantForAccessibility="no"
-            android:scaleType="fitCenter"
-            android:src="@mipmap/ic_launcher" />
-
-        <TextView
-            android:layout_width="wrap_content"
+        <br.com.falai.AppVersionArtwork
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="@string/app_name"
-            android:textColor="@color/text_primary"
-            android:textSize="28sp"
-            android:textStyle="bold" />
+            />
 
         <ProgressBar
             style="?android:attr/progressBarStyleHorizontal"

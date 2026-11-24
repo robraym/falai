@@ -9,6 +9,29 @@ if (apkVersionCode < apkFirstDatedCode || apkVersionCode > Integer.MAX_VALUE) {
     throw new GradleException('A data deste computador está fora do intervalo de versionCode do APK.')
 }
 
+def publishScript = rootProject.file('scripts/publish-update.ps1')
+def checkPublishLogin = tasks.register('verificarLoginPublicacao', Exec) {
+    group = 'publicacao'
+    description = 'Confere o login do GitHub sem publicar nem gerar APK.'
+    commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', publishScript.absolutePath, '-CheckOnly'
+}
+tasks.matching { it.name == 'assembleRelease' }.configureEach { mustRunAfter(checkPublishLogin) }
+tasks.register('publicarAtualizacao', Exec) {
+    group = 'publicacao'
+    description = 'Gera Falai.apk e publica a atualização no GitHub Releases.'
+    dependsOn checkPublishLogin, 'assembleRelease'
+    environment 'JAVA_HOME', System.getProperty('java.home')
+    doFirst {
+        if (!file('google-services.json').exists()) {
+            throw new GradleException('Adicione app/google-services.json antes de publicar o Falai.')
+        }
+    }
+    commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', publishScript.absolutePath,
+        '-Metadata', layout.buildDirectory.file('outputs/apk/release/output-metadata.json').get().asFile.absolutePath,
+        '-Aapt', new File(android.sdkDirectory, "build-tools/${android.buildToolsVersion}/aapt.exe").absolutePath,
+        '-ApkSigner', new File(android.sdkDirectory, "build-tools/${android.buildToolsVersion}/apksigner.bat").absolutePath
+}
+
 android {
     namespace 'br.com.falai'
     compileSdk 36
@@ -17,15 +40,25 @@ android {
         minSdk 24
         targetSdk 36
         versionCode(apkVersionCode.intValue())
-        versionName '1.2.4'
+        // Public versions use major.minor only (for example, 1.2 or 1.3).
+        versionName '1.3'
         buildConfigField 'long', 'APK_BUILD_EPOCH_SECONDS', "${apkBuildEpochSeconds}L"
         buildConfigField 'int', 'APK_FIRST_DATED_CODE', "${apkFirstDatedCode}"
         buildConfigField 'String', 'WORKER_URL', '"https://falai-notificacoes.robraym-studio.workers.dev"'
         if (!file('google-services.json').exists()) { resValue 'string', 'default_web_client_id', '' }
     }
     buildFeatures { buildConfig true }
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = 'Falai.apk'
+        }
+    }
     buildTypes {
         release {
+            // Keep the installed certificate: changing keys would prevent in-place updates.
+            // This is a non-debuggable release build, signed with the existing local key.
+            signingConfig signingConfigs.debug
+            debuggable false
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

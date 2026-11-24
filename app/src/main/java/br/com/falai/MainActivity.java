@@ -80,16 +80,19 @@ public final class MainActivity extends FalaiActivity {
         if (granted) Backend.registerDevice();
     });
     private final MessageSoundPicker messageSounds = new MessageSoundPicker(this);
+    private AppUpdateController appUpdates;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        appUpdates = new AppUpdateController(this);
+        if (state != null && state.getBoolean("updateDialog", false)) appUpdates.restore();
         chatState = new androidx.lifecycle.ViewModelProvider(this).get(ConversationState.class); cachedChats = chatState.documents;
         selectingContact = getIntent().getBooleanExtra("selectContact", false);
         if (state != null) { tab = state.getInt("tab"); chatQuery = state.getString("chatQuery", ""); contactQuery = state.getString("contactQuery", ""); }
         if (!Backend.ready()) { page(getString(R.string.app_name)); info(R.string.not_ready_title, R.string.not_ready_body); return; }
         if (Backend.uid().isEmpty()) showLogin(); else loadProfile();
     }
-    @Override protected void onSaveInstanceState(@NonNull Bundle out) { super.onSaveInstanceState(out); out.putInt("tab", tab); out.putString("chatQuery", chatQuery); out.putString("contactQuery", contactQuery); }
+    @Override protected void onSaveInstanceState(@NonNull Bundle out) { super.onSaveInstanceState(out); out.putInt("tab", tab); out.putString("chatQuery", chatQuery); out.putString("contactQuery", contactQuery); out.putBoolean("updateDialog", appUpdates != null && appUpdates.isOpen()); }
     @Override protected void onStart() {
         super.onStart(); if (!Backend.ready()) return;
         listenDefaultTimer();
@@ -488,23 +491,23 @@ public final class MainActivity extends FalaiActivity {
                 true, view -> showAppUpdate()));
     }
     private void showAppUpdate() {
-        AlertDialog about = new AlertDialog.Builder(this)
-                .setTitle(R.string.app_update)
-                .setMessage(installedApkDetails())
-                .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.check_apk_update, null)
-                .create();
-        about.setOnShowListener(dialog -> about.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> checkAppUpdate(about)));
+        if (appUpdates.openExisting()) return;
+        AppUpdateDialog about = new AppUpdateDialog(this);
+        about.setInstalledDetails(installedApkDetails());
+        about.setMessage("");
+        about.getButton(AlertDialog.BUTTON_NEGATIVE).setVisibility(View.GONE);
+        about.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> checkAppUpdate(about));
         about.show();
     }
-    private void checkAppUpdate(AlertDialog about) {
+    private void checkAppUpdate(AppUpdateDialog about) {
         Button check = about.getButton(AlertDialog.BUTTON_POSITIVE);
         check.setEnabled(false);
         about.setMessage(getString(R.string.checking_apk_update));
+        about.setProgressState(true, 0, "");
         AppUpdate.check().addOnCompleteListener(task -> {
             if (isFinishing() || isDestroyed() || !about.isShowing()) return;
             check.setEnabled(true);
+            about.hideProgress();
             if (!task.isSuccessful()) {
                 about.setMessage(getString(R.string.apk_update_check_failed));
                 return;
@@ -515,29 +518,22 @@ public final class MainActivity extends FalaiActivity {
                 return;
             }
             if (!update.isNewerThanInstalled()) {
-                about.setMessage(getString(R.string.apk_up_to_date, BuildConfig.VERSION_NAME)
-                        + "\n\n" + installedApkDetails());
+                about.setMessage(getString(R.string.apk_up_to_date));
                 return;
             }
-            long buildTime = AppUpdate.buildTimeMillis(update.versionCode);
-            String available = buildTime == 0 ? update.versionName
-                    : getString(R.string.apk_version_with_build_date, update.versionName, formatApkDate(buildTime));
-            about.setMessage(installedApkDetails() + "\n\n" + getString(R.string.apk_update_available, available));
+            about.setAvailableDetails(availableApkDetails(update));
+            about.setMessage(getString(R.string.apk_update_available));
             check.setText(R.string.download_apk);
             check.setOnClickListener(view -> {
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, update.download));
-                    about.dismiss();
-                } catch (android.content.ActivityNotFoundException error) {
-                    about.setMessage(getString(R.string.apk_update_no_browser));
-                }
+                appUpdates.download(update); about.dismiss();
             });
         });
     }
-    private String installedApkDetails() {
-        String installed = getString(R.string.installed_app_version, BuildConfig.VERSION_NAME);
-        long buildTime = AppUpdate.buildTimeMillis(BuildConfig.VERSION_CODE);
-        return buildTime == 0 ? installed : installed + "\n" + getString(R.string.apk_build_date, formatApkDate(buildTime));
+    String installedApkDetails() {
+        return BuildConfig.VERSION_NAME;
+    }
+    String availableApkDetails(AppUpdate update) {
+        return update.versionName + " · " + android.text.format.Formatter.formatShortFileSize(this, update.size);
     }
     private String formatApkDate(long millis) {
         java.util.Date date = new java.util.Date(millis);
