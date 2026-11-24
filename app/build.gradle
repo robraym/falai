@@ -76,7 +76,7 @@ dependencies {
     implementation 'androidx.exifinterface:exifinterface:1.4.2'
     implementation 'androidx.work:work-runtime:2.10.1'
     // Worker's Java API exposes ListenableFuture; Firebase only exports Guava at runtime.
-    implementation 'com.google.guava:guava:33.4.8-android'
+    implementation 'com.google.guava:guava:33.7.2-android'
     implementation platform('com.google.firebase:firebase-bom:34.6.0')
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
