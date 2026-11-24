@@ -3,7 +3,6 @@ package br.com.falai;
 import android.app.Dialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.MediaPlayer;
 import android.view.Gravity;
@@ -52,22 +51,23 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
         changed = onChanged;
         volume = MessageSounds.volume(activity);
         if (dialog != null) { dialog.dismiss(); dialog = null; }
-        Dialog next = new Dialog(activity); dialog = next;
-        LinearLayout content = Ui.column(activity); content.setPadding(dp(20), dp(18), dp(20), dp(12)); content.setBackground(Ui.shape(activity, R.color.card, 24));
-        LinearLayout header = Ui.row(activity);
-        header.addView(Ui.text(activity, activity.getString(R.string.message_sounds), 22, true), new LinearLayout.LayoutParams(0, -2, 1));
-        TextView add = action("+", R.string.sound_add); add.setTextSize(30); add.setOnClickListener(view -> {
+        SettingsPage next = new SettingsPage(activity, R.string.message_sounds); dialog = next;
+        LinearLayout content = next.body;
+        Button add = Ui.button(activity, R.string.sound_add, view -> {
             if (importing) return;
             stopPreview(); picker.launch(new String[]{"audio/*"});
-        }); header.addView(add); content.addView(header);
-        ScrollView scroll = new ScrollView(activity); options = Ui.column(activity); options.setPadding(0, 0, 0, dp(10)); scroll.addView(options);
-        int height = Math.min(dp(500), Math.round(activity.getResources().getDisplayMetrics().heightPixels * .62f));
-        content.addView(scroll, new LinearLayout.LayoutParams(-1, height)); renderOptions();
-        LinearLayout bar = Ui.row(activity); bar.setPadding(dp(12), dp(9), dp(12), dp(9)); bar.setBackground(Ui.shape(activity, R.color.presence_badge_surface, 24));
+        });
+        LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(-1, -2); addParams.setMargins(dp(8), dp(6), dp(8), dp(6));
+        content.addView(add, addParams);
+        ScrollView scroll = new ScrollView(activity); options = Ui.column(activity); options.setPadding(0, 0, 0, dp(6)); scroll.addView(options);
+        content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1)); renderOptions();
+        LinearLayout volumeCard = SettingsPage.panel(activity);
+        volumeCard.addView(Ui.text(activity, activity.getString(R.string.sound_preview_volume), 13, true));
+        LinearLayout bar = Ui.row(activity); bar.setPadding(0, dp(8), 0, 0);
         ImageView speaker = new ImageView(activity); speaker.setImageResource(R.drawable.ic_volume_preview); speaker.setImageTintList(android.content.res.ColorStateList.valueOf(Appearance.primary(activity)));
-        speaker.setPadding(0, 0, dp(10), 0); speaker.setContentDescription(activity.getString(R.string.sound_listen));
+        speaker.setPadding(dp(10), dp(10), dp(10), dp(10)); speaker.setContentDescription(activity.getString(R.string.sound_listen));
         speaker.setOnClickListener(view -> play(MessageSounds.selected(activity))); speaker.setFocusable(true);
-        bar.addView(speaker, new LinearLayout.LayoutParams(dp(34), dp(28)));
+        bar.addView(speaker, new LinearLayout.LayoutParams(dp(48), dp(48)));
         SeekBar slider = new SeekBar(activity); slider.setMax(100); slider.setProgress(Math.round(volume * 100)); slider.setContentDescription(activity.getString(R.string.sound_preview_volume));
         slider.setProgressTintList(android.content.res.ColorStateList.valueOf(Appearance.primary(activity))); slider.setThumbTintList(android.content.res.ColorStateList.valueOf(Appearance.primary(activity)));
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -82,38 +82,35 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
             public void onStartTrackingTouch(SeekBar seek) { }
             public void onStopTrackingTouch(SeekBar seek) { play(MessageSounds.selected(activity)); }
         }); bar.addView(slider, new LinearLayout.LayoutParams(0, -2, 1));
-        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, -2); barParams.topMargin = dp(8); barParams.bottomMargin = dp(2); content.addView(bar, barParams);
-        LinearLayout actions = Ui.row(activity); actions.setGravity(Gravity.END);
-        TextView close = action(activity.getString(R.string.sound_close), R.string.sound_close); close.setOnClickListener(view -> next.dismiss()); actions.addView(close); content.addView(actions);
-        next.setContentView(content); next.setOnDismissListener(ignored -> { stopPreview(); if (dialog == next) dialog = null; });
+        volumeCard.addView(bar); content.addView(volumeCard);
+        next.setOnDismissListener(ignored -> { stopPreview(); if (dialog == next) dialog = null; });
         next.show();
-        if (next.getWindow() != null) {
-            next.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            next.getWindow().setLayout(activity.getResources().getDisplayMetrics().widthPixels - dp(24), -2);
-            next.getWindow().setDimAmount(.65f);
-        }
     }
     private void renderOptions() {
         options.removeAllViews(); List<MessageSounds.Custom> customs = MessageSounds.custom(activity);
         if (!customs.isEmpty()) {
-            options.addView(section(R.string.sound_custom_section));
-            for (MessageSounds.Custom sound : customs) options.addView(option(sound.key, true));
+            LinearLayout card = SettingsPage.panel(activity); card.addView(section(R.string.sound_custom_section));
+            for (int i = 0; i < customs.size(); i++) { if (i > 0) divider(card); card.addView(option(customs.get(i).key, true)); }
+            options.addView(card);
         }
-        options.addView(section(R.string.sound_icq_section)); grid(java.util.Arrays.copyOfRange(MessageSounds.KEYS, 0, MessageSounds.ICQ_COUNT));
-        options.addView(section(R.string.sound_short_section)); grid(java.util.Arrays.copyOfRange(MessageSounds.KEYS, MessageSounds.ICQ_COUNT, MessageSounds.KEYS.length));
+        group(R.string.sound_icq_section, java.util.Arrays.copyOfRange(MessageSounds.KEYS, 0, MessageSounds.ICQ_COUNT));
+        group(R.string.sound_short_section, java.util.Arrays.copyOfRange(MessageSounds.KEYS, MessageSounds.ICQ_COUNT, MessageSounds.KEYS.length));
     }
-    private void grid(String[] keys) {
-        GridLayout grid = new GridLayout(activity); grid.setColumnCount(2); grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
+    private void group(int title, String[] keys) {
+        LinearLayout card = SettingsPage.panel(activity); card.addView(section(title));
         for (int i = 0; i < keys.length; i++) {
-            GridLayout.LayoutParams params = new GridLayout.LayoutParams(); params.width = 0; params.height = -2;
-            params.columnSpec = GridLayout.spec(i % 2, 1, 1f); params.rowSpec = GridLayout.spec(i / 2); params.setMargins(dp(2), dp(2), dp(2), dp(2));
-            grid.addView(option(keys[i], false), params);
+            if (i > 0) divider(card); card.addView(option(keys[i], false));
         }
-        options.addView(grid, new LinearLayout.LayoutParams(-1, -2));
+        options.addView(card);
+    }
+    private void divider(LinearLayout card) {
+        View line = new View(activity);
+        line.setBackgroundColor(androidx.core.graphics.ColorUtils.setAlphaComponent(activity.getColor(R.color.text_secondary), 35));
+        card.addView(line, new LinearLayout.LayoutParams(-1, dp(1)));
     }
     private LinearLayout option(String key, boolean custom) {
         boolean selected = key.equals(MessageSounds.selected(activity));
-        LinearLayout row = Ui.row(activity); row.setMinimumHeight(dp(44)); row.setPadding(dp(5), dp(4), dp(7), dp(4));
+        LinearLayout row = Ui.row(activity); row.setMinimumHeight(dp(56)); row.setPadding(dp(8), dp(8), dp(8), dp(8));
         row.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(activity)), selected ? Ui.shape(activity, R.color.action_green_soft, 16) : null, Ui.shape(activity, R.color.card, 16)));
         FrameLayout radio = new FrameLayout(activity);
         View ring = new View(activity); GradientDrawable outline = new GradientDrawable(); outline.setShape(GradientDrawable.OVAL); outline.setColor(Color.TRANSPARENT); outline.setStroke(dp(2), selected ? Appearance.primary(activity) : activity.getColor(R.color.text_secondary)); ring.setBackground(outline);
@@ -121,7 +118,7 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
         View dot = new View(activity); GradientDrawable fill = new GradientDrawable(); fill.setShape(GradientDrawable.OVAL); fill.setColor(Appearance.primary(activity)); dot.setBackground(fill); dot.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
         FrameLayout.LayoutParams dotParams = new FrameLayout.LayoutParams(dp(8), dp(8), Gravity.CENTER_VERTICAL | Gravity.START); dotParams.leftMargin = dp(6); radio.addView(dot, dotParams);
         radio.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); row.addView(radio, new LinearLayout.LayoutParams(dp(32), dp(36)));
-        TextView label = Ui.text(activity, MessageSounds.label(activity, key), 14, false); label.setTextColor(activity.getColor(R.color.text_primary)); label.setTypeface(Typeface.DEFAULT, Typeface.NORMAL); label.setMaxLines(custom ? 1 : 2); label.setEllipsize(android.text.TextUtils.TruncateAt.END); row.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView label = Ui.text(activity, MessageSounds.label(activity, key), 15, selected); label.setTextColor(activity.getColor(R.color.text_primary)); label.setMaxLines(2); label.setEllipsize(android.text.TextUtils.TruncateAt.END); row.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
         row.setSelected(selected); row.setFocusable(true); row.setContentDescription(MessageSounds.label(activity, key) + (selected ? activity.getString(R.string.sound_selected) : ""));
         row.setOnClickListener(view -> { MessageSounds.select(activity, key); renderOptions(); changed.run(); play(key); });
         if (custom) {

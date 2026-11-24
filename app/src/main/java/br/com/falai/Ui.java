@@ -77,6 +77,30 @@ final class Ui {
         size.height = Math.max(dp(c, 40), metrics.bottom - metrics.top + dp(c, 4)); box.setLayoutParams(size);
         return header;
     }
+    static LinearLayout backHeading(Context c, CharSequence title, View.OnClickListener action) {
+        LinearLayout header = row(c);
+        header.setPadding(0, dp(c, 12), 0, dp(c, 12));
+        ImageButton back = icon(c, R.drawable.ic_back, R.string.back, action);
+        back.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), null, shape(c, R.color.card, 24)));
+        back.setImageTintList(ColorStateList.valueOf(c.getColor(R.color.text_primary)));
+        back.setPadding(dp(c, 4), dp(c, 12), dp(c, 12), dp(c, 12));
+        header.addView(back, new LinearLayout.LayoutParams(dp(c, 40), dp(c, 48)));
+        LinearLayout heading = heading(c, title); heading.setPadding(0, 0, 0, 0);
+        TextView label = heading.findViewById(R.id.page_title);
+        label.setTextSize(23); label.setSingleLine(false); label.setMaxLines(2); label.setEllipsize(null);
+        label.setIncludeFontPadding(false); label.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout titleBox = heading.findViewById(R.id.page_title_box);
+        titleBox.setPadding(0, 0, 0, 0); titleBox.setGravity(Gravity.CENTER_VERTICAL);
+        ViewGroup.LayoutParams titleSize = titleBox.getLayoutParams(); titleSize.height = -2; titleBox.setLayoutParams(titleSize);
+        titleBox.setMinimumHeight(dp(c, 48));
+        header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+        header.post(() -> {
+            android.graphics.Rect touch = new android.graphics.Rect(); back.getHitRect(touch);
+            touch.inset(-dp(c, 4), 0);
+            header.setTouchDelegate(new android.view.TouchDelegate(touch, back));
+        });
+        return header;
+    }
     static LinearLayout card(Context c) {
         LinearLayout v = column(c); v.setPadding(dp(c, 16), dp(c, 18), dp(c, 16), dp(c, 18)); v.setBackground(shape(c, R.color.card, 20));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);

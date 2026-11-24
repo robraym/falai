@@ -549,7 +549,7 @@ public final class ChatActivity extends FalaiActivity {
         else { status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); status.setText(R.string.new_conversation); }
     }
     private void emoji() {
-        EmojiPicker.show(this, value -> {
+        EmojiPicker.show(this, true, value -> {
             int start = Math.max(0, composer.getSelectionStart()), end = Math.max(start, composer.getSelectionEnd());
             composer.getText().replace(start, end, value);
         });

@@ -302,7 +302,7 @@ public final class MainActivity extends FalaiActivity {
             nav.addView(item, new LinearLayout.LayoutParams(0, -1, 1)); if (i == selected) selectedView = item;
         }
         root.addView(nav, new LinearLayout.LayoutParams(-1, Ui.dp(this, 86))); NavigationSurface.attach(root, nav, selectedView);
-        root.setBackground(new SoftGlowBackground(this));
+        if (selected == 2) root.setBackgroundColor(getColor(R.color.background)); else root.setBackground(new SoftGlowBackground(this));
         if (selected == 0) showChats(); else if (selected == 1) showContacts(); else showSettings();
     }
     private RecyclerView list(LinearLayout parent, RowsAdapter adapter) {
@@ -546,7 +546,7 @@ public final class MainActivity extends FalaiActivity {
         });
     }
     private void showSettings() {
-        LinearLayout contents = scrollBody();
+        LinearLayout contents = SettingsPage.panel(this); scrollBody().addView(contents);
         LinearLayout profileRow = Ui.optionRow(this, R.drawable.ic_profile, getString(R.string.profile), profileName, false,
                 v -> startActivity(new Intent(this, ProfileActivity.class)));
         LinearLayout profileLabels = (LinearLayout) profileRow.getChildAt(1);
@@ -569,6 +569,7 @@ public final class MainActivity extends FalaiActivity {
         general.addView(Ui.optionRow(this, R.drawable.ic_settings, getString(R.string.app_update),
                 installedApkSummary(),
                 true, view -> showAppUpdate()));
+        SettingsPage.separateRows(general); SettingsPage.separateRows(contents);
     }
     private void showAppUpdate() {
         if (appUpdates.openExisting()) return;
@@ -647,18 +648,42 @@ public final class MainActivity extends FalaiActivity {
         AppearanceColorPicker.show(this);
     }
     private void chooseTextSize() {
-        LinearLayout content = Ui.column(this); content.setPadding(Ui.dp(this, 24), Ui.dp(this, 16), Ui.dp(this, 24), Ui.dp(this, 8));
-        TextView value = Ui.text(this, getString(R.string.text_size_value, Appearance.percent(this)), 18, true); content.addView(value);
-        TextView preview = Ui.text(this, getString(R.string.text_size_preview), 16, false); content.addView(preview);
-        android.widget.SeekBar slider = new android.widget.SeekBar(this); slider.setMax(80); slider.setProgress(Appearance.percent(this) - 70); content.addView(slider);
+        SettingsPage page = new SettingsPage(this, R.string.text_size);
+        int initialPercent = Appearance.percent(this);
+        LinearLayout content = Ui.column(this);
+        LinearLayout controls = SettingsPage.panel(this); content.addView(controls);
+        LinearLayout summary = Ui.row(this);
+        summary.addView(Ui.text(this, getString(R.string.settings_text_scale), 14, true), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView value = Ui.text(this, getString(R.string.text_size_value, Appearance.percent(this)), 22, true);
+        value.setTextColor(Appearance.primary(this)); summary.addView(value); controls.addView(summary); Ui.gap(controls, 16);
+        android.widget.SeekBar slider = new android.widget.SeekBar(this); slider.setMax(80); slider.setProgress(Appearance.percent(this) - 70);
+        slider.setContentDescription(getString(R.string.text_size));
+        slider.setProgressTintList(android.content.res.ColorStateList.valueOf(Appearance.primary(this)));
+        slider.setThumbTintList(android.content.res.ColorStateList.valueOf(Appearance.primary(this))); controls.addView(slider);
+        LinearLayout limits = Ui.row(this);
+        limits.addView(Ui.text(this, getString(R.string.text_size_value, 70), 12, false), new LinearLayout.LayoutParams(0, -2, 1));
+        limits.addView(Ui.text(this, getString(R.string.text_size_value, 150), 12, false)); controls.addView(limits);
+        LinearLayout sample = SettingsPage.panel(this); content.addView(sample);
+        sample.addView(Ui.text(this, getString(R.string.settings_preview), 13, true)); Ui.gap(sample, 16);
+        TextView preview = Ui.text(this, getString(R.string.text_size_preview), 16, false);
+        preview.setTextColor(getColor(R.color.text_primary));
+        preview.setPadding(Ui.dp(this, 14), Ui.dp(this, 14), Ui.dp(this, 14), Ui.dp(this, 14));
+        preview.setBackground(Ui.shape(this, R.color.action_green_soft, 16)); sample.addView(preview);
         slider.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) { value.setText(getString(R.string.text_size_value, progress + 70)); preview.setTextSize(16f * (progress + 70) / Appearance.percent(MainActivity.this)); }
+            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) {
+                value.setText(getString(R.string.text_size_value, progress + 70));
+                preview.setTextSize(16f * (progress + 70) / initialPercent);
+                if (fromUser) Appearance.prefs(MainActivity.this).edit().putInt("text", progress + 70).apply();
+            }
             public void onStartTrackingTouch(android.widget.SeekBar bar) { }
             public void onStopTrackingTouch(android.widget.SeekBar bar) { }
         });
-        new AlertDialog.Builder(this).setTitle(R.string.text_size).setView(content).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, (dialog, which) -> {
-            Appearance.prefs(this).edit().putInt("text", slider.getProgress() + 70).apply(); recreate();
-        }).show();
+        ScrollView scroll = new ScrollView(this); scroll.addView(content);
+        page.body.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        page.setOnDismissListener(ignored -> {
+            if (Appearance.percent(this) != initialPercent) SettingsPage.recreateAfterExit(this);
+        });
+        page.show();
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); if (profileLoaded) openNotificationIntent(intent); }
     private void openNotificationIntent(Intent intent) {

@@ -75,6 +75,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
     }
     static final class Holder extends RecyclerView.ViewHolder {
         android.view.View bubble, reactions;
+        AnimatedEmojiView animated;
         Holder(LinearLayout root) { super(root); }
         void setReplyOffset(float offset, boolean animate) {
             move(bubble, offset, animate);
@@ -97,6 +98,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         LinearLayout root = (LinearLayout) holder.itemView; android.content.Context c = root.getContext(); root.removeAllViews();
         holder.bubble = null;
         holder.reactions = null;
+        holder.animated = null;
         Item item = items.get(position);
         if (item.notice != null) { bindNotice(root, item.notice); return; }
         DocumentSnapshot doc = item.message; boolean mine = uid.equals(doc.getString("senderId"));
@@ -136,6 +138,16 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         if (!deleted && doc.getTimestamp("editedAt") != null) time = c.getString(R.string.message_edited) + " · " + time;
         android.text.SpannableString text = new android.text.SpannableString(content + "  \uFFFC");
         int status = mine ? doc.getTimestamp("readAt") != null ? 3 : doc.getTimestamp("deliveredAt") != null ? 2 : 1 : 0;
+        if (!deleted && !"nudge".equals(doc.getString("kind")) && AnimatedEmoji.index(content) >= 0) {
+            AnimatedEmojiView animated = new AnimatedEmojiView(c, content);
+            holder.animated = animated;
+            animated.setImportantForAccessibility(android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            int size = Ui.dp(c, 104 * Math.min(1.5f, c.getResources().getConfiguration().fontScale));
+            bubble.addView(animated, new LinearLayout.LayoutParams(size, size));
+            animated.setOnLongClickListener(view -> { actions.accept(doc); return true; });
+            text = new android.text.SpannableString("\uFFFC");
+            message.setGravity(Gravity.END);
+        }
         text.setSpan(new MessageMetaSpan(c, time, status), text.length() - 1, text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); message.setText(text); bubble.addView(message);
         message.setContentDescription(content + " " + time + (mine ? " " + c.getString(status == 3 ? R.string.message_read : status == 2 ? R.string.message_delivered : R.string.message_sent) : ""));
         if (mine || !deleted) {
@@ -237,6 +249,18 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         return DateFormat.getDateInstance(DateFormat.MEDIUM).format(timestamp.toDate());
     }
     @Override public int getItemCount() { return items.size(); }
+    @Override public void onViewAttachedToWindow(@NonNull Holder holder) {
+        super.onViewAttachedToWindow(holder);
+        if (holder.animated != null) holder.animated.setPlaybackAllowed(true);
+    }
+    @Override public void onViewDetachedFromWindow(@NonNull Holder holder) {
+        if (holder.animated != null) holder.animated.setPlaybackAllowed(false);
+        super.onViewDetachedFromWindow(holder);
+    }
+    @Override public void onViewRecycled(@NonNull Holder holder) {
+        if (holder.animated != null) holder.animated.setPlaybackAllowed(false);
+        super.onViewRecycled(holder);
+    }
     boolean scrollToMessage(RecyclerView list, String id) {
         for (int position = 0; position < items.size(); position++) {
             DocumentSnapshot doc = items.get(position).message;

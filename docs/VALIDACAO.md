@@ -230,3 +230,36 @@ Contato automático passou a usar o e-mail da agenda correspondente à conta Goo
 - Notificações podem recuperar a foto do cache persistente sem rede, com espera local limitada a 250 ms; a atualização online existente permanece após publicar o aviso.
 - Antes de abrir o histórico em cache, o chat verifica se a conta atual consta nos participantes. Os filtros existentes de expiração, limpeza e mensagens ocultas continuam aplicados. Presença/digitação continuam exigindo dados do servidor. Cache não é backup: as exclusões existentes de backup/transferência permanecem.
 - Validação: compilação Java debug e lintDebug concluídos com sucesso. Sem gerar APK, instalar, executar ou capturar em aparelho/emulador; reabertura após encerramento do processo e sincronização real ainda precisam de conferência no dispositivo.
+
+### Configurações em tela completa (24/11/2026)
+
+- Perfil, Cor, Tamanho do texto, Sons, Prazo das mensagens e Atualização compartilham o cabeçalho com seta sem círculo, cor de texto e alinhamento de 40 x 48 dp, com área de toque ampliada.
+- As opções de Ajustes usam uma superfície de tela completa com fundo e insets equivalentes ao Perfil. A seta e o retorno do Android fecham a tela atual. Cores continuam aplicadas ao sair; tamanho do texto mantém Salvar/Cancelar; sons preservam seleção, importação, prévia e volume; prazo mantém gravação no servidor; atualização mantém controle do download existente.
+- Reutilizadas as traduções existentes; nenhuma nova string foi adicionada. O seletor de prazo dentro de uma conversa mantém seu fluxo próprio.
+- Validação: compilação Java debug e lintDebug. Sem gerar APK, instalar ou executar em aparelho/emulador; alinhamento visual e navegação real ainda precisam de conferência no dispositivo.
+
+### Emojis animados locais (24/11/2026)
+
+- Seção Animados no seletor de mensagens com 12 opções Unicode e prévia animada: sorriso, riso, apaixonado, beijo, óculos, choro, raiva, sono, positivo, palmas, coração e festa. O seletor de reações mantém o comportamento anterior.
+- Um emoji compatível enviado sozinho é exibido maior, com movimentos e efeitos locais; texto misturado, sequências e emojis fora do catálogo mantêm a apresentação anterior. Não são enviados arquivos, links ou identificadores proprietários: permanece o texto Unicode original. Clientes antigos e notificações continuam mostrando o emoji estático.
+- A renderização usa Canvas e os glifos do aparelho, sem assets de mídia nem dependências novas. Respeita animações desativadas no Android e cancela o animador ao ocultar, destacar ou reciclar a mensagem. Horário, recibos, resposta, edição e exclusão usam os mesmos campos e fluxos existentes.
+- Validação: 17 testes unitários debug passaram, incluindo três casos do catálogo/variantes Unicode/texto misturado; lintDebug passou. Sem gerar APK, instalar ou executar em aparelho/emulador. A aparência dos glifos e a fluidez real ainda precisam de conferência em dispositivo.
+
+### Transições das configurações (24/11/2026)
+
+- Perfil e superfícies completas de configuração usam a mesma entrada lateral e saída lateral de 240 ms. Recriação após cor/tamanho aguarda a animação de saída para evitar cortá-la.
+- O envio de fotos nas conversas foi retirado a pedido do usuário antes de qualquer publicação ou uso real. Removidos botão de anexo, câmera/galeria, arquivos e filas de mídia, rotas e testes específicos, além do binding R2. A foto de perfil e seu cache existente permanecem.
+- Mantidos os emojis animados e as telas completas de configuração. Nenhuma dependência de R2 ou Supabase é necessária para esses recursos. A aparência e as transições ainda precisam de conferência em aparelho.
+
+### Refinamento das configurações pelas capturas (24/11/2026)
+
+- Cabeçalhos de retorno com tipografia de 23sp, até duas linhas e altura flexível, preservando seta sem círculo e transições. Perfil e superfícies de configurações usam fundo uniforme conforme o tema, sem o brilho verde central.
+- Configurações, perfil, recado, seleção de prazo, paleta, controles e prévias usam cards arredondados e margens consistentes. Prazo exibe primeiro as opções e depois a explicação completa; radio buttons diferenciam seleção por cor e fundo.
+- Cores com seleção contornada e grade de uma a três colunas conforme largura e escala de fonte. Sons em grupos de linhas inteiras com divisores, nomes mais legíveis, botão Adicionar som e card de volume com área de toque de 48dp para a prévia.
+- Tamanho dos textos com percentual, faixa 70–150% e prévia separados em cards; Cancelar e Salvar lado a lado, com hierarquia diferente. Mantidos limites, prévia proporcional e gravação somente ao salvar.
+- Atualização com card compacto de versão instalada, logo menor somente nessa tela e botão principal largo. O texto de Verificar atualização e demais estados do botão principal ficou branco, inclusive em tema claro com fundo de maior contraste. Download, cancelamento e instalação mantêm o controlador existente.
+- Compilação Java debug e lintDebug passaram. Nenhum APK gerado, instalação, abertura ou captura em Android; o resultado visual com fontes grandes e temas ainda depende de conferência em aparelho.
+
+- Ajuste posterior no tamanho dos textos: removidos Salvar/Cancelar. O valor escolhido é persistido automaticamente ao alterar o controle, a prévia usa a escala inicial da tela e a interface é recriada após sair pela seta/voltar, respeitando a transição. Revisão localizada de código e diff, sem novo build ou execução em aparelho.
+
+- Correções finais pelas capturas: a explicação de mensagens temporárias voltou para cima das opções. Na Atualização, restaurados o logo maior centralizado, brilho ao fundo e botão em formato de cápsula, sem card/título Versão instalada. Mantidos cabeçalho completo, transições e texto branco do botão principal. O tamanho dos textos salva automaticamente ao configurar e sair.

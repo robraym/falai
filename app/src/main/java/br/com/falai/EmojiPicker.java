@@ -15,6 +15,9 @@ import java.util.function.Consumer;
 
 final class EmojiPicker {
     static void show(Context context, Consumer<String> selected) {
+        show(context, false, selected);
+    }
+    static void show(Context context, boolean animated, Consumer<String> selected) {
         android.content.SharedPreferences prefs = context.getSharedPreferences("emoji_picker", Context.MODE_PRIVATE);
         String key = "recent_" + Backend.uid();
         List<String> recent = new ArrayList<>();
@@ -47,6 +50,23 @@ final class EmojiPicker {
         body.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         int cell = Math.max(48, Math.round(36 * context.getResources().getConfiguration().fontScale));
         int columns = Math.max(3, Math.min(8, (context.getResources().getConfiguration().screenWidthDp - 72) / cell));
+        if (animated) {
+            categories.addView(heading(context, context.getString(R.string.emoji_animated)));
+            categories.addView(Ui.text(context, context.getString(R.string.emoji_animated_hint), 12, false));
+            for (int offset = 0; offset < AnimatedEmoji.VALUES.size(); offset += columns) {
+                LinearLayout line = Ui.row(context); categories.addView(line);
+                for (int col = 0; col < columns; col++) {
+                    int index = offset + col;
+                    View option = new View(context);
+                    if (index < AnimatedEmoji.VALUES.size()) {
+                        String emoji = AnimatedEmoji.VALUES.get(index);
+                        option = new AnimatedEmojiView(context, emoji); option.setFocusable(true);
+                        option.setOnClickListener(view -> pick.accept(emoji));
+                    }
+                    line.addView(option, new LinearLayout.LayoutParams(0, Ui.dp(context, 60), 1));
+                }
+            }
+        }
         String[] labels = context.getResources().getStringArray(R.array.emoji_categories);
         String[] groups = context.getResources().getStringArray(R.array.emoji_groups);
         for (int category = 0; category < groups.length; category++) {

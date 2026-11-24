@@ -52,33 +52,33 @@ final class ProfileController {
         if (activity.isFinishing() || root == null || !owner.equals(Backend.uid())) return;
         root.removeAllViews();
         ScrollView scroll = new ScrollView(activity); LinearLayout content = Ui.column(activity); content.setGravity(Gravity.CENTER_HORIZONTAL);
-        content.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 28), Ui.dp(activity, 16), Ui.dp(activity, 24));
+        content.setPadding(0, 0, 0, Ui.dp(activity, 12));
         scroll.addView(content); root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout identity = SettingsPage.panel(activity); identity.setGravity(Gravity.CENTER_HORIZONTAL); content.addView(identity);
         AvatarView avatar = new AvatarView(activity); avatar.load(owner, name); avatar.setContentDescription(activity.getString(R.string.profile_photo));
         avatar.setOnClickListener(v -> photoActions()); avatar.setFocusable(true); avatar.setEnabled(!busy); avatar.setAlpha(busy ? .6f : 1f);
         FrameLayout photo = new FrameLayout(activity);
         photo.addView(avatar, new FrameLayout.LayoutParams(Ui.dp(activity, 112), Ui.dp(activity, 112), Gravity.TOP | Gravity.CENTER_HORIZONTAL));
         ImageButton editPhoto = new ImageButton(activity); editPhoto.setImageResource(R.drawable.ic_edit);
         editPhoto.setContentDescription(activity.getString(R.string.choose_photo)); editPhoto.setEnabled(!busy); editPhoto.setAlpha(busy ? .6f : 1f);
-        editPhoto.setImageTintList(android.content.res.ColorStateList.valueOf(activity.getColor(R.color.background)));
-        editPhoto.setPadding(Ui.dp(activity, 14), Ui.dp(activity, 14), Ui.dp(activity, 14), Ui.dp(activity, 14));
-        android.graphics.drawable.GradientDrawable badge = Ui.shape(activity, R.color.action_green, 20);
-        badge.setStroke(Ui.dp(activity, 2), activity.getColor(R.color.background));
-        editPhoto.setBackground(new android.graphics.drawable.InsetDrawable(badge, Ui.dp(activity, 4)));
+        editPhoto.setImageTintList(android.content.res.ColorStateList.valueOf(activity.getColor(R.color.text_secondary)));
+        editPhoto.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 16), Ui.dp(activity, 16), Ui.dp(activity, 16));
+        android.graphics.drawable.GradientDrawable badge = Ui.shape(activity, R.color.card, 16);
+        badge.setStroke(Ui.dp(activity, 1), activity.getColor(R.color.divider));
+        editPhoto.setBackground(new android.graphics.drawable.InsetDrawable(badge, Ui.dp(activity, 8)));
         editPhoto.setOnClickListener(v -> photoActions());
         photo.addView(editPhoto, new FrameLayout.LayoutParams(Ui.dp(activity, 48), Ui.dp(activity, 48), Gravity.BOTTOM | Gravity.END));
-        content.addView(photo, new LinearLayout.LayoutParams(Ui.dp(activity, 120), Ui.dp(activity, 120)));
+        identity.addView(photo, new LinearLayout.LayoutParams(Ui.dp(activity, 120), Ui.dp(activity, 120)));
         if (busy) {
-            TextView saving = Ui.text(activity, activity.getString(R.string.photo_saving), 13, false); saving.setPadding(0, Ui.dp(activity, 12), 0, 0); content.addView(saving);
+            TextView saving = Ui.text(activity, activity.getString(R.string.photo_saving), 13, false); saving.setPadding(0, Ui.dp(activity, 12), 0, 0); identity.addView(saving);
         }
-        TextView displayName = Ui.text(activity, name, 28, false); displayName.setMaxLines(2); displayName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        TextView displayName = Ui.text(activity, name, 24, true); displayName.setMaxLines(2); displayName.setEllipsize(android.text.TextUtils.TruncateAt.END);
         displayName.setGravity(Gravity.CENTER); displayName.setPadding(Ui.dp(activity, 8), Ui.dp(activity, 24), Ui.dp(activity, 8), Ui.dp(activity, 8));
         android.graphics.drawable.Drawable editIcon = activity.getDrawable(R.drawable.ic_edit).mutate(); editIcon.setTint(Appearance.primary(activity)); editIcon.setBounds(0, 0, Ui.dp(activity, 18), Ui.dp(activity, 18));
         displayName.setCompoundDrawables(null, null, editIcon, null); displayName.setCompoundDrawablePadding(Ui.dp(activity, 8));
-        displayName.setContentDescription(activity.getString(R.string.edit_name) + ": " + name); displayName.setOnClickListener(v -> editName()); displayName.setFocusable(true); content.addView(displayName, new LinearLayout.LayoutParams(-2, -2));
+        displayName.setContentDescription(activity.getString(R.string.edit_name) + ": " + name); displayName.setOnClickListener(v -> editName()); displayName.setFocusable(true); identity.addView(displayName, new LinearLayout.LayoutParams(-2, -2));
         TextView mail = Ui.text(activity, email, 15, false); mail.setGravity(Gravity.CENTER); mail.setSingleLine(true); mail.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        content.addView(mail, new LinearLayout.LayoutParams(-1, -2));
-        Ui.gap(content, 32);
+        identity.addView(mail, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout aboutRow = Ui.row(activity); aboutRow.setGravity(Gravity.TOP); aboutRow.setBaselineAligned(false);
         aboutRow.setPadding(Ui.dp(activity, 4), Ui.dp(activity, 8), 0, Ui.dp(activity, 12));
         LinearLayout text = Ui.column(activity);
@@ -91,7 +91,7 @@ final class ProfileController {
         aboutRow.addView(pencil, new LinearLayout.LayoutParams(Ui.dp(activity, 48), Ui.dp(activity, 48)));
         aboutRow.setOnClickListener(v -> editAbout()); aboutRow.setFocusable(true); aboutRow.setContentDescription(activity.getString(R.string.edit_about) + ": " + (about.isEmpty() ? activity.getString(R.string.about_empty) : about));
         aboutRow.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(activity)), null, new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
-        content.addView(aboutRow, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout aboutCard = SettingsPage.panel(activity); aboutCard.addView(aboutRow, new LinearLayout.LayoutParams(-1, -2)); content.addView(aboutCard);
     }
     private void editAbout() {
         EditText field = Ui.input(activity, R.string.about_hint); field.setSingleLine(false); field.setMaxLines(3); field.setText(about);

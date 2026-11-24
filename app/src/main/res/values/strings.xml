@@ -77,6 +77,11 @@
     <string name="conversations">Conversas</string>
     <string name="contacts">Contatos</string>
     <string name="settings">Configurações</string>
+    <string name="settings_choose_duration">Escolha o prazo</string>
+    <string name="settings_how_it_works">Como funciona</string>
+    <string name="settings_preview">Prévia</string>
+    <string name="settings_choose_color">Escolha uma cor</string>
+    <string name="settings_text_scale">Tamanho atual</string>
     <string name="welcome">Suas conversas, sem complicação</string>
     <string name="login_intro">Entre com sua conta Google para conversar por texto e emojis.</string>
     <string name="sign_in_google">Entrar com Google</string>
@@ -196,6 +201,8 @@
     <string name="search_loaded_results">%1$d resultado(s) nas mensagens carregadas. Carregue mensagens anteriores para buscar mais.</string>
     <string name="typing">digitando…</string>
     <string name="emoji_recent">Recentes</string>
+    <string name="emoji_animated">Animados</string>
+    <string name="emoji_animated_hint">Envie um destes emojis sozinho para ver a animação na conversa.</string>
     <string name="emoji_recent_empty">Seus emojis usados aparecerão aqui.</string>
     <string name="online">online</string>
     <string name="presence_unknown">Status não informado</string>

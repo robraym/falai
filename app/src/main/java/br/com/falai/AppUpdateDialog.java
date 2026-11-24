@@ -1,6 +1,5 @@
 package br.com.falai;
 
-import android.app.Dialog;
 import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -11,9 +10,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
 import android.view.View;
-import android.view.Window;
 import android.widget.Button;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -21,7 +18,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 
 /** Full screen update surface; download and installation remain owned by the controller. */
-final class AppUpdateDialog extends Dialog {
+final class AppUpdateDialog extends SettingsPage {
     final TextView message, detail;
     final ProgressBar progress;
     private final FalaiActivity activity;
@@ -31,28 +28,9 @@ final class AppUpdateDialog extends Dialog {
     private final Button primary, close, cancel;
 
     AppUpdateDialog(FalaiActivity activity) {
-        super(activity, Appearance.theme(activity));
+        super(activity, R.string.app_update);
         this.activity = activity;
-        requestWindowFeature(Window.FEATURE_NO_TITLE);
-        LinearLayout root = Ui.column(activity);
-        root.setBackgroundColor(activity.getColor(R.color.background));
-        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
-            androidx.core.graphics.Insets bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars()
-                    | androidx.core.view.WindowInsetsCompat.Type.displayCutout());
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-            return insets;
-        });
-        LinearLayout toolbar = Ui.row(activity);
-        toolbar.setPadding(Ui.dp(activity, 12), Ui.dp(activity, 8), Ui.dp(activity, 12), 0);
-        ImageButton back = new ImageButton(activity);
-        back.setImageResource(R.drawable.ic_back);
-        back.setImageTintList(ColorStateList.valueOf(activity.getColor(R.color.text_primary)));
-        back.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(activity)), null, Ui.shape(activity, R.color.card, 24)));
-        back.setContentDescription(activity.getString(R.string.sound_close));
-        back.setOnClickListener(view -> dismiss());
-        toolbar.addView(back, new LinearLayout.LayoutParams(Ui.dp(activity, 48), Ui.dp(activity, 48)));
-        root.addView(toolbar);
+        LinearLayout root = body;
 
         ScrollView scroll = new ScrollView(activity);
         scroll.setFillViewport(true);
@@ -68,8 +46,7 @@ final class AppUpdateDialog extends Dialog {
                 super.dispatchDraw(canvas);
             }
         };
-        hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setGravity(Gravity.CENTER);
+        hero.setOrientation(LinearLayout.VERTICAL); hero.setGravity(Gravity.CENTER);
         hero.setPadding(Ui.dp(activity, 28), Ui.dp(activity, 32), Ui.dp(activity, 28), Ui.dp(activity, 32));
         artwork = new AppVersionArtwork(activity);
         hero.addView(artwork, new LinearLayout.LayoutParams(-1, -2));
@@ -104,7 +81,6 @@ final class AppUpdateDialog extends Dialog {
         close.setVisibility(View.GONE);
         close.setOnClickListener(view -> dismiss()); cancel.setOnClickListener(view -> dismiss());
         root.addView(actions);
-        setContentView(root); setCanceledOnTouchOutside(false);
     }
     private TextView centered(int size, boolean bold) {
         TextView text = Ui.text(activity, "", size, bold); text.setGravity(Gravity.CENTER); return text;
@@ -118,8 +94,8 @@ final class AppUpdateDialog extends Dialog {
         button.setPadding(Ui.dp(activity, 24), Ui.dp(activity, 12), Ui.dp(activity, 24), Ui.dp(activity, 12));
         button.setBackgroundTintList(null);
         button.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(activity)),
-                filled ? Ui.shape(activity, R.color.action_green_soft, 28) : new ColorDrawable(Color.TRANSPARENT), null));
-        button.setTextColor(filled ? Appearance.primary(activity) : activity.getColor(R.color.text_secondary));
+                filled ? Ui.shape(activity, Appearance.dark(activity) ? R.color.action_green_soft : R.color.action_green, 28) : new ColorDrawable(Color.TRANSPARENT), null));
+        button.setTextColor(filled ? Color.WHITE : activity.getColor(R.color.text_secondary));
         return button;
     }
     Button getButton(int which) { return which == AlertDialog.BUTTON_POSITIVE ? primary : which == AlertDialog.BUTTON_NEGATIVE ? cancel : close; }
@@ -147,15 +123,4 @@ final class AppUpdateDialog extends Dialog {
     }
     void hideProgress() { progressGroup.setVisibility(View.GONE); }
 
-    @Override protected void onStart() {
-        super.onStart();
-        if (getWindow() == null) return;
-        getWindow().setBackgroundDrawable(new ColorDrawable(activity.getColor(R.color.background)));
-        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-        getWindow().setLayout(-1, -1);
-        androidx.core.view.WindowInsetsControllerCompat bars = androidx.core.view.WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        bars.setAppearanceLightStatusBars(!Appearance.dark(activity));
-        bars.setAppearanceLightNavigationBars(!Appearance.dark(activity));
-        androidx.core.view.ViewCompat.requestApplyInsets(getWindow().getDecorView());
-    }
 }
