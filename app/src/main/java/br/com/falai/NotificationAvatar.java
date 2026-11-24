@@ -6,7 +6,7 @@ import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.Source;
 import java.util.concurrent.TimeUnit;
 
-/** Small bounded avatars; the notification is posted before any network request. */
+/** Small bounded avatars; local disk lookup is bounded and never requests the network. */
 final class NotificationAvatar {
     static boolean valid(String uid) { return uid != null && uid.matches("[A-Za-z0-9_-]{1,128}"); }
     static boolean refresh(String uid) {
@@ -23,6 +23,14 @@ final class NotificationAvatar {
         Bitmap result = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(result); Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         Bitmap photo = valid(uid) ? AvatarView.cachedPhoto(uid) : null;
+        if (photo == null && valid(uid)) {
+            try {
+                com.google.firebase.firestore.DocumentSnapshot saved = Tasks.await(
+                        Backend.db().collection("profilePhotos").document(uid).get(Source.CACHE), 250, TimeUnit.MILLISECONDS);
+                photo = ProfilePhotos.decode(saved.getString("photo"));
+            } catch (InterruptedException error) { Thread.currentThread().interrupt(); }
+            catch (Exception ignored) { }
+        }
         if (photo != null) {
             BitmapShader shader = new BitmapShader(photo, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
             float scale = Math.max(size / (float) photo.getWidth(), size / (float) photo.getHeight());

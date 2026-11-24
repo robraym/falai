@@ -46,8 +46,10 @@ final class AvatarView extends View {
     private void listen() {
         if (listener != null || owner.isEmpty() || !Backend.ready() || Backend.uid().isEmpty()) return;
         String requested = owner;
-        listener = Backend.db().collection("profilePhotos").document(requested).addSnapshotListener((doc, error) -> {
+        listener = Backend.db().collection("profilePhotos").document(requested).addSnapshotListener(com.google.firebase.firestore.MetadataChanges.INCLUDE, (doc, error) -> {
             if (error != null || doc == null) return;
+            // An empty local snapshot is not a confirmed photo removal.
+            if (!doc.exists() && doc.getMetadata().isFromCache()) return;
             Bitmap photo = ProfilePhotos.decode(doc.getString("photo")); cachePhoto(requested, photo);
             if (requested.equals(owner)) setPhoto(photo);
         });

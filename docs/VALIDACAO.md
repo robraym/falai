@@ -221,3 +221,12 @@ Os erros de permissão exibidos durante os testes são esperados nos casos em qu
 Ainda não foram testados em aparelhos: login Google, aparência, permissão e leitura real da agenda, troca de texto entre duas contas e notificação com o app fechado. A validação online comprova a configuração do servidor e as recusas de autenticação testadas; não comprova entrega real a um dispositivo.
 
 Contato automático passou a usar o e-mail da agenda correspondente à conta Google, com busca manual por e-mail. Não há cadastro por SMS, mídia ou criptografia de ponta a ponta. As cotas gratuitas e as restrições do Android continuam valendo.
+
+### Cache persistente na reabertura (24/11/2026)
+
+- Firestore passou de cache somente em RAM para cache interno persistente com limiar de limpeza de 100 MiB: perfil, fotos, nomes, recados, conversas e mensagens já consultados podem ser recuperados sem aguardar a rede. Os listeners continuam sincronizando com o servidor.
+- Foto ausente apenas no snapshot local não remove uma imagem já carregada. Listeners de foto/nome incluem mudanças de metadados para distinguir ausência local de remoção confirmada pelo servidor.
+- Contatos descobertos são salvos no armazenamento privado por conta. A lista salva pode ser apresentada durante a atualização; resultados recentes são reutilizados por dez minutos, sem renovar a idade apenas por reabrir o app. Mudanças observadas na agenda e edição do nome invalidam a cópia. Leitura/gravação e serialização ficam no executor de IO; a permissão de contatos continua obrigatória.
+- Notificações podem recuperar a foto do cache persistente sem rede, com espera local limitada a 250 ms; a atualização online existente permanece após publicar o aviso.
+- Antes de abrir o histórico em cache, o chat verifica se a conta atual consta nos participantes. Os filtros existentes de expiração, limpeza e mensagens ocultas continuam aplicados. Presença/digitação continuam exigindo dados do servidor. Cache não é backup: as exclusões existentes de backup/transferência permanecem.
+- Validação: compilação Java debug e lintDebug concluídos com sucesso. Sem gerar APK, instalar, executar ou capturar em aparelho/emulador; reabertura após encerramento do processo e sincronização real ainda precisam de conferência no dispositivo.

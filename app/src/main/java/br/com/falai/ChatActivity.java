@@ -210,6 +210,8 @@ public final class ChatActivity extends FalaiActivity {
                 return;
             }
             if (!doc.exists()) return;
+            @SuppressWarnings("unchecked") List<String> members = (List<String>) doc.get("members");
+            if (members == null || !members.contains(Backend.uid())) { showLoadError("Conversation membership", null); return; }
             com.google.firebase.Timestamp previousCutoff = clearedBefore;
             boolean initial = !chatReady;
             clearedBefore = (com.google.firebase.Timestamp) doc.get("clearedBefore." + Backend.uid()); chatReady = true;
@@ -217,8 +219,7 @@ public final class ChatActivity extends FalaiActivity {
             timerIndicator.setVisibility(timerHours > 0 ? View.VISIBLE : View.GONE);
             timerFormatSince = doc.getTimestamp("timerFormatSince");
             if (listener == null || !java.util.Objects.equals(listenerFormatSince, timerFormatSince)) startMessageListener();
-            @SuppressWarnings("unchecked") List<String> members = (List<String>) doc.get("members");
-            if (members != null) for (String member : members) if (!member.equals(Backend.uid())) { otherUid = member; avatar.load(member, name); presence.listen(member); }
+            for (String member : members) if (!member.equals(Backend.uid())) { otherUid = member; avatar.load(member, name); presence.listen(member); }
             @SuppressWarnings("unchecked") Map<String, String> names = (Map<String, String>) doc.get("names");
             String fallbackName = names != null && names.get(otherUid) != null ? names.get(otherUid) : name;
             retentionNotice.bind(doc, name);

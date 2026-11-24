@@ -28,7 +28,7 @@ final class ProfileNameView extends AppCompatTextView {
     private void listen() {
         if (listener != null || uid.isEmpty() || !Backend.ready() || Backend.uid().isEmpty()) return;
         String requested = uid;
-        listener = Backend.db().collection("profileNames").document(uid).addSnapshotListener((doc, error) -> {
+        listener = Backend.db().collection("profileNames").document(uid).addSnapshotListener(com.google.firebase.firestore.MetadataChanges.INCLUDE, (doc, error) -> {
             if (error != null || doc == null || !requested.equals(uid)) return;
             if (!doc.exists() && doc.getMetadata().isFromCache()) return;
             String name = doc.getString("name");

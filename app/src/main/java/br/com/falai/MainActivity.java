@@ -491,12 +491,24 @@ public final class MainActivity extends FalaiActivity {
         if (contacts != null && System.currentTimeMillis() - contactsAt < 600000) { renderContacts(); return; }
         if (contactsBusy) { body.addView(Ui.text(this, getString(R.string.loading), 15, false)); return; }
         contactsBusy = true; body.addView(Ui.text(this, getString(R.string.loading), 15, false));
+        String owner = Backend.uid();
+        ContactsRepository.local(this).addOnCompleteListener(this, saved -> {
+            if (!owner.equals(Backend.uid())) return;
+            if (saved.isSuccessful() && saved.getResult() != null) {
+                contacts = saved.getResult(); contactsAt = contacts.savedAt;
+                if (home && tab == 1) { body.removeAllViews(); renderContacts(); }
+            }
+            refreshContacts(owner);
+        });
+    }
+    private void refreshContacts(String owner) {
         ContactsRepository.load(this, email).addOnCompleteListener(this, task -> {
+            if (!owner.equals(Backend.uid())) return;
             contactsBusy = false;
-            if (task.isSuccessful()) { contacts = task.getResult(); contactsAt = System.currentTimeMillis(); }
+            if (task.isSuccessful()) { contacts = task.getResult(); contactsAt = contacts.savedAt; }
             if (!home || tab != 1) return;
             body.removeAllViews();
-            if (task.isSuccessful()) renderContacts();
+            if (contacts != null) renderContacts();
             else info(R.string.contacts_title, R.string.error_connection).addView(Ui.button(this, R.string.retry, v -> { body.removeAllViews(); showContacts(); }));
         });
     }
