@@ -45,7 +45,6 @@ public final class ChatActivity extends FalaiActivity {
     private android.widget.ImageView timerIndicator;
     private RetentionNoticeController retentionNotice;
     private Button older;
-    private android.widget.ImageButton nudgeButton;
     private RecyclerView messages;
     private LinearLayoutManager layoutManager;
     private MessageAdapter adapter;
@@ -55,6 +54,7 @@ public final class ChatActivity extends FalaiActivity {
     private DocumentSnapshot oldest;
     private boolean loadingOlder, historyExhausted;
     private boolean chatReady;
+    private boolean clearingChat;
     private com.google.firebase.Timestamp clearedBefore;
     private long localHistoryCutoff;
     private int timerHours;
@@ -98,10 +98,6 @@ public final class ChatActivity extends FalaiActivity {
         TextView availability = Ui.text(this, "", 12, false); availability.setPadding(Ui.dp(this, 14), 0, 0, 0); heading.addView(availability);
         presence = new ChatPresence(this, chatId, availability);
         header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
-        nudgeButton = Ui.icon(this, R.drawable.ic_nudge, R.string.nudge_action, view -> new AlertDialog.Builder(this)
-            .setTitle(R.string.nudge_action).setMessage(getString(R.string.nudge_question, name)).setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.nudge_action, (dialog, which) -> model.sendNudge()).show());
-        header.addView(nudgeButton);
         header.addView(Ui.icon(this, R.drawable.ic_more, R.string.chat_options, this::showChatOptions));
         root.addView(header);
         searchSummary = Ui.text(this, "", 12, false); searchSummary.setVisibility(View.GONE); root.addView(searchSummary);
@@ -249,11 +245,36 @@ public final class ChatActivity extends FalaiActivity {
     private void showChatOptions(View anchor) {
         if (!chatReady) { toast(R.string.loading); return; }
         androidx.appcompat.widget.PopupMenu menu = new androidx.appcompat.widget.PopupMenu(this, anchor);
-        String duration = getString(R.string.retention_off);
-        for (int i = 0; i < HistoryRetention.HOURS.length; i++) if (HistoryRetention.HOURS[i] == timerHours) duration = getString(HistoryRetention.LABELS[i]);
-        menu.getMenu().add(getString(R.string.chat_timer_option, duration));
-        menu.setOnMenuItemClickListener(item -> { chooseChatTimer(); return true; });
+        menu.getMenu().add(0, 1, 0, R.string.chat_timer_title);
+        menu.getMenu().add(0, 2, 1, R.string.nudge_action).setEnabled(!model.nudgeBusy);
+        menu.getMenu().add(0, 3, 2, R.string.clear_chat).setEnabled(!clearingChat);
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) chooseChatTimer();
+            else if (item.getItemId() == 2) new AlertDialog.Builder(this)
+                    .setTitle(R.string.nudge_action).setMessage(getString(R.string.nudge_question, name))
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.nudge_action, (dialog, which) -> model.sendNudge()).show();
+            else if (item.getItemId() == 3) confirmClearChat();
+            else return false;
+            return true;
+        });
         menu.show();
+    }
+    private void confirmClearChat() {
+        if (clearingChat) return;
+        new AlertDialog.Builder(this).setTitle(R.string.clear_chat).setMessage(R.string.clear_chat_question)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.clear_chat, (dialog, which) -> {
+                    if (clearingChat) return;
+                    clearingChat = true;
+                    String owner = Backend.uid();
+                    Backend.call("clearConversation", Backend.data("chatId", chatId)).addOnCompleteListener(result -> {
+                        clearingChat = false;
+                        if (isFinishing() || isDestroyed() || !owner.equals(Backend.uid())) return;
+                        if (result.isSuccessful()) toast(R.string.chat_cleared);
+                        else Toast.makeText(this, Backend.error(this, result.getException()), Toast.LENGTH_LONG).show();
+                    });
+                }).show();
     }
     private void merge(List<DocumentSnapshot> docs) {
         localHistoryCutoff = HistoryRetention.cutoff(this);
@@ -474,7 +495,6 @@ public final class ChatActivity extends FalaiActivity {
         });
     }
     private void updateSendState() {
-        nudgeButton.setEnabled(!model.nudgeBusy);
         if (model.nudgeNotice != 0) { toast(model.nudgeNotice); model.nudgeNotice = 0; }
         Ui.enable(composerRow, !model.busy && model.pendingId == null); retryRow.setVisibility(model.failed ? View.VISIBLE : View.GONE);
         if (!composer.getText().toString().equals(model.draft)) composer.setText(model.draft);

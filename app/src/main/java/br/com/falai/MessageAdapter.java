@@ -57,7 +57,8 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
             next.add(new Item(doc, null, id == null ? null : findMessage.apply(id)));
         }
         if (includeNotices) for (Notice notice : notices) next.add(new Item(null, notice, null));
-        next.sort(java.util.Comparator.comparing(Item::time, java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())).thenComparing(Item::key));
+        next.sort(java.util.Comparator.comparing(Item::time, java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder()))
+                .thenComparingInt(item -> item.notice == null ? 1 : 0).thenComparing(Item::key));
         DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
             public int getOldListSize() { return before.size(); }
             public int getNewListSize() { return next.size(); }

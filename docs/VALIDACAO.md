@@ -2,6 +2,21 @@
 
 ## Atualização em 23/11/2026
 
+### Prazo dos Ajustes aplicado ao próximo envio e menu Limpar conversa
+
+- Ajustado conforme a intenção esclarecida pelo usuário: uma nova escolha em Ajustes passa a valer no próximo envio, inclusive em conversas existentes. O servidor lê as configurações dos dois participantes e aplica a escolha mais recente que seja posterior à configuração da conversa. O padrão antigo desativado do destinatário não desfaz as 24 horas recém-escolhidas. Alterações explícitas mais recentes dentro da conversa continuam tendo prioridade sobre padrões antigos.
+- Texto e chamar atenção usam a mesma resolução. Mudança de prazo, evento compartilhado e nova mensagem são gravados na mesma transação. A repetição do envio não duplica o aviso; mensagens anteriores mantêm `expiresAt`. A consulta acrescenta duas leituras de configuração por novo envio, sem varrer ou regravar todas as conversas. O aviso fica antes da primeira mensagem quando ambos têm o mesmo horário.
+- Adicionado Limpar conversa no menu ⋮, com confirmação e uso do endpoint de limpeza apenas do próprio histórico, preservando o histórico do outro participante e mantendo a conversa na lista. Nenhuma limpeza real foi executada durante a validação.
+- 22 testes do Worker passaram, incluindo troca 7 dias → 24 horas, destinatário com padrão desativado, primeiro envio pelo outro participante, repetição de envio e prioridade de alteração explícita. Compilação Java release, 14 testes JVM e lint passaram (zero erros, 52 avisos); após a última edição do menu, compilação/lint repetidos com sucesso. Não houve instalação nem geração de APK.
+- Worker publicado como `7dd32f5b-b431-410a-bee5-b8e00a08b0cd`; `/health` confirmou banco e validação FCM. Nenhuma mensagem/notificação de teste foi enviada, nenhum histórico anterior foi regravado e não houve push Git. O comportamento nos aparelhos depende de um novo envio do usuário; não foi alegado teste ponta a ponta com mensagem real.
+
+### Diagnóstico real do prazo de 24 horas e aplicação em conversas existentes
+
+- Conferidos os dois aparelhos principais conectados (S23 Ultra e S7 edge), ambos com Falai 1.4. Leitura dos metadados do Firestore, sem conteúdo das mensagens: duas conversas existentes sem `timerHours`/autor/data de ativação, uma conta com padrão 24 horas e outra com padrão desativado. O padrão da conta não havia ativado os chats antigos; essa foi a causa confirmada da ausência do aviso nesse cenário.
+- Após a correção solicitada pelo usuário, removida a seleção de conversas e sua abertura automática. Duração padrão das mensagens salva apenas o padrão para novas conversas; selecionar o prazo atual fecha a janela. Conversas existentes são alteradas individualmente pelo menu ⋮ → Mensagens temporárias, sem mudar a duração das mensagens anteriores.
+- Menu ⋮ da conversa simplificado para Mensagens temporárias e Chamar atenção. Removido o botão separado de chamar atenção do cabeçalho, preservando confirmação e controle de envio/cooldown existentes.
+- Cinco testes locais do módulo de temporizadores passaram, incluindo reprodução do padrão em chat legado, aplicação explícita com evento compartilhado, repetição idempotente, alteração pelo outro participante e recusa de não participante. Compilação Java release e lint aprovados após a última edição. Nenhuma configuração de conversa real foi alterada, nem APK instalado/gerado, notificação enviada, servidor publicado ou código enviado ao Git. A nova seleção ainda não foi exercitada nos aparelhos.
+
 ### Repositório renomeado para robraym/falai
 
 - Remoto origin, consulta de Releases, publicador e documentação atualizados. URLs antigas só permanecem na validação de downloads pendentes para permitir retomada após atualizar o app.

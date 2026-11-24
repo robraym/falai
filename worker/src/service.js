@@ -1,7 +1,7 @@
 import {ApiError, requireValue, hash, normalizeEmail, validUid, validChat, validMessageId, normalizeMessage, chatId} from "./validation.js";
 import {validatePhoto} from "./photo.js";
 import {addUnread, consumeUnread, pruneUnread} from "./unread.js";
-import {expiration} from "./timers.js";
+import {expiration, applyLatestAccountTimer} from "./timers.js";
 
 export async function updateProfileAbout(db, user, data) {
   requireValue(typeof data.text === "string");
@@ -98,6 +98,8 @@ export async function persistMessage(db, uid, data) {
     }
     const recipientId = chat.data.members.find(member => member !== uid);
     const now = new Date();
+    const settings = await tx.getAll(chat.data.members.map(member => `messageDefaults/${member}`));
+    const timerChanged = applyLatestAccountTimer(chat.data, settings.map((setting, index) => ({uid: chat.data.members[index], data: setting?.data})), now);
     const expiresAt = expiration(chat.data, now);
     let reply;
     if (replyToId) {
@@ -110,6 +112,8 @@ export async function persistMessage(db, uid, data) {
       reply = {messageId: replyToId, senderId: original.senderId, kind: original.kind || "message",
         expiresAt: original.expiresAt ?? null, ...(original.expiresAt ? {} : {text: original.text.slice(0, 220)})};
     }
+    if (timerChanged) tx.set(`chats/${data.chatId}/timerEvents/default-${data.messageId}`,
+      {hours: chat.data.timerHours, changedBy: chat.data.timerChangedBy, createdAt: now, source: "account"}, false);
     addUnread(chat.data, recipientId, expiresAt);
     tx.set(path, {...message, ...(reply ? {reply} : {}), senderId: uid, createdAt: now, expiresAt, expired: false, unreadTracked: true}, false);
     tx.set(`chats/${data.chatId}`, {...chat.data, lastText: message.text, updatedAt: now, lastMessageId: data.messageId,
@@ -140,6 +144,11 @@ export async function sendNudge(db, user, data) {
     const count = (sameHour ? usage.data.count : 0) + 1;
     if (count > 20) throw new ApiError(429, "resource-exhausted");
     const createdAt = new Date(now), text = "Chamou sua atenção!";
+    const settings = await tx.getAll(chat.data.members.map(member => `messageDefaults/${member}`));
+    if (applyLatestAccountTimer(chat.data, settings.map((setting, index) => ({uid: chat.data.members[index], data: setting?.data})), createdAt)) {
+      tx.set(`chats/${data.chatId}/timerEvents/default-${data.messageId}`,
+        {hours: chat.data.timerHours, changedBy: chat.data.timerChangedBy, createdAt, source: "account"}, false);
+    }
     const expiresAt = expiration(chat.data, createdAt);
     addUnread(chat.data, chat.data.members.find(uid => uid !== user.uid), expiresAt);
     tx.set(messagePath, {senderId: user.uid, kind: "nudge", text, createdAt, expiresAt, expired: false, unreadTracked: true}, false);

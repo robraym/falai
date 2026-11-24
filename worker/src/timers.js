@@ -6,6 +6,26 @@ export const TIMER_HOURS = [0, 24, 168, 2160];
 export function expiration(chat, createdAt) {
   return TIMER_HOURS.includes(chat.timerHours) && chat.timerHours > 0 ? new Date(createdAt.getTime() + chat.timerHours * 3600000) : null;
 }
+// A newly chosen account timer takes effect on the next send in an existing chat.
+// Older settings from the recipient must not undo the newer shared conversation timer.
+export function applyAccountTimer(chat, setting, senderId, now) {
+  if (!setting || !TIMER_HOURS.includes(setting.hours) || !(setting.updatedAt instanceof Date)
+      || !Number.isFinite(setting.updatedAt.getTime())) return false;
+  const changedAt = chat.timerChangedAt || chat.timerFormatSince;
+  if (changedAt instanceof Date && setting.updatedAt <= changedAt) return false;
+  if ((chat.timerHours || 0) === setting.hours) return false;
+  chat.timerHours = setting.hours;
+  chat.timerChangedBy = senderId;
+  chat.timerChangedAt = now;
+  chat.timerFormatSince ||= now;
+  return true;
+}
+export function applyLatestAccountTimer(chat, accounts, now) {
+  const latest = accounts.filter(account => account?.data && TIMER_HOURS.includes(account.data.hours)
+      && account.data.updatedAt instanceof Date && Number.isFinite(account.data.updatedAt.getTime()))
+    .sort((a, b) => b.data.updatedAt - a.data.updatedAt || a.uid.localeCompare(b.uid))[0];
+  return latest ? applyAccountTimer(chat, latest.data, latest.uid, now) : false;
+}
 export async function setDefaultTimer(db, user, data) {
   requireValue(TIMER_HOURS.includes(data.hours));
   await quota(db, user.uid, "defaultTimer", 1, 60);

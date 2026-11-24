@@ -9,9 +9,10 @@ final class MessageTimerDialog {
         for (int i = 0; i < labels.length; i++) { labels[i] = activity.getString(HistoryRetention.LABELS[i]); if (HistoryRetention.HOURS[i] == hours) current = i; }
         TextView explanation = Ui.text(activity, activity.getString(chatId == null ? R.string.retention_info : R.string.retention_notice_details), 13, false);
         explanation.setPadding(Ui.dp(activity, 24), Ui.dp(activity, 12), Ui.dp(activity, 24), Ui.dp(activity, 12));
-        new AlertDialog.Builder(activity).setTitle(chatId == null ? R.string.history_duration : R.string.chat_timer_title).setView(explanation)
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity).setTitle(chatId == null ? R.string.history_duration : R.string.chat_timer_title).setView(explanation)
             .setSingleChoiceItems(labels, current, (dialog, index) -> {
-                dialog.dismiss(); if (HistoryRetention.HOURS[index] == hours) return;
+                dialog.dismiss();
+                if (HistoryRetention.HOURS[index] == hours) return;
                 String owner = Backend.uid();
                 com.google.android.gms.tasks.Task<java.util.Map<String, Object>> task = chatId == null
                     ? Backend.call("setDefaultTimer", Backend.data("hours", HistoryRetention.HOURS[index]))
@@ -22,7 +23,8 @@ final class MessageTimerDialog {
                     if (result.isSuccessful()) saved.run();
                     else android.widget.Toast.makeText(activity, Backend.error(activity, result.getException()), android.widget.Toast.LENGTH_LONG).show();
                 });
-            }).setNegativeButton(R.string.cancel, null).show();
+            }).setNegativeButton(R.string.cancel, null);
+        builder.show();
     }
     private MessageTimerDialog() { }
 }
