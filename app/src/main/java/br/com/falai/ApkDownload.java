@@ -33,9 +33,15 @@ final class ApkDownload {
         Uri uri = Uri.parse(p.getString("url", "")); String digest = p.getString("sha256", "");
         if (code <= 0 || code > Integer.MAX_VALUE || size <= 0 || size > ApkUpdatePolicy.MAX_BYTES
             || !"https".equals(uri.getScheme()) || !"github.com".equals(uri.getHost()) || uri.getPort() != -1
-            || uri.getUserInfo() != null || !uri.toString().startsWith("https://github.com/robraym/falei/releases/download/")
+            || uri.getUserInfo() != null || !trustedReleaseUrl(uri)
             || uri.getQuery() != null || uri.getFragment() != null || (!digest.isEmpty() && !digest.matches("[a-f0-9]{64}"))) return null;
         return new AppUpdate(p.getString("name", ""), code, uri, size, digest);
+    }
+    private static boolean trustedReleaseUrl(Uri uri) {
+        String url = uri.toString();
+        // Keep downloads already started before the repository rename resumable.
+        return url.startsWith("https://github.com/robraym/falai/releases/download/")
+            || url.startsWith("https://github.com/robraym/falei/releases/download/");
     }
     static boolean pending(Context context) {
         AppUpdate update = saved(context); return id(context) > 0 && update != null && update.isNewerThanInstalled();

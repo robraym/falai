@@ -20,7 +20,12 @@
     <string name="retention_day">24 horas</string>
     <string name="retention_week">7 dias</string>
     <string name="retention_quarter">90 dias</string>
-    <string name="retention_info">Escolha um prazo para novas conversas. As novas mensagens desaparecerão para os dois participantes após esse tempo contado do envio. Conversas existentes não mudam. Para alterar uma conversa, toque no aviso de mensagens temporárias ou no nome da pessoa e depois em Mensagens temporárias.</string>
+    <string name="retention_info">Escolha um prazo para novas conversas. As novas mensagens desaparecerão para os dois participantes após esse tempo contado do envio. Conversas existentes não mudam. Para alterar uma conversa, abra o menu ⋮ e toque em Mensagens temporárias, ou toque no aviso dentro da conversa.</string>
+    <string name="chat_options">Opções da conversa</string>
+    <string name="chat_timer_option">Mensagens temporárias · %1$s</string>
+    <string name="retention_notice_active">As novas mensagens desta conversa desaparecem após %1$s. Toque para alterar.</string>
+    <string name="retention_default_notice_you">Você usa uma duração padrão de %1$s. As novas mensagens desta conversa desaparecerão após esse prazo. Toque para alterar.</string>
+    <string name="retention_default_notice_other">%1$s usa uma duração padrão de %2$s. As novas mensagens desta conversa desaparecerão após esse prazo. Toque para alterar.</string>
     <string name="retention_notice_you">Você definiu as mensagens temporárias para %1$s.</string>
     <string name="retention_notice_other">%1$s definiu as mensagens temporárias para %2$s.</string>
     <string name="retention_notice_off_you">Você desativou as mensagens temporárias.</string>

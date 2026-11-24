@@ -2,6 +2,18 @@
 
 ## Atualização em 23/11/2026
 
+### Repositório renomeado para robraym/falai
+
+- Remoto origin, consulta de Releases, publicador e documentação atualizados. URLs antigas só permanecem na validação de downloads pendentes para permitir retomada após atualizar o app.
+- Confirmados acesso Git e permissão de publicação no novo repositório. A API nova responde HTTP 200; a antiga retorna HTTP 301 e os APKs anteriores não seguem redirecionamentos nessa consulta, exigindo atualização manual de migração. Nenhuma Release publicada ou push realizado.
+
+### Aviso de mensagens temporárias na conversa
+
+- A janela da foto permanece somente com os dados do perfil. Adicionado menu ⋮ na conversa com Mensagens temporárias e a duração atual, além do relógio na foto quando o prazo está ativo.
+- Avisos centralizados continuam no histórico, com toque para explicar/alterar o prazo. O estado do documento da conversa agora supre eventos ausentes, atrasados ou indisponíveis, sem duplicar o evento correspondente e sem inventar ativação em conversa desativada. Eventos de padrão inicial têm explicação própria; falhas de leitura do histórico registram apenas o código do erro.
+- O padrão em Ajustes continua valendo somente para conversas novas; não houve mudança de prazos, retroatividade ou escrita de mensagens/avisos pela correção. Backend e regras não foram alterados. Referência: https://faq.whatsapp.com/673193694148537/.
+- Compilação Java, 14 testes JVM (cinco cenários novos de avisos) e lint debug aprovados: zero erros, 51 avisos. Sem APK novo, instalação, teste visual em aparelho, publicação ou envio ao Git.
+
 ### Release e revisão do Play Protect
 
 - Fluxo `publicarAtualizacao` alterado de debug para release; assinatura original mantida para atualização das instalações anteriores. Depuração desativada, R8/redução de recursos ativos e publicação com conferência de assinatura/certificado. Certificado permanece sendo o Android Debug original, conforme explicado em `REVISAO_PLAY_PROTECT.md`.

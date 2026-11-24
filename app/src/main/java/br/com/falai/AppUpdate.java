@@ -15,7 +15,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 final class AppUpdate {
-    private static final String REPOSITORY = "robraym/falei";
+    private static final String REPOSITORY = "robraym/falai";
     private static final String APK_NAME = "Falai.apk";
     private static final Pattern VERSION_TAG = Pattern.compile("v([0-9]+(?:\\.[0-9]+){1,3})-apk\\.([1-9][0-9]{0,9})");
 

@@ -42,6 +42,7 @@ public final class ChatActivity extends FalaiActivity {
     private String messageQuery = "";
     private ChatPresence presence;
     private AvatarView avatar;
+    private android.widget.ImageView timerIndicator;
     private RetentionNoticeController retentionNotice;
     private Button older;
     private android.widget.ImageButton nudgeButton;
@@ -81,7 +82,16 @@ public final class ChatActivity extends FalaiActivity {
         NavigationSurface.attachCard(root);
         LinearLayout header = Ui.row(this); header.setPadding(Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12));
         header.addView(Ui.icon(this, R.drawable.ic_back, R.string.back, v -> leave()));
-        avatar = new AvatarView(this); avatar.load("", name); avatar.setContentDescription(getString(R.string.profile)); avatar.setOnClickListener(v -> contactInfo()); header.addView(avatar, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40)));
+        FrameLayout portrait = new FrameLayout(this);
+        avatar = new AvatarView(this); avatar.load("", name); avatar.setContentDescription(getString(R.string.profile)); avatar.setOnClickListener(v -> contactInfo());
+        portrait.addView(avatar, new FrameLayout.LayoutParams(-1, -1));
+        timerIndicator = new android.widget.ImageView(this); timerIndicator.setImageResource(R.drawable.ic_history_duration);
+        timerIndicator.setImageTintList(android.content.res.ColorStateList.valueOf(Appearance.primary(this)));
+        timerIndicator.setPadding(Ui.dp(this, 2), Ui.dp(this, 2), Ui.dp(this, 2), Ui.dp(this, 2));
+        timerIndicator.setBackground(Ui.shape(this, R.color.background, 10));
+        timerIndicator.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); timerIndicator.setVisibility(View.GONE);
+        portrait.addView(timerIndicator, new FrameLayout.LayoutParams(Ui.dp(this, 18), Ui.dp(this, 18), Gravity.BOTTOM | Gravity.END));
+        header.addView(portrait, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40)));
         title = new ProfileNameView(this); title.setText(name); title.setTextSize(20); title.setTypeface(null, android.graphics.Typeface.BOLD); title.setTextColor(getColor(R.color.text_primary)); title.setPadding(Ui.dp(this, 14), 0, 0, 0); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         title.setOnClickListener(v -> contactInfo()); title.setFocusable(true);
         LinearLayout heading = Ui.column(this); heading.addView(title);
@@ -91,7 +101,9 @@ public final class ChatActivity extends FalaiActivity {
         nudgeButton = Ui.icon(this, R.drawable.ic_nudge, R.string.nudge_action, view -> new AlertDialog.Builder(this)
             .setTitle(R.string.nudge_action).setMessage(getString(R.string.nudge_question, name)).setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.nudge_action, (dialog, which) -> model.sendNudge()).show());
-        header.addView(nudgeButton); root.addView(header);
+        header.addView(nudgeButton);
+        header.addView(Ui.icon(this, R.drawable.ic_more, R.string.chat_options, this::showChatOptions));
+        root.addView(header);
         searchSummary = Ui.text(this, "", 12, false); searchSummary.setVisibility(View.GONE); root.addView(searchSummary);
         older = Ui.button(this, R.string.older_messages, v -> loadOlder()); older.setVisibility(View.GONE); root.addView(older);
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
@@ -178,13 +190,14 @@ public final class ChatActivity extends FalaiActivity {
             boolean initial = !chatReady;
             clearedBefore = (com.google.firebase.Timestamp) doc.get("clearedBefore." + Backend.uid()); chatReady = true;
             Long hours = doc.getLong("timerHours"); timerHours = hours == null ? 0 : hours.intValue();
+            timerIndicator.setVisibility(timerHours > 0 ? View.VISIBLE : View.GONE);
             timerFormatSince = doc.getTimestamp("timerFormatSince");
             if (listener == null || !java.util.Objects.equals(listenerFormatSince, timerFormatSince)) startMessageListener();
             @SuppressWarnings("unchecked") List<String> members = (List<String>) doc.get("members");
             if (members != null) for (String member : members) if (!member.equals(Backend.uid())) { otherUid = member; avatar.load(member, name); presence.listen(member); }
             @SuppressWarnings("unchecked") Map<String, String> names = (Map<String, String>) doc.get("names");
             String fallbackName = names != null && names.get(otherUid) != null ? names.get(otherUid) : name;
-            retentionNotice.bind(chatId, name);
+            retentionNotice.bind(doc, name);
             ((ProfileNameView) title).bind(otherUid, fallbackName, resolved -> {
                 name = resolved; avatar.load(otherUid, resolved); retentionNotice.setContactName(resolved);
             });
@@ -227,11 +240,20 @@ public final class ChatActivity extends FalaiActivity {
     }
     private void contactInfo() {
         if (otherUid.isEmpty()) { toast(R.string.loading); return; }
-        ContactProfileDialog.show(this, otherUid, name, this::chooseChatTimer);
+        ContactProfileDialog.show(this, otherUid, name);
     }
     private void chooseChatTimer() {
         if (!chatReady) { toast(R.string.loading); return; }
         MessageTimerDialog.show(this, chatId, timerHours, () -> { });
+    }
+    private void showChatOptions(View anchor) {
+        if (!chatReady) { toast(R.string.loading); return; }
+        androidx.appcompat.widget.PopupMenu menu = new androidx.appcompat.widget.PopupMenu(this, anchor);
+        String duration = getString(R.string.retention_off);
+        for (int i = 0; i < HistoryRetention.HOURS.length; i++) if (HistoryRetention.HOURS[i] == timerHours) duration = getString(HistoryRetention.LABELS[i]);
+        menu.getMenu().add(getString(R.string.chat_timer_option, duration));
+        menu.setOnMenuItemClickListener(item -> { chooseChatTimer(); return true; });
+        menu.show();
     }
     private void merge(List<DocumentSnapshot> docs) {
         localHistoryCutoff = HistoryRetention.cutoff(this);
