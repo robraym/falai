@@ -76,7 +76,7 @@
     <string name="app_name">Falai</string>
     <string name="conversations">Conversas</string>
     <string name="contacts">Contatos</string>
-    <string name="settings">Ajustes</string>
+    <string name="settings">Configurações</string>
     <string name="welcome">Suas conversas, sem complicação</string>
     <string name="login_intro">Entre com sua conta Google para conversar por texto e emojis.</string>
     <string name="sign_in_google">Entrar com Google</string>
@@ -242,7 +242,7 @@
     <string name="apk_download_retry_hint">Tente baixar novamente ou descarte este download para verificar outra atualização.</string>
     <string name="apk_verifying_download">Conferindo a atualização…</string>
     <string name="apk_ready_to_install">Download concluído</string>
-    <string name="install_apk_update">Instalar atualização</string>
+    <string name="install_apk_update">Atualizar agora</string>
     <string name="apk_install_confirmation">Confirme a instalação na próxima tela.</string>
     <string name="apk_update_invalid_file">O arquivo baixado não corresponde à atualização esperada ou está incompleto. Baixe novamente.</string>
     <string name="apk_update_signature_mismatch">Esta atualização usa uma assinatura diferente da versão instalada. Peça ao responsável um APK compatível.</string>

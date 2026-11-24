@@ -79,9 +79,12 @@ public final class ChatActivity extends FalaiActivity {
             model.reply = state.getBundle("reply");
         }
         LinearLayout root = Ui.root(this);
+        root.setClipToPadding(false);
         NavigationSurface.attachCard(root);
-        LinearLayout header = Ui.row(this); header.setPadding(Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12));
-        header.addView(Ui.icon(this, R.drawable.ic_back, R.string.back, v -> leave()));
+        LinearLayout header = Ui.row(this); header.setPadding(0, Ui.dp(this, 12), 0, Ui.dp(this, 12));
+        android.widget.ImageButton back = headerIcon(R.drawable.ic_back, R.string.back, v -> leave());
+        back.setPadding(Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 12), Ui.dp(this, 12));
+        header.addView(back, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 48)));
         FrameLayout portrait = new FrameLayout(this);
         avatar = new AvatarView(this); avatar.load("", name); avatar.setContentDescription(getString(R.string.profile)); avatar.setOnClickListener(v -> contactInfo());
         portrait.addView(avatar, new FrameLayout.LayoutParams(-1, -1));
@@ -92,16 +95,33 @@ public final class ChatActivity extends FalaiActivity {
         timerIndicator.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); timerIndicator.setVisibility(View.GONE);
         portrait.addView(timerIndicator, new FrameLayout.LayoutParams(Ui.dp(this, 18), Ui.dp(this, 18), Gravity.BOTTOM | Gravity.END));
         header.addView(portrait, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40)));
-        title = new ProfileNameView(this); title.setText(name); title.setTextSize(20); title.setTypeface(null, android.graphics.Typeface.BOLD); title.setTextColor(getColor(R.color.text_primary)); title.setPadding(Ui.dp(this, 14), 0, 0, 0); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        title = new ProfileNameView(this); title.setText(name); title.setTextSize(20); title.setTypeface(null, android.graphics.Typeface.BOLD); title.setTextColor(getColor(R.color.text_primary)); title.setPadding(Ui.dp(this, 10), 0, 0, 0); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         title.setOnClickListener(v -> contactInfo()); title.setFocusable(true);
         LinearLayout heading = Ui.column(this); heading.addView(title);
-        TextView availability = Ui.text(this, "", 12, false); availability.setPadding(Ui.dp(this, 14), 0, 0, 0); heading.addView(availability);
+        TextView availability = Ui.text(this, "", 12, false); availability.setPadding(Ui.dp(this, 10), 0, 0, 0); heading.addView(availability);
         presence = new ChatPresence(this, chatId, availability);
         header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
-        header.addView(Ui.icon(this, R.drawable.ic_more, R.string.chat_options, this::showChatOptions));
+        header.addView(headerIcon(R.drawable.ic_more, R.string.chat_options, this::showChatOptions));
+        header.setBackground(new SoftGlowBackground(this));
         root.addView(header);
+        // Cover the entire header, including the status bar and side insets.
+        header.getViewTreeObserver().addOnPreDrawListener(() -> {
+            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) header.getLayoutParams();
+            int left = root.getPaddingLeft(), right = root.getPaddingRight(), top = root.getPaddingTop();
+            if (params.leftMargin == -left && params.rightMargin == -right && params.topMargin == -top) return true;
+            params.leftMargin = -left; params.rightMargin = -right; params.topMargin = -top;
+            int side = getResources().getDimensionPixelSize(R.dimen.navigation_side_padding);
+            header.setPadding(Math.max(0, left - side), top + Ui.dp(this, 12), Math.max(0, right - side), Ui.dp(this, 12));
+            header.setLayoutParams(params); return false;
+        });
+        header.post(() -> {
+            android.graphics.Rect touch = new android.graphics.Rect(); back.getHitRect(touch);
+            touch.inset(-Ui.dp(this, 4), 0);
+            header.setTouchDelegate(new android.view.TouchDelegate(touch, back));
+        });
         messageSearch = (EditText) getLayoutInflater().inflate(R.layout.view_inline_search, root, false);
         messageSearch.setHint(R.string.search_messages);
+        messageSearch.setVisibility(View.GONE);
         root.addView(messageSearch);
         root.setFocusableInTouchMode(true); root.requestFocus();
         messageSearch.setOnEditorActionListener((view, action, event) -> {
@@ -174,7 +194,10 @@ public final class ChatActivity extends FalaiActivity {
             public void onTextChanged(CharSequence s, int start, int before, int count) { messageQuery = s.toString(); renderMessages(); }
             public void afterTextChanged(android.text.Editable s) { }
         });
-        if (state != null) search.setText(state.getString("messageQuery", ""));
+        if (state != null) {
+            search.setText(state.getString("messageQuery", ""));
+            if (state.getBoolean("messageSearchOpen", false) || !messageQuery.isEmpty()) messageSearch.setVisibility(View.VISIBLE);
+        }
     }
     @Override protected void onStart() {
         super.onStart(); if (model == null) return;
@@ -247,12 +270,21 @@ public final class ChatActivity extends FalaiActivity {
         if (!chatReady) { toast(R.string.loading); return; }
         MessageTimerDialog.show(this, chatId, timerHours, () -> { });
     }
+    private android.widget.ImageButton headerIcon(int drawable, int description, View.OnClickListener action) {
+        android.widget.ImageButton button = Ui.icon(this, drawable, description, action);
+        button.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), null,
+                Ui.shape(this, R.color.card, 24)));
+        button.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.text_primary)));
+        return button;
+    }
     private void showChatOptions(View anchor) {
         if (!chatReady) { toast(R.string.loading); return; }
         androidx.appcompat.widget.PopupMenu menu = new androidx.appcompat.widget.PopupMenu(this, anchor);
-        menu.getMenu().add(0, 1, 0, R.string.chat_timer_title);
-        menu.getMenu().add(0, 2, 1, R.string.nudge_action).setEnabled(!model.nudgeBusy);
-        menu.getMenu().add(0, 3, 2, R.string.clear_chat).setEnabled(!clearingChat);
+        menu.getMenu().add(0, 4, 0, R.string.search_hint);
+        menu.getMenu().add(0, 1, 1, R.string.chat_timer_title);
+        menu.getMenu().add(0, 2, 2, R.string.nudge_action).setEnabled(!model.nudgeBusy);
+        menu.getMenu().add(0, 3, 3, R.string.clear_chat).setEnabled(!clearingChat);
         menu.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == 1) chooseChatTimer();
             else if (item.getItemId() == 2) new AlertDialog.Builder(this)
@@ -260,6 +292,14 @@ public final class ChatActivity extends FalaiActivity {
                     .setNegativeButton(R.string.cancel, null)
                     .setPositiveButton(R.string.nudge_action, (dialog, which) -> model.sendNudge()).show();
             else if (item.getItemId() == 3) confirmClearChat();
+            else if (item.getItemId() == 4) {
+                messageSearch.setVisibility(View.VISIBLE); messageSearch.requestFocus();
+                messageSearch.post(() -> {
+                    if (!isFinishing() && !isDestroyed() && messageSearch.getVisibility() == View.VISIBLE)
+                        ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
+                                .showSoftInput(messageSearch, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                });
+            }
             else return false;
             return true;
         });
@@ -514,6 +554,12 @@ public final class ChatActivity extends FalaiActivity {
         });
     }
     private void leave() {
+        if (messageSearch != null && messageSearch.getVisibility() == View.VISIBLE) {
+            ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
+                    .hideSoftInputFromWindow(messageSearch.getWindowToken(), 0);
+            messageSearch.setText(""); messageSearch.setVisibility(View.GONE); messageSearch.clearFocus();
+            return;
+        }
         if (model.busy) { toast(R.string.sending); return; }
         if (model.pendingId != null || !model.draft.trim().isEmpty()) {
             new AlertDialog.Builder(this).setMessage(R.string.draft_discard).setNegativeButton(R.string.cancel, null)
@@ -524,6 +570,7 @@ public final class ChatActivity extends FalaiActivity {
         super.onSaveInstanceState(out); if (model == null) return;
         out.putString("messageQuery", messageQuery); out.putString("draft", model.draft); out.putString("pendingId", model.pendingId); out.putString("pendingText", model.pendingText);
         out.putBundle("reply", model.reply);
+        out.putBoolean("messageSearchOpen", messageSearch != null && messageSearch.getVisibility() == View.VISIBLE);
     }
     private void toast(int message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
 }

@@ -84,7 +84,6 @@ public final class MainActivity extends FalaiActivity {
         if (granted) Backend.registerDevice();
     });
     private final MessageSoundPicker messageSounds = new MessageSoundPicker(this);
-    private final ProfileController profile = new ProfileController(this);
     private AppUpdateController appUpdates;
 
     @Override protected void onCreate(Bundle state) {
@@ -259,10 +258,12 @@ public final class MainActivity extends FalaiActivity {
     }
     private void showHome(int selected) {
         if (Backend.uid().isEmpty()) { showLogin(); return; }
+        if (selected == 3) { showHome(2); return; }
         if (!selectingContact && selected == 1) { showHome(0); return; }
         home = true; tab = selectingContact ? 1 : selected;
         if (selected != 0) showingArchived = false;
-        page(getString(selectingContact ? R.string.contacts : showingArchived ? R.string.archived_chats : selected == 0 ? R.string.conversations : selected == 3 ? R.string.profile : selected == 1 ? R.string.contacts : R.string.settings));
+        page(getString(selectingContact ? R.string.contacts : showingArchived ? R.string.archived_chats : selected == 0 ? R.string.conversations : selected == 1 ? R.string.contacts : R.string.settings));
+        root.setBackground(new SoftGlowBackground(this));
         if (!selectingContact && showingArchived) {
             archiveBack.setEnabled(true);
             View heading = root.getChildAt(0); root.removeViewAt(0);
@@ -279,9 +280,9 @@ public final class MainActivity extends FalaiActivity {
             showContacts(); return;
         }
         LinearLayout nav = Ui.row(this); nav.setBaselineAligned(false); View selectedView = null;
-        int[] titles = {R.string.conversations, R.string.contacts, R.string.settings, R.string.profile};
-        int[] icons = {R.drawable.ic_chat, R.drawable.ic_contacts, R.drawable.ic_settings, R.drawable.ic_profile};
-        for (int i : new int[]{0, 3, 2}) {
+        int[] titles = {R.string.conversations, R.string.contacts, R.string.settings};
+        int[] icons = {R.drawable.ic_chat, R.drawable.ic_contacts, R.drawable.ic_settings};
+        for (int i : new int[]{0, 2}) {
             final int index = i; LinearLayout item = Ui.column(this); item.setGravity(Gravity.CENTER); item.setBaselineAligned(false); item.setClickable(true); item.setFocusable(true);
             item.setSelected(i == selected);
             item.setContentDescription(getString(titles[i])); item.setOnClickListener(v -> showHome(index));
@@ -293,15 +294,16 @@ public final class MainActivity extends FalaiActivity {
                 highlight.setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(Appearance.primary(this), 40));
                 iconArea.setBackground(highlight);
             }
-            iconArea.addView(icon, new FrameLayout.LayoutParams(Ui.dp(this, 25), Ui.dp(this, 25), Gravity.CENTER));
-            item.addView(iconArea, new LinearLayout.LayoutParams(Ui.dp(this, 56), Ui.dp(this, 38)));
-            TextView label = Ui.text(this, getString(titles[i]), 12, i == selected); label.setTextColor(Ui.color(this, i == selected ? R.color.action_green : R.color.text_secondary));
+            iconArea.addView(icon, new FrameLayout.LayoutParams(Ui.dp(this, 29), Ui.dp(this, 29), Gravity.CENTER));
+            item.addView(iconArea, new LinearLayout.LayoutParams(Ui.dp(this, 64), Ui.dp(this, 42)));
+            TextView label = Ui.text(this, getString(titles[i]), 14, i == selected); label.setTextColor(Ui.color(this, i == selected ? R.color.action_green : R.color.text_secondary));
             label.setGravity(Gravity.CENTER); label.setIncludeFontPadding(false); label.setSingleLine(true); label.setPadding(0, Ui.dp(this, 4), 0, 0);
-            item.addView(label, new LinearLayout.LayoutParams(-1, Ui.dp(this, 24)));
+            item.addView(label, new LinearLayout.LayoutParams(-1, Ui.dp(this, 28)));
             nav.addView(item, new LinearLayout.LayoutParams(0, -1, 1)); if (i == selected) selectedView = item;
         }
-        root.addView(nav, new LinearLayout.LayoutParams(-1, Ui.dp(this, 78))); NavigationSurface.attach(root, nav, selectedView);
-        if (selected == 0) showChats(); else if (selected == 3) profile.show(body); else if (selected == 1) showContacts(); else showSettings();
+        root.addView(nav, new LinearLayout.LayoutParams(-1, Ui.dp(this, 86))); NavigationSurface.attach(root, nav, selectedView);
+        root.setBackground(new SoftGlowBackground(this));
+        if (selected == 0) showChats(); else if (selected == 1) showContacts(); else showSettings();
     }
     private RecyclerView list(LinearLayout parent, RowsAdapter adapter) {
         RecyclerView list = new RecyclerView(this); list.setLayoutManager(new LinearLayoutManager(this)); list.setAdapter(adapter);
@@ -533,6 +535,16 @@ public final class MainActivity extends FalaiActivity {
     }
     private void showSettings() {
         LinearLayout contents = scrollBody();
+        LinearLayout profileRow = Ui.optionRow(this, R.drawable.ic_profile, getString(R.string.profile), profileName, false,
+                v -> startActivity(new Intent(this, ProfileActivity.class)));
+        LinearLayout profileLabels = (LinearLayout) profileRow.getChildAt(1);
+        profileLabels.removeViewAt(1);
+        ProfileNameView currentName = new ProfileNameView(this); currentName.setTextSize(13);
+        currentName.setTextColor(getColor(R.color.text_secondary)); currentName.setMaxLines(2);
+        currentName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        currentName.bind(Backend.uid(), profileName, null);
+        profileLabels.addView(currentName);
+        contents.addView(profileRow);
         contents.addView(Ui.optionRow(this, R.drawable.ic_history_duration, getString(R.string.history_duration), getString(HistoryRetention.LABELS[HistoryRetention.selected(this)]), false, v -> chooseHistoryDuration()));
         contents.addView(Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.app_color), getString(Appearance.LABELS[Appearance.selected(this)]), false, v -> chooseColor()));
         contents.addView(Ui.optionRow(this, R.drawable.ic_font, getString(R.string.text_size), getString(R.string.text_size_value, Appearance.percent(this)), false, v -> chooseTextSize()));

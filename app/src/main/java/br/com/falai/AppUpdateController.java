@@ -49,7 +49,7 @@ final class AppUpdateController implements DefaultLifecycleObserver {
     }
     boolean openExisting() {
         if (!ApkDownload.pending(app)) return false;
-        update = ApkDownload.saved(app); installRequested = foreground; showDialog(); refresh(); return true;
+        update = ApkDownload.saved(app); installRequested = false; showDialog(); refresh(); return true;
     }
     boolean isOpen() { return showing(); }
     void restore() { restoreOnStart = true; }
@@ -79,17 +79,18 @@ final class AppUpdateController implements DefaultLifecycleObserver {
     private void buttons(boolean ready, boolean active) {
         if (!showing()) return;
         android.widget.Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-        positive.setVisibility(failure != 0 ? View.VISIBLE : View.GONE);
-        positive.setText(R.string.retry);
+        positive.setVisibility(ready || failure != 0 ? View.VISIBLE : View.GONE);
+        positive.setText(failure != 0 ? R.string.retry : R.string.install_apk_update);
         positive.setEnabled(!busy && !verifying);
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setVisibility(active ? View.VISIBLE : View.GONE);
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setText(R.string.cancel_apk_download);
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setVisibility(View.VISIBLE);
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setText(active ? R.string.cancel_apk_download : R.string.discard_apk_download);
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(!busy);
 
     }
     private void begin() {
         if (busy || update == null) return;
-        busy = true; failure = 0; verifiedId = -1; installRequested = foreground;
+        busy = true; failure = 0; verifiedId = -1; installRequested = false;
+        detail.setVisibility(View.GONE);
         dialog.setProgressState(true, 0, ""); status.setText(R.string.apk_preparing_download); buttons(false, true);
         AppUpdate offered = update;
         Tasks.call(ContactsRepository.IO, () -> { ApkDownload.start(app, offered); return null; }).addOnCompleteListener(result -> {
