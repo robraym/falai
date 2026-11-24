@@ -212,7 +212,6 @@
     <string name="apk_update_unpublished">Nenhum APK foi disponibilizado para download.</string>
     <string name="apk_up_to_date">Seu aplicativo está atualizado.</string>
     <string name="app_version_title">%1$s %2$s</string>
-    <string name="apk_update_available">Nova atualização disponível.</string>
     <string name="apk_update_subtitle">Mantenha seu Falai atualizado</string>
     <string name="apk_update_intro">Confira se há uma nova versão</string>
     <string name="apk_update_on_device">Neste aparelho</string>
@@ -221,7 +220,6 @@
     <string name="apk_update_percent">%1$d%%</string>
     <string name="apk_update_downloading">Baixando atualização</string>
     <string name="apk_update_transfer_size">%1$s de %2$s</string>
-    <string name="download_apk">Baixar atualização</string>
     <string name="apk_preparing_download">Preparando o download…</string>
     <string name="apk_downloading_version">Baixando Falai %1$s</string>
     <string name="apk_download_progress">Baixando: %1$d%% — %2$s de %3$s</string>
@@ -242,7 +240,6 @@
     <string name="apk_update_signature_mismatch">Esta atualização usa uma assinatura diferente da versão instalada. Peça ao responsável um APK compatível.</string>
     <string name="apk_install_permission_explanation">Autorize o Falai a instalar atualizações na próxima tela do Android. Depois de permitir, volte para continuar a instalação.</string>
     <string name="apk_install_permission_needed">A instalação ainda não foi autorizada. Toque em Instalar atualização para permitir.</string>
-    <string name="apk_allow_install">Autorizar</string>
     <string name="apk_install_unavailable">Não foi possível abrir a instalação. Confira a permissão para o Falai instalar aplicativos e tente novamente.</string>
     <string name="unread_messages">Mensagens não lidas</string>
     <plurals name="unread_message_count">

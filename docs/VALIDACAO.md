@@ -2,6 +2,12 @@
 
 ## Atualização em 23/11/2026
 
+### Atualização com uma única ação no Falai
+
+- Verificar atualização agora inicia diretamente o download quando encontra uma versão nova. Após validação, abre o instalador enquanto a tela permanece visível, sem botões intermediários de baixar, Atualizar agora ou Instalar no fluxo normal. A tela inicial não verifica/baixa antes desse toque.
+- Removida a confirmação própria antes da autorização de instalar por origem: quando necessária, abre diretamente a configuração do Android e continua após o retorno autorizado. As confirmações do instalador/Play Protect continuam sob controle do sistema.
+- Fechar a atualização, sair do app, cancelar ou falhar retira a intenção de abrir automaticamente. Downloads continuam em segundo plano, com retomada explícita para instalar. Validações do arquivo e certificado preservadas.
+
 ### Prazo dos Ajustes aplicado ao próximo envio e menu Limpar conversa
 
 - Ajustado conforme a intenção esclarecida pelo usuário: uma nova escolha em Ajustes passa a valer no próximo envio, inclusive em conversas existentes. O servidor lê as configurações dos dois participantes e aplica a escolha mais recente que seja posterior à configuração da conversa. O padrão antigo desativado do destinatário não desfaz as 24 horas recém-escolhidas. Alterações explícitas mais recentes dentro da conversa continuam tendo prioridade sobre padrões antigos.

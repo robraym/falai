@@ -521,12 +521,8 @@ public final class MainActivity extends FalaiActivity {
                 about.setMessage(getString(R.string.apk_up_to_date));
                 return;
             }
-            about.setAvailableDetails(availableApkDetails(update));
-            about.setMessage(getString(R.string.apk_update_available));
-            check.setText(R.string.download_apk);
-            check.setOnClickListener(view -> {
-                appUpdates.download(update); about.dismiss();
-            });
+            appUpdates.download(update);
+            about.dismiss();
         });
     }
     String installedApkDetails() {

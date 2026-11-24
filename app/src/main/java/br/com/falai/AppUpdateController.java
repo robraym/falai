@@ -71,7 +71,7 @@ final class AppUpdateController implements DefaultLifecycleObserver {
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(view -> cancel());
             buttons(false, true);
         });
-        dialog.setOnDismissListener(ignored -> handler.removeCallbacks(poll));
+        dialog.setOnDismissListener(ignored -> { installRequested = false; handler.removeCallbacks(poll); });
         dialog.setCanceledOnTouchOutside(false); dialog.show();
     }
     private void buttons(boolean ready, boolean active) {
@@ -86,7 +86,7 @@ final class AppUpdateController implements DefaultLifecycleObserver {
     }
     private void begin() {
         if (busy || update == null) return;
-        busy = true; failure = 0; verifiedId = -1; installRequested = false;
+        busy = true; failure = 0; verifiedId = -1; installRequested = foreground;
         dialog.setProgressState(true, 0, ""); status.setText(R.string.apk_preparing_download); buttons(false, true);
         AppUpdate offered = update;
         Tasks.call(ContactsRepository.IO, () -> { ApkDownload.start(app, offered); return null; }).addOnCompleteListener(result -> {
@@ -160,11 +160,10 @@ final class AppUpdateController implements DefaultLifecycleObserver {
         installRequested = false;
         try {
             if (!canInstall()) {
-                new AlertDialog.Builder(activity).setTitle(R.string.install_apk_update).setMessage(R.string.apk_install_permission_explanation)
-                    .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.apk_allow_install, (dialog, button) -> {
-                        try { installPermission.launch(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + activity.getPackageName()))); }
-                        catch (RuntimeException error) { if (showing()) status.setText(R.string.apk_install_unavailable); }
-                    }).show(); return;
+                status.setText(R.string.apk_install_permission_needed);
+                detail.setText(R.string.apk_install_permission_explanation);
+                installPermission.launch(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + activity.getPackageName())));
+                return;
             }
             Uri uri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".updates", ApkDownload.installerFile(app, verifiedId));
             Intent install = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, ApkDownload.MIME).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
@@ -177,7 +176,9 @@ final class AppUpdateController implements DefaultLifecycleObserver {
         if (restoreOnStart) { restoreOnStart = false; openExisting(); }
         refresh();
     }
-    @Override public void onStop(LifecycleOwner owner) { foreground = false; handler.removeCallbacks(poll); }
+    @Override public void onStop(LifecycleOwner owner) {
+        foreground = false; installRequested = false; handler.removeCallbacks(poll);
+    }
     @Override public void onDestroy(LifecycleOwner owner) {
         destroyed = true; handler.removeCallbacks(poll); if (dialog != null) dialog.dismiss(); activity.getLifecycle().removeObserver(this);
     }
