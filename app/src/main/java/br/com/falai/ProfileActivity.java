@@ -2,6 +2,7 @@ package br.com.falai;
 
 import android.os.Bundle;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 /** Profile editing opened from Settings. */
 public final class ProfileActivity extends FalaiActivity {
@@ -16,7 +17,13 @@ public final class ProfileActivity extends FalaiActivity {
         LinearLayout root = Ui.root(this);
         NavigationSurface.attachCard(root);
         root.setBackground(new SoftGlowBackground(this));
-        root.addView(Ui.backHeading(this, getString(R.string.profile), view -> finish()));
+        LinearLayout header = Ui.heading(this, getString(R.string.profile));
+        TextView close = Ui.text(this, getString(R.string.close), 16, true);
+        close.setTextColor(Appearance.primary(this)); close.setGravity(android.view.Gravity.CENTER);
+        close.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 4), Ui.dp(this, 8));
+        close.setClickable(true); close.setFocusable(true); close.setContentDescription(getString(R.string.close)); close.setOnClickListener(view -> finish());
+        header.addView(close, new LinearLayout.LayoutParams(-2, Ui.dp(this, 48)));
+        root.addView(header);
         LinearLayout body = Ui.column(this);
         root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
         profile.show(body);

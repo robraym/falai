@@ -548,28 +548,24 @@ public final class MainActivity extends FalaiActivity {
     }
     private void showSettings() {
         LinearLayout contents = Ui.column(this); scrollBody().addView(contents);
-        LinearLayout profileRow = Ui.optionRow(this, R.drawable.ic_profile, getString(R.string.profile), profileName, false,
-                v -> startActivity(new Intent(this, ProfileActivity.class)));
-        LinearLayout profileLabels = (LinearLayout) profileRow.getChildAt(1);
-        profileLabels.removeViewAt(1);
-        ProfileNameView currentName = new ProfileNameView(this); currentName.setTextSize(13);
-        currentName.setTextColor(getColor(R.color.text_secondary)); currentName.setMaxLines(2);
-        currentName.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        currentName.bind(Backend.uid(), profileName, null);
-        profileLabels.addView(currentName);
-        contents.addView(profileRow);
-        contents.addView(Ui.optionRow(this, R.drawable.ic_history_duration, getString(R.string.history_duration), getString(HistoryRetention.LABELS[HistoryRetention.selected(this)]), false, v -> chooseHistoryDuration()));
-        contents.addView(Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.app_color), getString(Appearance.LABELS[Appearance.selected(this)]), false, v -> chooseColor()));
-        contents.addView(Ui.optionRow(this, R.drawable.ic_font, getString(R.string.text_size), getString(R.string.text_size_value, Appearance.percent(this)), false, v -> chooseTextSize()));
+        addProfileSummary(contents);
+        LinearLayout retention = Ui.optionRow(this, R.drawable.ic_history_duration, getString(R.string.history_duration), getString(HistoryRetention.LABELS[HistoryRetention.selected(this)]), false, v -> chooseHistoryDuration());
+        compactSettingsRow(retention); contents.addView(retention);
+        LinearLayout color = Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.app_color), getString(Appearance.LABELS[Appearance.selected(this)]), false, v -> chooseColor());
+        compactSettingsRow(color); contents.addView(color);
+        LinearLayout textSize = Ui.optionRow(this, R.drawable.ic_font, getString(R.string.text_size), getString(R.string.text_size_value, Appearance.percent(this)), false, v -> chooseTextSize());
+        compactSettingsRow(textSize); contents.addView(textSize);
         LinearLayout general = Ui.column(this); contents.addView(general);
         LinearLayout soundRow = Ui.optionRow(this, R.drawable.ic_volume_preview, getString(R.string.message_sounds), MessageSounds.label(this, MessageSounds.selected(this)), true, view -> messageSounds.show(() -> {
             if (messageSoundSummary != null) messageSoundSummary.setText(MessageSounds.label(this, MessageSounds.selected(this)));
         }));
+        compactSettingsRow(soundRow);
         messageSoundSummary = (TextView) ((LinearLayout) soundRow.getChildAt(1)).getChildAt(1);
         general.addView(soundRow);
-        general.addView(Ui.optionRow(this, R.drawable.ic_settings, getString(R.string.app_update),
+        LinearLayout appUpdate = Ui.optionRow(this, R.drawable.ic_settings, getString(R.string.app_update),
                 installedApkSummary(),
-                true, view -> showAppUpdate()));
+                true, view -> showAppUpdate());
+        compactSettingsRow(appUpdate); general.addView(appUpdate);
         androidx.appcompat.widget.SwitchCompat updates = new androidx.appcompat.widget.SwitchCompat(this);
         updates.setChecked(UpdateNotice.enabled(this)); updates.setMinHeight(Ui.dp(this, 48));
         updates.setThumbTintList(new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
@@ -577,6 +573,7 @@ public final class MainActivity extends FalaiActivity {
         updates.setContentDescription(getString(R.string.apk_update_notifications));
         LinearLayout updateNotices = Ui.optionRow(this, R.drawable.ic_app_update, getString(R.string.apk_update_notifications),
                 getString(R.string.apk_update_notifications_summary), false, null);
+        compactSettingsRow(updateNotices);
         LinearLayout updateLabels = (LinearLayout) updateNotices.getChildAt(1);
         for (int i = 0; i < updateLabels.getChildCount(); i++) {
             TextView label = (TextView) updateLabels.getChildAt(i);
@@ -587,6 +584,30 @@ public final class MainActivity extends FalaiActivity {
         updates.setOnCheckedChangeListener((button, checked) -> UpdateNotice.setEnabled(this, checked));
         updateNotices.setOnClickListener(view -> updates.setChecked(!updates.isChecked()));
         general.addView(updateNotices);
+    }
+    private void compactSettingsRow(LinearLayout row) {
+        row.setMinimumHeight(Ui.dp(this, 64));
+        row.setPadding(0, Ui.dp(this, 6), 0, Ui.dp(this, 6));
+        LinearLayout labels = (LinearLayout) row.getChildAt(1);
+        TextView title = (TextView) labels.getChildAt(0); title.setTextSize(16);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        title.setTextColor(getColor(R.color.text_primary));
+        TextView summary = (TextView) labels.getChildAt(1); summary.setTextSize(12);
+    }
+    private void addProfileSummary(LinearLayout contents) {
+        LinearLayout profile = Ui.column(this); profile.setGravity(Gravity.CENTER_HORIZONTAL);
+        profile.setPadding(Ui.dp(this, 8), Ui.dp(this, 16), Ui.dp(this, 8), Ui.dp(this, 20));
+        AvatarView avatar = new AvatarView(this); avatar.load(Backend.uid(), profileName);
+        profile.addView(avatar, new LinearLayout.LayoutParams(Ui.dp(this, 82), Ui.dp(this, 82)));
+        ProfileNameView name = new ProfileNameView(this); name.setTextSize(22); name.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        name.setTextColor(getColor(R.color.text_primary)); name.setGravity(Gravity.CENTER); name.setSingleLine(true); name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        name.setPadding(Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8), 0); name.bind(Backend.uid(), profileName, null);
+        profile.addView(name, new LinearLayout.LayoutParams(-1, -2));
+        profile.setContentDescription(getString(R.string.profile)); profile.setClickable(true); profile.setFocusable(true);
+        profile.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), null,
+                new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)));
+        profile.setOnClickListener(view -> startActivity(new Intent(this, ProfileActivity.class)));
+        contents.addView(profile, new LinearLayout.LayoutParams(-1, -2));
     }
     private void showAppUpdate() {
         if (appUpdates.openExisting()) return;

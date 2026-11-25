@@ -65,6 +65,7 @@
     <string name="profile_name">Nome</string>
     <string name="profile_email">E-mail</string>
     <string name="profile_email_hint">O e-mail é o da sua conta Google e não pode ser alterado aqui.</string>
+    <string name="close">Fechar</string>
     <string name="notifications_summary">Som, permissões e avisos de mensagens</string>
     <string name="privacy_summary">Saiba como suas conversas são protegidas</string>
     <string name="sign_out_summary">Encerrar a sessão neste aparelho</string>
