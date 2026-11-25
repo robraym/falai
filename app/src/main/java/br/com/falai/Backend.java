@@ -62,6 +62,54 @@ final class Backend {
             } finally { connection.disconnect(); }
         }));
     }
+    static Task<Void> uploadChatMedia(String chatId, String messageId, byte[] bytes) {
+        if (auth().getCurrentUser() == null || bytes == null || bytes.length < 4 || bytes.length > ChatMedia.MAX_BYTES)
+            return Tasks.forException(new ApiException("invalid-argument"));
+        String owner = uid();
+        return auth().getCurrentUser().getIdToken(false).onSuccessTask(token -> Tasks.call(ContactsRepository.IO, () -> {
+            if (!owner.equals(uid())) throw new ApiException("unauthenticated");
+            HttpURLConnection connection = (HttpURLConnection) new URL(BuildConfig.WORKER_URL + "/v1/uploadChatMedia").openConnection();
+            try {
+                connection.setRequestMethod("POST"); connection.setConnectTimeout(20000); connection.setReadTimeout(45000);
+                connection.setRequestProperty("Authorization", "Bearer " + token.getToken()); connection.setRequestProperty("Content-Type", "image/jpeg");
+                connection.setRequestProperty("X-Chat-Id", chatId); connection.setRequestProperty("X-Message-Id", messageId);
+                connection.setDoOutput(true); connection.setFixedLengthStreamingMode(bytes.length);
+                try (java.io.OutputStream output = connection.getOutputStream()) { output.write(bytes); }
+                int status = connection.getResponseCode();
+                if (status < 200 || status >= 300) throw apiError(connection, status);
+                return null;
+            } finally { connection.disconnect(); }
+        }));
+    }
+    static Task<byte[]> downloadChatMedia(String chatId, String messageId) {
+        if (auth().getCurrentUser() == null) return Tasks.forException(new ApiException("unauthenticated"));
+        String owner = uid();
+        return auth().getCurrentUser().getIdToken(false).onSuccessTask(token -> Tasks.call(ContactsRepository.IO, () -> {
+            if (!owner.equals(uid())) throw new ApiException("unauthenticated");
+            HttpURLConnection connection = (HttpURLConnection) new URL(BuildConfig.WORKER_URL + "/v1/downloadChatMedia").openConnection();
+            try {
+                connection.setRequestMethod("POST"); connection.setConnectTimeout(15000); connection.setReadTimeout(45000);
+                connection.setRequestProperty("Authorization", "Bearer " + token.getToken()); connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                connection.setDoOutput(true); byte[] body = new JSONObject(data("chatId", chatId, "messageId", messageId)).toString().getBytes(StandardCharsets.UTF_8);
+                connection.setFixedLengthStreamingMode(body.length); try (java.io.OutputStream output = connection.getOutputStream()) { output.write(body); }
+                int status = connection.getResponseCode();
+                if (status < 200 || status >= 300) throw apiError(connection, status);
+                try (InputStream input = connection.getInputStream(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[8192]; int count;
+                    while ((count = input.read(buffer)) != -1) { if (output.size() + count > ChatMedia.MAX_BYTES) throw new ApiException("invalid-argument"); output.write(buffer, 0, count); }
+                    return output.toByteArray();
+                }
+            } finally { connection.disconnect(); }
+        }));
+    }
+    private static ApiException apiError(HttpURLConnection connection, int status) throws Exception {
+        try (InputStream input = connection.getErrorStream()) {
+            if (input != null) { ByteArrayOutputStream output = new ByteArrayOutputStream(); byte[] buffer = new byte[2048]; int count;
+                while ((count = input.read(buffer)) != -1 && output.size() < 8192) output.write(buffer, 0, count);
+                return new ApiException(new JSONObject(output.toString("UTF-8")).optString("error", "unavailable")); }
+        }
+        return new ApiException(status == 404 ? "not-found" : status == 429 ? "resource-exhausted" : "unavailable");
+    }
     private static Map<String, Object> objectMap(JSONObject object) throws org.json.JSONException {
         Map<String, Object> result = new HashMap<>(); Iterator<String> keys = object.keys();
         while (keys.hasNext()) { String key = keys.next(); result.put(key, value(object.get(key))); } return result;

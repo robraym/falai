@@ -21,6 +21,10 @@ export function normalizeEmail(value) {
 export async function chatId(a, b) { return hash(JSON.stringify([a, b].sort())); }
 export function normalizeMessage(data) {
   requireValue(data && validChat(data.chatId) && validMessageId(data.messageId));
+  if (data.kind === "image") {
+    requireValue(data.mediaId === data.messageId);
+    return {text: "📷 Foto", kind: "image", mediaId: data.mediaId};
+  }
   requireValue(typeof data.text === "string" && data.text.trim().length > 0 && data.text.trim().length <= 4000);
   return {text: data.text.trim()};
 }

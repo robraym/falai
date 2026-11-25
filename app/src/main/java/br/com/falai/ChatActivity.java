@@ -12,6 +12,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -50,6 +52,7 @@ public final class ChatActivity extends FalaiActivity {
     private RecyclerView messages;
     private LinearLayoutManager layoutManager;
     private MessageAdapter adapter;
+    private ActivityResultLauncher<String> photoPicker;
     private ListenerRegistration listener;
     private ListenerRegistration chatListener;
     private final Map<String, DocumentSnapshot> loaded = new HashMap<>();
@@ -63,6 +66,7 @@ public final class ChatActivity extends FalaiActivity {
     private DocumentSnapshot historyCursor;
     private DocumentSnapshot liveHistoryEnd;
     private final java.util.Set<String> reacting = new java.util.HashSet<>();
+    private final java.util.Set<String> downloadingPhotos = new java.util.HashSet<>();
     private com.google.firebase.Timestamp timerFormatSince, listenerFormatSince;
     private final java.util.Set<String> deliveryQueued = new java.util.HashSet<>(), readQueued = new java.util.HashSet<>();
     static void open(Context context, String id, String name) {
@@ -70,6 +74,9 @@ public final class ChatActivity extends FalaiActivity {
     }
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        photoPicker = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+            if (uri != null && model != null) model.preparePhoto(uri);
+        });
         chatId = getIntent().getStringExtra("chatId"); name = getIntent().getStringExtra("name");
         if (!Backend.ready() || Backend.uid().isEmpty() || chatId == null || !chatId.matches("[a-f0-9]{64}")) { finish(); return; }
         if (name == null) name = getString(R.string.app_name);
@@ -77,7 +84,7 @@ public final class ChatActivity extends FalaiActivity {
         boolean freshModel = model.chatId == null; model.init(chatId);
         if (freshModel && state != null) {
             model.draft = state.getString("draft", ""); model.pendingId = state.getString("pendingId");
-            model.pendingText = state.getString("pendingText"); model.failed = model.pendingId != null;
+            model.pendingText = state.getString("pendingText"); model.pendingKind = state.getString("pendingKind"); model.failed = model.pendingId != null;
             model.reply = state.getBundle("reply");
         }
         LinearLayout root = Ui.root(this);
@@ -136,7 +143,7 @@ public final class ChatActivity extends FalaiActivity {
         older = Ui.button(this, R.string.older_messages, v -> loadOlder()); older.setVisibility(View.GONE); root.addView(older);
         messages = new RecyclerView(this); layoutManager = new LinearLayoutManager(this); layoutManager.setStackFromEnd(true);
         messages.setLayoutManager(layoutManager); adapter = new MessageAdapter(Backend.uid(), this::messageActions,
-                loaded::get, () -> name, this::jumpToMessage); messages.setAdapter(adapter);
+                loaded::get, () -> name, this::jumpToMessage, this::openPhoto); messages.setAdapter(adapter);
         messages.addOnItemTouchListener(new SwipeToReply(messages, adapter, this::canReply, this::beginReply));
         retentionNotice = new RetentionNoticeController(this, notices -> {
             boolean bottom = layoutManager.findLastVisibleItemPosition() >= adapter.getItemCount() - 3;
@@ -162,6 +169,12 @@ public final class ChatActivity extends FalaiActivity {
         LinearLayout inputBar = Ui.row(this); inputBar.setGravity(Gravity.BOTTOM); inputBar.setBaselineAligned(false);
         inputBar.setBackground(Ui.shape(this, R.color.card, 24));
         composerRow.addView(inputBar, new LinearLayout.LayoutParams(0, -2, 1));
+        android.widget.ImageButton photoButton = Ui.icon(this, R.drawable.ic_photo, R.string.send_photo, v -> choosePhoto());
+        photoButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.text_secondary)));
+        photoButton.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Appearance.ripple(this)),
+                new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), null));
+        inputBar.addView(photoButton);
         emojiButton = Ui.icon(this, R.drawable.ic_emoji, R.string.emoji, v -> emoji());
         emojiButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.text_secondary)));
         emojiButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.card, 24), null));
@@ -322,7 +335,7 @@ public final class ChatActivity extends FalaiActivity {
                     Backend.call("clearConversation", Backend.data("chatId", chatId)).addOnCompleteListener(result -> {
                         clearingChat = false;
                         if (isFinishing() || isDestroyed() || !owner.equals(Backend.uid())) return;
-                        if (result.isSuccessful()) toast(R.string.chat_cleared);
+                        if (result.isSuccessful()) { for (DocumentSnapshot message : loaded.values()) if ("image".equals(message.getString("kind"))) ChatMedia.delete(this, message.getString("mediaId")); toast(R.string.chat_cleared); }
                         else Toast.makeText(this, Backend.error(this, result.getException()), Toast.LENGTH_LONG).show();
                     });
                 }).show();
@@ -336,7 +349,18 @@ public final class ChatActivity extends FalaiActivity {
         List<String> delivered = new ArrayList<>();
         for (DocumentSnapshot doc : docs) if (!Backend.uid().equals(doc.getString("senderId")) && doc.getTimestamp("deliveredAt") == null && deliveryQueued.add(doc.getId())) delivered.add(doc.getId());
         ReceiptWorker.schedule(chatId, delivered, false);
-        for (DocumentSnapshot doc : docs) { if (visible(doc)) loaded.put(doc.getId(), doc); else loaded.remove(doc.getId()); }
+        for (DocumentSnapshot doc : docs) {
+            if ("image".equals(doc.getString("kind")) && (HistoryRetention.expired(doc)
+                    || Boolean.TRUE.equals(doc.getBoolean("deletedForAll"))
+                    || (doc.get("hiddenFor") instanceof List && ((List<?>) doc.get("hiddenFor")).contains(Backend.uid())))) {
+                ChatMedia.delete(this, doc.getString("mediaId"));
+            }
+            if ("image".equals(doc.getString("kind")) && visible(doc)
+                    && !Backend.uid().equals(doc.getString("senderId"))) {
+                downloadPhoto(doc, false);
+            }
+            if (visible(doc)) loaded.put(doc.getId(), doc); else loaded.remove(doc.getId());
+        }
         loaded.values().removeIf(doc -> !visible(doc));
         List<DocumentSnapshot> sorted = new ArrayList<>(loaded.values());
         sorted.sort(Comparator.comparing((DocumentSnapshot doc) -> doc.getTimestamp("createdAt")).thenComparing(DocumentSnapshot::getId));
@@ -379,7 +403,7 @@ public final class ChatActivity extends FalaiActivity {
         if (HistoryRetention.expired(doc)) return;
         boolean mine = Backend.uid().equals(doc.getString("senderId"));
         boolean deleted = Boolean.TRUE.equals(doc.getBoolean("deletedForAll"));
-        boolean nonEditable = "nudge".equals(doc.getString("kind")) || GifCatalog.index(doc.getString("text")) >= 0;
+        boolean nonEditable = "nudge".equals(doc.getString("kind")) || "image".equals(doc.getString("kind")) || GifCatalog.index(doc.getString("text")) >= 0;
         if (!mine && deleted) return;
         AlertDialog.Builder menuBuilder = new AlertDialog.Builder(this);
         LinearLayout picker = Ui.row(this);
@@ -418,7 +442,8 @@ public final class ChatActivity extends FalaiActivity {
                 String scope = !deleted && selected == (nonEditable ? 0 : 1) ? "all" : "self";
                 new AlertDialog.Builder(this).setMessage(R.string.delete_message_question).setNegativeButton(R.string.cancel, null).setPositiveButton("all".equals(scope) ? R.string.delete_for_all : R.string.delete_for_me, (confirm, button) ->
                     Backend.call("deleteMessage", Backend.data("chatId", chatId, "messageId", doc.getId(), "scope", scope)).addOnCompleteListener(this, task -> {
-                        if (!task.isSuccessful()) Toast.makeText(this, Backend.error(this, task.getException()), Toast.LENGTH_LONG).show();
+                        if (task.isSuccessful() && "image".equals(doc.getString("kind"))) ChatMedia.delete(this, doc.getString("mediaId"));
+                        else if (!task.isSuccessful()) Toast.makeText(this, Backend.error(this, task.getException()), Toast.LENGTH_LONG).show();
                     })).show();
             }
         });
@@ -551,8 +576,48 @@ public final class ChatActivity extends FalaiActivity {
         if (!composer.getText().toString().equals(model.draft)) composer.setText(model.draft);
         renderReplyPreview();
         if (model.busy) { status.setVisibility(View.VISIBLE); status.setText(R.string.sending); }
-        else if (model.failed) { status.setVisibility(View.VISIBLE); status.setText(R.string.error_send); }
+        else if (model.failed) { status.setVisibility(View.VISIBLE); status.setText(model.sendError == 0 ? R.string.error_send : model.sendError); }
         else { status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); status.setText(R.string.new_conversation); }
+    }
+    private void choosePhoto() {
+        if (!chatReady || model.busy || model.pendingId != null) { toast(R.string.photo_wait); return; }
+        closeEmojiPanel();
+        photoPicker.launch("image/*");
+    }
+    private void openPhoto(DocumentSnapshot doc) {
+        String id = doc.getString("mediaId");
+        if (id == null) return;
+        java.io.File local = ChatMedia.file(this, id);
+        if (local != null && local.isFile()) {
+            android.graphics.Bitmap bitmap = ChatMedia.preview(this, id, 1600);
+            if (bitmap == null) { local.delete(); openPhoto(doc); return; }
+            android.widget.ImageView image = new android.widget.ImageView(this); image.setImageBitmap(bitmap);
+            image.setAdjustViewBounds(true); image.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            image.setMaxHeight(getResources().getDisplayMetrics().heightPixels - Ui.dp(this, 96));
+            AlertDialog dialog = new AlertDialog.Builder(this).setView(image).setPositiveButton(R.string.close, null).create();
+            dialog.setOnDismissListener(ignored -> bitmap.recycle()); dialog.show(); return;
+        }
+        if (Backend.uid().equals(doc.getString("senderId"))) { toast(R.string.photo_expired); return; }
+        downloadPhoto(doc, true);
+    }
+    private void downloadPhoto(DocumentSnapshot doc, boolean showFeedback) {
+        String id = doc.getString("mediaId");
+        if (id == null || ChatMedia.file(this, id).isFile() || !downloadingPhotos.add(id)) return;
+        if (showFeedback) toast(R.string.photo_downloading);
+        String owner = Backend.uid();
+        Backend.downloadChatMedia(chatId, id).onSuccessTask(bytes -> com.google.android.gms.tasks.Tasks.call(ContactsRepository.IO, () -> { ChatMedia.save(getApplicationContext(), id, bytes); return null; }))
+                .onSuccessTask(ignored -> Backend.call("deleteChatMedia", Backend.data("chatId", chatId, "messageId", id)))
+                .addOnCompleteListener(this, task -> {
+                    downloadingPhotos.remove(id);
+                    if (!owner.equals(Backend.uid()) || isFinishing() || isDestroyed()) return;
+                    if (!task.isSuccessful()) {
+                        Exception error = task.getException();
+                        int message = error instanceof Backend.ApiException && "not-found".equals(((Backend.ApiException) error).code)
+                                ? R.string.photo_expired : R.string.photo_error;
+                        if (showFeedback) Toast.makeText(this, getString(message), Toast.LENGTH_LONG).show();
+                    }
+                    int position = adapter.findPosition(doc.getId()); if (position >= 0) adapter.notifyItemChanged(position);
+                });
     }
     private void emoji() {
         if (emojiPanelHost.getVisibility() == View.VISIBLE) {
@@ -599,6 +664,7 @@ public final class ChatActivity extends FalaiActivity {
     @Override protected void onSaveInstanceState(@NonNull Bundle out) {
         super.onSaveInstanceState(out); if (model == null) return;
         out.putString("messageQuery", messageQuery); out.putString("draft", model.draft); out.putString("pendingId", model.pendingId); out.putString("pendingText", model.pendingText);
+        out.putString("pendingKind", model.pendingKind);
         out.putBundle("reply", model.reply);
         out.putBoolean("messageSearchOpen", messageSearch != null && messageSearch.getVisibility() == View.VISIBLE);
     }

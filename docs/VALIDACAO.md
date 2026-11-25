@@ -1,5 +1,18 @@
 # Validação da adaptação gratuita
 
+## Limpeza da conversa e avisos de prazo (25/11/2026)
+
+- Ao limpar uma conversa, mensagens e avisos anteriores deixam de aparecer para quem limpou. O último aviso de mensagens temporárias permanece como contexto, junto com alterações feitas depois da limpeza. O histórico do outro participante não é alterado.
+
+## Envio de fotos em conversas — implementação local (25/11/2026)
+
+- Reintroduzido o botão de foto na conversa. O seletor do Android abre a galeria sem pedir permissão ampla de arquivos; o app corrige a orientação EXIF, reduz a imagem a JPEG de até 512 KiB e guarda uma cópia privada no aparelho.
+- O Worker autentica e valida o participante, formato, dimensões e limite do arquivo. A mídia fica em documento Firestore separado do histórico, com limite de 10 fotos por conta a cada 24 horas (até 20/dia entre duas contas) e validade de 24 horas. O destinatário baixa por rota autenticada, grava a cópia privada e só então confirma a exclusão remota. Uma tarefa agendada remove fotos que ninguém baixou; excluir para todos ou ocultar para o destinatário também remove a cópia do servidor.
+- O cache local é limitado a 50 MiB. Fotos são somente JPEG comprimidos; o histórico guarda metadados e identificador, sem carregar o arquivo em cada atualização do chat. Não foi adicionado Firebase Storage, R2, fornecedor de GIFs, dependência paga nem solicitação de cartão.
+- Limite superior estimado para duas contas usando o máximo diário, arquivo no máximo e um download por foto: cerca de 400 MiB/mês lidos pelo Worker do Firestore, além de aproximadamente 13 MiB de mídia simultânea aguardando download. Isso é uma estimativa pelo tamanho dos payloads, não uma garantia de consumo total; o restante do app também usa as cotas Firebase.
+- O conteúdo de fotos passa pelo Worker e Firestore e não tem criptografia ponta a ponta. O cliente só remove a mídia remota depois que a cópia local foi salva; se o download falhar ou o aparelho destinatário não abrir o Falai, a foto fica disponível até 24 horas.
+- A configuração de índice Firestore foi publicada no projeto `falai-4d04c`; Worker publicado como `2ba215d6-f870-47e8-9cbb-efa8c3bfc54d`. O endpoint `/health` confirmou banco Firestore e validação FCM. A compilação Java e o dry-run passaram. O fluxo de upload/download de uma foto real ainda não foi exercitado. Não rodei testes, não gerei APK, não acessei aparelhos nem enviei alterações ao Git.
+
 ## Atualização em 23/11/2026
 
 ### Atualização com uma única ação no Falai

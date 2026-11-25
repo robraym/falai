@@ -1,7 +1,7 @@
 import {ApiError, requireValue} from "./validation.js";
 import {verifyUser, serviceAccount} from "./google.js";
 import {Firestore} from "./firestore.js";
-import {registerProfile, discoverContacts, openChat, persistMessage, quota, registerDevice, unregisterDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge} from "./service.js";
+import {registerProfile, discoverContacts, openChat, persistMessage, quota, registerDevice, unregisterDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge, uploadChatMedia, downloadChatMedia, deleteChatMedia} from "./service.js";
 import {dispatchJob, drainOutbox, sendPush} from "./push.js";
 import {changeMessage, deleteConversation, clearConversation, setMessageReaction} from "./mutations.js";
 import {setDefaultTimer, setChatTimer, expireMessages} from "./timers.js";
@@ -24,6 +24,17 @@ async function readBody(request) {
   const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
   try { const value = JSON.parse(new TextDecoder().decode(bytes)); requireValue(value && typeof value === "object" && !Array.isArray(value)); return value; }
   catch { throw new ApiError(400, "invalid-argument"); }
+}
+async function readMedia(request) {
+  const maximum = 512 * 1024;
+  if (Number(request.headers.get("content-length") || 0) > maximum) throw new ApiError(413, "request-too-large");
+  const reader = request.body?.getReader(); if (!reader) throw new ApiError(400, "invalid-argument");
+  const chunks = []; let size = 0;
+  while (true) { const {done, value} = await reader.read(); if (done) break;
+    size += value.length; if (size > maximum) { await reader.cancel(); throw new ApiError(413, "request-too-large"); } chunks.push(value); }
+  const bytes = new Uint8Array(size); let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  return bytes;
 }
 async function health(env, db) {
   if (lastHealth?.until > Date.now()) return lastHealth.value;
@@ -48,13 +59,22 @@ export default {
       if (request.method === "GET" && url.pathname === "/health") return response(await health(env, db));
       if (request.method !== "POST" || !url.pathname.startsWith("/v1/")) return response({error: "not-found"}, 404);
       const action = url.pathname.slice(4);
-      const handlers = {registerProfile, discoverContacts, openChat, registerDevice, unregisterDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge, getAppUpdate,
-        editMessage: (db, user, data) => changeMessage(db, user, data, true), deleteMessage: changeMessage,
-        deleteConversation, clearConversation, archiveConversation, setMessageReaction, setDefaultTimer, setChatTimer};
-      if (!(Object.hasOwn(handlers, action) || action === "sendMessage")) return response({error: "not-found"}, 404);
       const auth = request.headers.get("Authorization") || "";
       if (!auth.startsWith("Bearer ")) throw new ApiError(401, "unauthenticated");
       const user = await verifyUser(auth.slice(7), env.FIREBASE_PROJECT_ID);
+      if (action === "uploadChatMedia") {
+        if (request.headers.get("Content-Type") !== "image/jpeg") throw new ApiError(400, "invalid-argument");
+        return response(await uploadChatMedia(db, user, request.headers.get("X-Chat-Id"), request.headers.get("X-Message-Id"), await readMedia(request)));
+      }
+      if (action === "downloadChatMedia") {
+        const bytes = await downloadChatMedia(db, user, await readBody(request));
+        return new Response(bytes, {headers: {"Content-Type": "image/jpeg", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}});
+      }
+      const handlers = {registerProfile, discoverContacts, openChat, registerDevice, unregisterDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge, getAppUpdate,
+        deleteChatMedia,
+        editMessage: (db, user, data) => changeMessage(db, user, data, true), deleteMessage: changeMessage,
+        deleteConversation, clearConversation, archiveConversation, setMessageReaction, setDefaultTimer, setChatTimer};
+      if (!(Object.hasOwn(handlers, action) || action === "sendMessage")) return response({error: "not-found"}, 404);
       const data = await readBody(request);
       if (action === "sendMessage") {
         await quota(db, user.uid, "messages", 1, 600);

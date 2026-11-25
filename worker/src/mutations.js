@@ -50,12 +50,17 @@ export async function changeMessage(db, user, data, editing = false) {
     }
     if (editing) {
       if (message.data.kind === "nudge") throw new ApiError(400, "invalid-argument");
+      if (message.data.kind === "image") throw new ApiError(400, "invalid-argument");
       if (message.data.deletedForAll) throw new ApiError(409, "already-exists");
       tx.set(path, {...message.data, text: replacement, editedAt: new Date()}, true);
       if (last) summary.lastText = replacement;
     } else if (data.scope === "self") {
       const hiddenFor = [...new Set([...(message.data.hiddenFor || []), user.uid])];
       tx.set(path, {...message.data, hiddenFor}, true);
+      if (message.data.kind === "image" && message.data.senderId !== user.uid) {
+        tx.delete(`chatMedia/${data.chatId}_${message.data.mediaId}`);
+        tx.delete(`chatMediaExpiry/${data.chatId}_${message.data.mediaId}`);
+      }
       if (last) summary.previewHiddenFor = [...new Set([...(summary.previewHiddenFor || []), user.uid])];
     } else {
       const {reactions, reply, ...remaining} = message.data;
@@ -63,6 +68,10 @@ export async function changeMessage(db, user, data, editing = false) {
       if (last) { summary.lastText = ""; summary.lastDeleted = true; }
       const recipientId = chat.data.members.find(uid => uid !== user.uid);
       tx.delete(`notificationOutbox/${data.chatId}_${data.messageId}`);
+      if (message.data.kind === "image" && message.data.mediaId) {
+        tx.delete(`chatMedia/${data.chatId}_${message.data.mediaId}`);
+        tx.delete(`chatMediaExpiry/${data.chatId}_${message.data.mediaId}`);
+      }
       jobId = `${data.chatId}_${data.messageId}_deleted`;
       tx.set(`notificationOutbox/${jobId}`, {chatId: data.chatId, messageId: data.messageId, recipientId, event: "deleted",
         createdAt: new Date(), nextAttemptAt: new Date(), status: "pending", attempts: 0, sentDeviceIds: []});
@@ -82,7 +91,8 @@ export async function deleteConversation(db, user, data, keepVisible = false) {
     tx.set(path, {...chat.data, unreadCounts: {...(chat.data.unreadCounts || {}), [user.uid]: 0},
       unreadExpiry: {...(chat.data.unreadExpiry || {}), [user.uid]: {}},
       clearedVisible: {...(chat.data.clearedVisible || {}), [user.uid]: keepVisible},
-      clearedBefore: {...(chat.data.clearedBefore || {}), [user.uid]: new Date()}}, true);
+      clearedBefore: {...(chat.data.clearedBefore || {}), [user.uid]: new Date()},
+      clearedTimerBefore: {...(chat.data.clearedTimerBefore || {}), [user.uid]: new Date()}}, true);
   });
   return {ok: true};
 }

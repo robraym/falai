@@ -31,7 +31,8 @@ final class RetentionNoticeController implements DefaultLifecycleObserver {
     void setContactName(String name) { this.name = name; render(); }
     private void render() {
         List<MessageAdapter.Notice> notices = new ArrayList<>();
-        for (DocumentSnapshot event : events) {
+        List<DocumentSnapshot> visibleEvents = visibleEvents();
+        for (DocumentSnapshot event : visibleEvents) {
             Long hours = event.getLong("hours");
             if (hours == null || event.getTimestamp("createdAt") == null) continue;
             addNotice(notices, "timer:" + event.getId(), hours, event.getString("changedBy"),
@@ -44,7 +45,7 @@ final class RetentionNoticeController implements DefaultLifecycleObserver {
             com.google.firebase.Timestamp at = current.getTimestamp("timerChangedAt");
             if (at == null) at = current.getTimestamp("timerFormatSince");
             List<TimerNoticeState.Change> history = new ArrayList<>();
-            for (DocumentSnapshot event : events) {
+            for (DocumentSnapshot event : visibleEvents) {
                 Long value = event.getLong("hours");
                 com.google.firebase.Timestamp time = event.getTimestamp("createdAt");
                 if (value != null && time != null) history.add(new TimerNoticeState.Change(value, event.getString("changedBy"), time.toDate().getTime()));
@@ -55,6 +56,19 @@ final class RetentionNoticeController implements DefaultLifecycleObserver {
             }
         }
         changed.accept(notices);
+    }
+    /** Keeps the latest prior setting after a conversation is cleared, plus later changes. */
+    private List<DocumentSnapshot> visibleEvents() {
+        List<DocumentSnapshot> result = new ArrayList<>();
+        com.google.firebase.Timestamp cutoff = current == null ? null : current.getTimestamp("clearedTimerBefore." + owner);
+        DocumentSnapshot latestBefore = null;
+        for (DocumentSnapshot event : events) {
+            com.google.firebase.Timestamp time = event.getTimestamp("createdAt");
+            if (time == null || cutoff == null || time.compareTo(cutoff) > 0) result.add(event);
+            else if (latestBefore == null) latestBefore = event;
+        }
+        if (latestBefore != null) result.add(latestBefore);
+        return result;
     }
     private void addNotice(List<MessageAdapter.Notice> notices, String key, long hours, String by, long time, boolean defaultTimer) {
         String duration = "";

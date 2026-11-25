@@ -39,11 +39,13 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
     private final java.util.function.Function<String, DocumentSnapshot> findMessage;
     private final java.util.function.Supplier<String> contactName;
     private final java.util.function.Consumer<String> openQuote;
+    private final java.util.function.Consumer<DocumentSnapshot> openPhoto;
     MessageAdapter(String uid, java.util.function.Consumer<DocumentSnapshot> actions,
             java.util.function.Function<String, DocumentSnapshot> findMessage,
-            java.util.function.Supplier<String> contactName, java.util.function.Consumer<String> openQuote) {
+            java.util.function.Supplier<String> contactName, java.util.function.Consumer<String> openQuote,
+            java.util.function.Consumer<DocumentSnapshot> openPhoto) {
         this.uid = uid; this.actions = actions; this.findMessage = findMessage;
-        this.contactName = contactName; this.openQuote = openQuote;
+        this.contactName = contactName; this.openQuote = openQuote; this.openPhoto = openPhoto;
     }
     void submit(List<DocumentSnapshot> docs) {
         submit(docs, includeNotices);
@@ -134,13 +136,37 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         }
         String content = deleted ? c.getString(R.string.message_deleted) : doc.getString("text");
         if (!deleted && "nudge".equals(doc.getString("kind"))) content = c.getString(mine ? R.string.nudge_sent : R.string.nudge_received);
+        boolean imageMessage = !deleted && "image".equals(doc.getString("kind"));
+        if (imageMessage) content = "";
         TextView message = Ui.text(c, "", 16, false); message.setTextColor(c.getColor(deleted ? R.color.text_secondary : R.color.text_primary));
         message.setTypeface(android.graphics.Typeface.DEFAULT, deleted ? android.graphics.Typeface.ITALIC : android.graphics.Typeface.NORMAL);
         String time = timestamp == null ? "" : android.text.format.DateFormat.getTimeFormat(c).format(timestamp.toDate());
         if (!deleted && doc.getTimestamp("editedAt") != null) time = c.getString(R.string.message_edited) + " · " + time;
-        android.text.SpannableString text = new android.text.SpannableString(content + "  \uFFFC");
+        android.text.SpannableString text = new android.text.SpannableString((content.isEmpty() ? "" : content + "  ") + "\uFFFC");
         int status = mine ? doc.getTimestamp("readAt") != null ? 3 : doc.getTimestamp("deliveredAt") != null ? 2 : 1 : 0;
-        if (!deleted && GifCatalog.index(content) >= 0) {
+        if (imageMessage) {
+            android.widget.ImageView photo = new android.widget.ImageView(c);
+            int size = Math.min(Ui.dp(c, 224), c.getResources().getDisplayMetrics().widthPixels - Ui.dp(c, 100));
+            photo.setLayoutParams(new LinearLayout.LayoutParams(size, Ui.dp(c, 224)));
+            photo.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP); photo.setClipToOutline(true);
+            photo.setBackground(Ui.shape(c, R.color.card, 14));
+            String mediaId = doc.getString("mediaId");
+            android.graphics.Bitmap bitmap = ChatMedia.preview(c, mediaId, 600);
+            if (bitmap != null) photo.setImageBitmap(bitmap);
+            else {
+                photo.setImageResource(R.drawable.ic_photo);
+                photo.setImageTintList(android.content.res.ColorStateList.valueOf(c.getColor(R.color.text_secondary)));
+                photo.setContentDescription(c.getString(R.string.photo_tap_to_download));
+            }
+            photo.setOnClickListener(view -> openPhoto.accept(doc));
+            photo.setOnLongClickListener(view -> { actions.accept(doc); return true; });
+            bubble.addView(photo);
+            String checks = status == 0 ? "" : status == 1 ? " ✓" : " ✓✓";
+            TextView footer = Ui.text(c, time + checks, 11, false);
+            footer.setGravity(Gravity.END); footer.setPadding(0, Ui.dp(c, 3), Ui.dp(c, 2), 0);
+            footer.setTextColor(c.getColor(status == 3 ? R.color.check_read : R.color.text_secondary));
+            bubble.addView(footer, new LinearLayout.LayoutParams(-1, -2));
+        } else if (!deleted && GifCatalog.index(content) >= 0) {
             LocalGifView gif = new LocalGifView(c, GifCatalog.index(content)); holder.gif = gif;
             int size = Math.min(Ui.dp(c, 176), c.getResources().getDisplayMetrics().widthPixels - Ui.dp(c, 96));
             bubble.addView(gif, new LinearLayout.LayoutParams(size, size));
@@ -156,7 +182,10 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
             text = new android.text.SpannableString("\uFFFC");
             message.setGravity(Gravity.END);
         }
-        text.setSpan(new MessageMetaSpan(c, time, status), text.length() - 1, text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); message.setText(text); bubble.addView(message);
+        if (!imageMessage) {
+            text.setSpan(new MessageMetaSpan(c, time, status), text.length() - 1, text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            message.setText(text); bubble.addView(message);
+        }
         message.setContentDescription(content + " " + time + (mine ? " " + c.getString(status == 3 ? R.string.message_read : status == 2 ? R.string.message_delivered : R.string.message_sent) : ""));
         if (mine || !deleted) {
             android.view.View.OnLongClickListener hold = view -> { actions.accept(doc); return true; };
@@ -199,6 +228,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
             return context.getString(R.string.reply_unavailable);
         }
         if ("nudge".equals(kind)) return context.getString(mine ? R.string.nudge_sent : R.string.nudge_received);
+        if ("image".equals(kind)) return context.getString(R.string.sent_photo);
         return text == null || text.isEmpty() ? context.getString(R.string.reply_unavailable) : GifCatalog.preview(context, text);
     }
     static LinearLayout quoteView(android.content.Context context, String author, String excerpt) {
@@ -283,4 +313,8 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         return false;
     }
     DocumentSnapshot at(int position) { return position >= 0 && position < items.size() ? items.get(position).message : null; }
+    int findPosition(String messageId) {
+        for (int index = 0; index < items.size(); index++) if (items.get(index).message != null && items.get(index).message.getId().equals(messageId)) return index;
+        return -1;
+    }
 }

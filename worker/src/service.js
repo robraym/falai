@@ -32,6 +32,15 @@ export async function quota(db, uid, action, amount, limit) {
     tx.set(path, {start: same ? previous.start : now, count});
   });
 }
+async function dailyQuota(db, uid, action, amount, limit) {
+  await db.transaction(async tx => {
+    const path = `quotas/${uid}_${action}`, previous = (await tx.get(path))?.data;
+    const now = Date.now(), same = previous && previous.start > now - 86400000;
+    const count = (same ? previous.count : 0) + amount;
+    if (count > limit) throw new ApiError(429, "resource-exhausted");
+    tx.set(path, {start: same ? previous.start : now, count});
+  });
+}
 export async function registerProfile(db, user, data) {
   const name = typeof data.name === "string" ? data.name.trim() : "";
   requireValue(name && name.length <= 60 && !/[\u0000-\u001f]/.test(name));
@@ -92,10 +101,12 @@ export async function persistMessage(db, uid, data) {
     if (!chat || !chat.data.members.includes(uid)) throw new ApiError(403, "permission-denied");
     if (existing) {
       if (existing.data.expired) throw new ApiError(404, "not-found");
-      if (existing.data.senderId !== uid || existing.data.text !== message.text
+      if (existing.data.senderId !== uid || existing.data.text !== message.text || existing.data.kind !== message.kind
           || (existing.data.reply?.messageId ?? null) !== replyToId) throw new ApiError(409, "already-exists");
       return false;
     }
+    const media = message.kind === "image" ? await tx.get(`chatMedia/${data.chatId}_${data.messageId}`) : null;
+    if (message.kind === "image" && (!media || media.data.senderId !== uid || media.data.expiresAt <= new Date())) throw new ApiError(404, "not-found");
     const recipientId = chat.data.members.find(member => member !== uid);
     const now = new Date();
     const settings = await tx.getAll(chat.data.members.map(member => `messageDefaults/${member}`));
@@ -117,13 +128,81 @@ export async function persistMessage(db, uid, data) {
     addUnread(chat.data, recipientId, expiresAt);
     tx.set(path, {...message, ...(reply ? {reply} : {}), senderId: uid, createdAt: now, expiresAt, expired: false, unreadTracked: true}, false);
     tx.set(`chats/${data.chatId}`, {...chat.data, lastText: message.text, updatedAt: now, lastMessageId: data.messageId,
-      lastSenderId: uid, lastKind: "message", lastExpiresAt: expiresAt, lastExpired: false, lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
+      lastSenderId: uid, lastKind: message.kind || "message", lastExpiresAt: expiresAt, lastExpired: false, lastDeliveredAt: null, lastReadAt: null, lastDeleted: false, previewHiddenFor: []}, true);
     tx.set(`notificationOutbox/${jobId}`, {chatId: data.chatId, messageId: data.messageId, recipientId,
       createdAt: now, expiresAt, nextAttemptAt: now, status: "pending", attempts: 0, sentDeviceIds: []}, false);
     if (expiresAt) tx.set(`messageExpiry/${jobId}`, {chatId: data.chatId, messageId: data.messageId, expiresAt}, false);
     return true;
   });
   return {messageId: data.messageId, jobId, created};
+}
+
+export async function uploadChatMedia(db, user, chatId, messageId, bytes) {
+  requireValue(validChat(chatId) && validMessageId(messageId) && bytes instanceof Uint8Array
+    && bytes.length >= 4 && bytes.length <= 512 * 1024);
+  requireValue(validBoundedJpeg(bytes));
+  const chat = await db.get(`chats/${chatId}`);
+  if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
+  const recipientId = chat.data.members.find(member => member !== user.uid);
+  const path = `chatMedia/${chatId}_${messageId}`, existing = await db.get(path);
+  const now = new Date();
+  if (existing) {
+    if (existing.data.senderId === user.uid && existing.data.chatId === chatId) return {ok: true};
+    throw new ApiError(409, "already-exists");
+  }
+  await dailyQuota(db, user.uid, "chatMedia", 1, 10);
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+  const photo = btoa(binary);
+  await db.commit([db.write(path, {chatId, messageId, senderId: user.uid, recipientId, data: photo,
+    bytes: bytes.length, createdAt: now, expiresAt: new Date(now.getTime() + 86400000)}, false),
+    db.write(`chatMediaExpiry/${chatId}_${messageId}`, {chatId, messageId, expiresAt: new Date(now.getTime() + 86400000)}, false)]);
+  return {ok: true};
+}
+function validBoundedJpeg(bytes) {
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[bytes.length - 2] !== 0xff || bytes[bytes.length - 1] !== 0xd9) return false;
+  const frames = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
+  let offset = 2;
+  while (offset + 3 < bytes.length) {
+    if (bytes[offset++] !== 0xff) return false;
+    while (offset < bytes.length && bytes[offset] === 0xff) offset++;
+    const marker = bytes[offset++];
+    if (marker === 0xd9 || marker === 0xda) break;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > bytes.length) return false;
+    const length = (bytes[offset] << 8) | bytes[offset + 1];
+    if (length < 2 || offset + length > bytes.length) return false;
+    if (frames.has(marker)) {
+      if (length < 7) return false;
+      const height = (bytes[offset + 3] << 8) | bytes[offset + 4];
+      const width = (bytes[offset + 5] << 8) | bytes[offset + 6];
+      return width > 0 && height > 0 && width <= 2400 && height <= 2400 && width * height <= 4000000;
+    }
+    offset += length;
+  }
+  return false;
+}
+export async function downloadChatMedia(db, user, data) {
+  requireValue(validChat(data.chatId) && validMessageId(data.messageId));
+  const [chat, media] = await db.getAll([`chats/${data.chatId}`, `chatMedia/${data.chatId}_${data.messageId}`]);
+  if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
+  if (!media || media.data.chatId !== data.chatId || media.data.messageId !== data.messageId
+      || media.data.recipientId !== user.uid || media.data.expiresAt <= new Date()) throw new ApiError(404, "not-found");
+  await quota(db, user.uid, "mediaDownloads", 1, 100);
+  const binary = atob(media.data.data), bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+export async function deleteChatMedia(db, user, data) {
+  requireValue(validChat(data.chatId) && validMessageId(data.messageId));
+  const path = `chatMedia/${data.chatId}_${data.messageId}`, expiry = `chatMediaExpiry/${data.chatId}_${data.messageId}`;
+  await db.transaction(async tx => {
+    const [chat, media] = await tx.getAll([`chats/${data.chatId}`, path]);
+    if (!chat || !chat.data.members.includes(user.uid)) throw new ApiError(403, "permission-denied");
+    if (media && media.data.recipientId !== user.uid) throw new ApiError(403, "permission-denied");
+    tx.delete(path); tx.delete(expiry);
+  });
+  return {ok: true};
 }
 export async function sendNudge(db, user, data) {
   requireValue(validChat(data.chatId) && validMessageId(data.messageId));

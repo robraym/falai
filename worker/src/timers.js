@@ -70,4 +70,6 @@ export async function expireMessages(db) {
     }
     tx.delete(`notificationOutbox/${job.data.chatId}_${job.data.messageId}`); tx.delete(job.path);
   });
+  const mediaJobs = await db.query("chatMediaExpiry", [["expiresAt", "LESS_THAN_OR_EQUAL", new Date()]], "expiresAt", 5);
+  for (const job of mediaJobs) await db.commit([db.remove(`chatMedia/${job.data.chatId}_${job.data.messageId}`), db.remove(job.path)]);
 }
