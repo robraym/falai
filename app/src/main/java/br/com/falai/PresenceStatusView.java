@@ -14,7 +14,7 @@ final class PresenceStatusView extends AppCompatTextView {
         setMinHeight(Ui.dp(context, 24));
         setPadding(Ui.dp(context, 7), Ui.dp(context, 3), Ui.dp(context, 7), Ui.dp(context, 3));
         setEllipsize(android.text.TextUtils.TruncateAt.END);
-        setTextColor(context.getColor(R.color.text_secondary)); setText(R.string.presence_unknown);
+        setTextColor(context.getColor(R.color.text_secondary)); setVisibility(GONE);
         refreshBadge();
         presence = new ChatPresence(context, "", this, false); presence.listen(uid);
     }

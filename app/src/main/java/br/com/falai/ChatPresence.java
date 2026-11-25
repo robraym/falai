@@ -52,23 +52,25 @@ final class ChatPresence {
         PresenceSnapshot cached = uid.isEmpty() || owner.isEmpty() ? null : CACHE.get(key);
         presence = cached == null ? UNKNOWN : cached;
         render();
-        if (!resumed || uid.isEmpty()) return;
+        if (!resumed || uid.isEmpty() || owner.isEmpty()) return;
         if (showTyping) typingListener = Backend.db().collection("chats").document(chatId).collection("typing").document(uid).addSnapshotListener(MetadataChanges.INCLUDE, (doc, error) -> {
             remoteTyping = error == null ? doc : null; render();
         });
         presenceListener = Backend.db().collection("presence").document(uid).collection("sessions").orderBy("updatedAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener(MetadataChanges.INCLUDE, (docs, error) -> {
-            if (error != null || docs == null || docs.getMetadata().isFromCache() || !owner.equals(Backend.uid())) return;
+            if (error != null || docs == null || !owner.equals(Backend.uid())) return;
+            boolean fromCache = docs.getMetadata().isFromCache();
+            if (fromCache && presence != UNKNOWN) return;
             long lastSeen = 0, lastActive = 0, now = System.currentTimeMillis();
             for (DocumentSnapshot session : docs) {
                 com.google.firebase.Timestamp timestamp = session.getTimestamp("updatedAt");
-                if (timestamp == null) continue;
+                if (timestamp == null || session.getMetadata().hasPendingWrites()) continue;
                 long time = timestamp.toDate().getTime();
                 lastSeen = Math.max(lastSeen, time);
-                if (!session.getMetadata().hasPendingWrites() && time <= now + 5000
-                        && Boolean.TRUE.equals(session.getBoolean("active"))) {
+                if (time <= now + 5000 && Boolean.TRUE.equals(session.getBoolean("active"))) {
                     lastActive = Math.max(lastActive, time);
                 }
             }
+            if (fromCache && lastSeen == 0) return;
             presence = new PresenceSnapshot(lastSeen, lastActive);
             CACHE.put(key, presence);
             render();
@@ -110,7 +112,7 @@ final class ChatPresence {
                 if (label instanceof PresenceStatusView) ((PresenceStatusView) label).refreshBadge();
             }
             if (online) { setLabel(R.string.online); return; }
-            if (last == 0) { setLabel(R.string.presence_unknown); return; }
+            if (last == 0) { setLabel(""); return; }
             long minutes = Math.max(0, (now - last) / 60000);
             if (minutes == 0) setLabel(R.string.offline_now);
             else if (minutes < 60) setLabel(context.getString(R.string.offline_minutes, minutes));
@@ -129,5 +131,9 @@ final class ChatPresence {
     private void setLabel(int resource) { setLabel(context.getText(resource)); }
     private void setLabel(CharSequence text) {
         if (!TextUtils.equals(label.getText(), text)) label.setText(text);
+        if (label instanceof PresenceStatusView) {
+            int visibility = TextUtils.isEmpty(text) ? TextView.GONE : TextView.VISIBLE;
+            if (label.getVisibility() != visibility) label.setVisibility(visibility);
+        }
     }
 }
