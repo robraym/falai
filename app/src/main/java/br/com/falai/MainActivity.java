@@ -546,7 +546,7 @@ public final class MainActivity extends FalaiActivity {
         });
     }
     private void showSettings() {
-        LinearLayout contents = Ui.section(this); scrollBody().addView(contents);
+        LinearLayout contents = Ui.column(this); scrollBody().addView(contents);
         LinearLayout profileRow = Ui.optionRow(this, R.drawable.ic_profile, getString(R.string.profile), profileName, false,
                 v -> startActivity(new Intent(this, ProfileActivity.class)));
         LinearLayout profileLabels = (LinearLayout) profileRow.getChildAt(1);

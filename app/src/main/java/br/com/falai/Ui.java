@@ -145,7 +145,7 @@ final class Ui {
         return contactRow(c, name, detail, dateTime, uid, status, showAbout, chatId, 0);
     }
     static LinearLayout contactRow(Context c, String name, String detail, String dateTime, String uid, int status, boolean showAbout, String chatId, int unread) {
-        LinearLayout row = row(c); row.setPadding(dp(c, 4), dp(c, 10), dp(c, 4), dp(c, 10)); row.setMinimumHeight(dp(c, 72));
+        LinearLayout row = row(c); row.setPadding(0, dp(c, 10), 0, dp(c, 10)); row.setMinimumHeight(dp(c, 72));
         row.setBackground(new RippleDrawable(ColorStateList.valueOf(Appearance.ripple(c)), new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
         AvatarView circle = new AvatarView(c); circle.load(uid, name);
         if (showAbout) {
@@ -202,7 +202,7 @@ final class Ui {
         return row;
     }
     static LinearLayout optionRow(Context c, int icon, String title, String summary, boolean section, View.OnClickListener action) {
-        LinearLayout row = row(c); row.setBaselineAligned(false); row.setMinimumHeight(dp(c, 72)); row.setPadding(dp(c, 4), dp(c, 10), dp(c, 4), dp(c, 10));
+        LinearLayout row = row(c); row.setBaselineAligned(false); row.setMinimumHeight(dp(c, 72)); row.setPadding(0, dp(c, 10), 0, dp(c, 10));
         ImageView image = new ImageView(c); image.setImageResource(icon); image.setImageTintList(ColorStateList.valueOf(Appearance.primary(c)));
         image.setPadding(dp(c, 8), dp(c, 8), dp(c, 8), dp(c, 8)); image.setBackground(shape(c, R.color.action_green_soft, 24));
         row.addView(image, new LinearLayout.LayoutParams(dp(c, 46), dp(c, 46)));
