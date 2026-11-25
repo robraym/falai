@@ -171,7 +171,9 @@ final class AppUpdateController implements DefaultLifecycleObserver {
                 return;
             }
             Uri uri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".updates", ApkDownload.installerFile(app, verifiedId));
-            Intent install = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, ApkDownload.MIME).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            // Android 8 can remove the caller's entire task during replacement, including installer activities.
+            Intent install = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, ApkDownload.MIME)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
             install.setClipData(android.content.ClipData.newRawUri("Falai", uri));
             activity.startActivity(install);
             dialog.dismiss();

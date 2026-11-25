@@ -269,6 +269,13 @@ Contato automático passou a usar o e-mail da agenda correspondente à conta Goo
 - Grade compartilhada por largura: duas colunas em celulares a partir de 304dp, três em telas largas e uma apenas em larguras muito pequenas. A escala de fonte não força mais uma única coluna; os nomes podem usar duas linhas.
 - Prévia de cores em uma linha, sem o rótulo duplicado, com menor padding. Paleta e toques padrão usam células de no mínimo 48dp, margens menores e alinhamento por linha. Sons personalizados mantêm largura inteira, exclusão confirmada e divisores.
 - Card de volume mais compacto, mantendo a área de toque de 48dp, importação, reprodução, seleção e gravação existentes. Revisão dos arquivos e diff sem erros de formatação; sem novo build ou execução em aparelho para este ajuste visual localizado.
+### Tela preta após atualizar no S7 Edge (25/11/2026)
+
+- Diagnóstico somente de leitura no SM-G935F, Android 8.0, usuário principal. APK 2.0 instalado com sucesso; buffer de crash sem falha do Falai. Registros de ActivityManager mostraram InstallStart/InstallInstalling na mesma tarefa 188 de MainActivity; durante installPackageLI, force-stop encerrou tanto o Falai quanto as atividades do instalador, e o sistema retomou GuardActivity do DroidSMS na tarefa 182.
+- A tela preta observada pertencia ao DroidSMS; naquele momento não havia processo do Falai. Usuário confirmou abertura normal do Falai pelo ícone, e a leitura posterior confirmou MainActivity em primeiro plano no usuário 0.
+- A abertura do instalador passa a usar FLAG_ACTIVITY_NEW_TASK, mantendo grant temporário de leitura e ClipData. Isso separa a tarefa do instalador da tarefa do pacote substituído. Não foram alteradas a proteção do DroidSMS, as verificações de APK, assinatura ou permissões.
+- Validação: compilação Java debug, 29 testes unitários e lintDebug passaram. Nenhuma geração, instalação ou abertura de APK foi feita pelo agente no aparelho; a abertura manual foi feita pelo usuário. O novo fluxo de atualização ainda precisa ser validado no S7 com uma próxima versão que contenha a correção.
+
 ### Painel integrado à conversa e carregamento de GIFs (25/11/2026)
 
 - O seletor de mensagens agora é um painel abaixo do campo de composição, sem janela modal. Campo, rascunho e botão Enviar permanecem visíveis; selecionar um emoji insere no cursor e mantém o painel aberto para novas escolhas. Ícone alterna entre emojis e teclado; tocar no campo ou voltar fecha o painel antes de sair da conversa. O seletor modal de reações mantém seleção única, e GIFs mantêm a prévia de confirmação.
