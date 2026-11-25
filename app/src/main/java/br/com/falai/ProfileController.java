@@ -54,7 +54,7 @@ final class ProfileController {
         ScrollView scroll = new ScrollView(activity); LinearLayout content = Ui.column(activity); content.setGravity(Gravity.CENTER_HORIZONTAL);
         content.setPadding(0, 0, 0, Ui.dp(activity, 12));
         scroll.addView(content); root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        LinearLayout identity = SettingsPage.panel(activity); identity.setGravity(Gravity.CENTER_HORIZONTAL); content.addView(identity);
+        LinearLayout identity = Ui.section(activity); identity.setGravity(Gravity.CENTER_HORIZONTAL); content.addView(identity);
         AvatarView avatar = new AvatarView(activity); avatar.load(owner, name); avatar.setContentDescription(activity.getString(R.string.profile_photo));
         avatar.setOnClickListener(v -> photoActions()); avatar.setFocusable(true); avatar.setEnabled(!busy); avatar.setAlpha(busy ? .6f : 1f);
         FrameLayout photo = new FrameLayout(activity);
@@ -91,7 +91,7 @@ final class ProfileController {
         aboutRow.addView(pencil, new LinearLayout.LayoutParams(Ui.dp(activity, 48), Ui.dp(activity, 48)));
         aboutRow.setOnClickListener(v -> editAbout()); aboutRow.setFocusable(true); aboutRow.setContentDescription(activity.getString(R.string.edit_about) + ": " + (about.isEmpty() ? activity.getString(R.string.about_empty) : about));
         aboutRow.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(activity)), null, new android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE)));
-        LinearLayout aboutCard = SettingsPage.panel(activity); aboutCard.addView(aboutRow, new LinearLayout.LayoutParams(-1, -2)); content.addView(aboutCard);
+        LinearLayout aboutCard = Ui.section(activity); aboutCard.addView(aboutRow, new LinearLayout.LayoutParams(-1, -2)); content.addView(aboutCard);
     }
     private void editAbout() {
         EditText field = Ui.input(activity, R.string.about_hint); field.setSingleLine(false); field.setMaxLines(3); field.setText(about);

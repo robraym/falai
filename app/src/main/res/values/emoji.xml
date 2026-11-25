@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string-array name="emoji_catalog_categories">
+        <item>Rostos e emoções</item><item>Pessoas e gestos</item><item>Animais e natureza</item>
+        <item>Comidas e bebidas</item><item>Viagens e lugares</item><item>Atividades</item>
+        <item>Objetos</item><item>Símbolos</item><item>Bandeiras</item>
+    </string-array>
     <!-- Selection based on Unicode emoji frequency; grouped for browsing, not a live ranking. -->
     <string-array name="emoji_categories">
         <item>Rostos e emoções</item>

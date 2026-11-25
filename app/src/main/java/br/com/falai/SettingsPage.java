@@ -52,14 +52,6 @@ class SettingsPage extends Dialog {
         activity.getLifecycle().removeObserver(lifecycle);
         super.dismiss();
     }
-    static LinearLayout panel(android.content.Context context) {
-        LinearLayout panel = Ui.column(context);
-        panel.setPadding(Ui.dp(context, 16), Ui.dp(context, 16), Ui.dp(context, 16), Ui.dp(context, 16));
-        panel.setBackground(Ui.shape(context, R.color.card, 20));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(Ui.dp(context, 8), Ui.dp(context, 6), Ui.dp(context, 8), Ui.dp(context, 10));
-        panel.setLayoutParams(params); return panel;
-    }
     static int optionColumns(android.content.Context context) {
         int available = context.getResources().getConfiguration().screenWidthDp - 64;
         return available >= 540 ? 3 : available >= 240 ? 2 : 1;

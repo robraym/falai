@@ -61,7 +61,7 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
         content.addView(add, addParams);
         ScrollView scroll = new ScrollView(activity); options = Ui.column(activity); options.setPadding(0, 0, 0, dp(6)); scroll.addView(options);
         content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1)); renderOptions();
-        LinearLayout volumeCard = SettingsPage.panel(activity);
+        LinearLayout volumeCard = Ui.section(activity);
         volumeCard.setPadding(dp(16), dp(10), dp(16), dp(10));
         volumeCard.addView(Ui.text(activity, activity.getString(R.string.sound_preview_volume), 13, true));
         LinearLayout bar = Ui.row(activity);
@@ -90,7 +90,7 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
     private void renderOptions() {
         options.removeAllViews(); List<MessageSounds.Custom> customs = MessageSounds.custom(activity);
         if (!customs.isEmpty()) {
-            LinearLayout card = SettingsPage.panel(activity); card.addView(section(R.string.sound_custom_section));
+            LinearLayout card = Ui.section(activity); card.addView(section(R.string.sound_custom_section));
             for (int i = 0; i < customs.size(); i++) { if (i > 0) divider(card); card.addView(option(customs.get(i).key, true)); }
             options.addView(card);
         }
@@ -98,7 +98,7 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
         group(R.string.sound_short_section, java.util.Arrays.copyOfRange(MessageSounds.KEYS, MessageSounds.ICQ_COUNT, MessageSounds.KEYS.length));
     }
     private void group(int title, String[] keys) {
-        LinearLayout card = SettingsPage.panel(activity); card.addView(section(title));
+        LinearLayout card = Ui.section(activity); card.addView(section(title));
         card.setPadding(dp(10), dp(8), dp(10), dp(8));
         int columns = SettingsPage.optionColumns(activity);
         GridLayout grid = new GridLayout(activity); grid.setColumnCount(columns); grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);

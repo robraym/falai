@@ -202,7 +202,8 @@
     <string name="typing">digitando…</string>
     <string name="emoji_recent">Recentes</string>
     <string name="emoji_animated">Animados</string>
-    <string name="emoji_animated_hint">Envie um destes emojis sozinho para ver a animação na conversa.</string>
+    <string name="emoji_tab_standard">Emojis</string>
+    <string name="emoji_load_error">Não foi possível carregar os emojis. Feche e tente novamente.</string>
     <string name="emoji_recent_empty">Seus emojis usados aparecerão aqui.</string>
     <string name="online">online</string>
     <string name="presence_unknown">Status não informado</string>

@@ -20,7 +20,7 @@ final class AppearanceColorPicker {
         int initial = Appearance.selected(activity);
         SettingsPage dialog = new SettingsPage(activity, R.string.app_color);
         LinearLayout content = dialog.body;
-        LinearLayout preview = SettingsPage.panel(activity); content.addView(preview);
+        LinearLayout preview = Ui.section(activity); content.addView(preview);
         preview.setPadding(Ui.dp(activity, 12), Ui.dp(activity, 10), Ui.dp(activity, 12), Ui.dp(activity, 10));
         LinearLayout previewRow = Ui.row(activity); preview.addView(previewRow);
         TextView title = Ui.text(activity, activity.getString(R.string.app_name), 18, true); title.setSingleLine(true); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -30,7 +30,7 @@ final class AppearanceColorPicker {
         LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-2, -2); actionParams.leftMargin = Ui.dp(activity, 8); previewRow.addView(action, actionParams);
         int columns = SettingsPage.optionColumns(activity);
         GridLayout grid = new GridLayout(activity); grid.setColumnCount(columns); grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
-        LinearLayout palette = SettingsPage.panel(activity);
+        LinearLayout palette = Ui.section(activity);
         palette.setPadding(Ui.dp(activity, 10), Ui.dp(activity, 12), Ui.dp(activity, 10), Ui.dp(activity, 10));
         palette.addView(Ui.text(activity, activity.getString(R.string.settings_choose_color), 13, true)); Ui.gap(palette, 6); palette.addView(grid);
         LinearLayout list = Ui.column(activity); list.addView(palette);

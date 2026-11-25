@@ -32,7 +32,7 @@ final class MessageTimerDialog {
         android.widget.ScrollView scroll = new android.widget.ScrollView(activity);
         android.widget.LinearLayout content = Ui.column(activity);
         content.setPadding(0, 0, 0, Ui.dp(activity, 12));
-        android.widget.LinearLayout selection = SettingsPage.panel(activity); content.addView(selection);
+        android.widget.LinearLayout selection = Ui.section(activity); content.addView(selection);
         selection.addView(Ui.text(activity, activity.getString(R.string.settings_choose_duration), 13, true)); Ui.gap(selection, 8);
         android.widget.RadioGroup options = new android.widget.RadioGroup(activity);
         for (int i = 0; i < HistoryRetention.HOURS.length; i++) {
@@ -45,7 +45,7 @@ final class MessageTimerDialog {
                     new int[]{Appearance.primary(activity), activity.getColor(R.color.text_secondary)}));
             option.setMinHeight(Ui.dp(activity, 56));
             option.setPadding(Ui.dp(activity, 12), Ui.dp(activity, 8), Ui.dp(activity, 12), Ui.dp(activity, 8));
-            option.setBackground(Ui.shape(activity, HistoryRetention.HOURS[i] == hours ? R.color.action_green_soft : R.color.card, 12));
+            option.setBackground(HistoryRetention.HOURS[i] == hours ? Ui.shape(activity, R.color.action_green_soft, 12) : null);
             options.addView(option); option.setChecked(HistoryRetention.HOURS[i] == hours);
             option.setOnClickListener(view -> {
                 page.dismiss();
@@ -60,7 +60,7 @@ final class MessageTimerDialog {
             });
         }
         selection.addView(options);
-        android.widget.LinearLayout info = SettingsPage.panel(activity); content.addView(info, 0);
+        android.widget.LinearLayout info = Ui.section(activity); content.addView(info, 0);
         info.addView(Ui.text(activity, activity.getString(R.string.settings_how_it_works), 14, true)); Ui.gap(info, 8);
         info.addView(Ui.text(activity, activity.getString(R.string.retention_info), 13, false));
         scroll.addView(content);

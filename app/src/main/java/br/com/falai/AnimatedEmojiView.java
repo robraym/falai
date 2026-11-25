@@ -73,7 +73,16 @@ final class AnimatedEmojiView extends View {
             case 9: scale = 1 + fast * .08f; rotation = fast * 8; break;
             case 10: scale = 1 + Math.max(0, fast) * .14f; break;
             case 11: rotation = wave * 12; scale = 1 + wave * .05f; break;
-            default: lift = -Math.abs(wave) * side * .06f;
+            default:
+                // Reuse light local movements across the full Unicode catalogue.
+                switch (Math.max(0, kind) % 6) {
+                    case 1: rotation = wave * 9; break;
+                    case 2: scale = 1 + wave * .07f; break;
+                    case 3: rotation = wave * 6; lift = -Math.abs(wave) * side * .04f; break;
+                    case 4: rotation = fast * 5; break;
+                    case 5: scale = 1 + Math.max(0, fast) * .08f; break;
+                    default: lift = -Math.abs(wave) * side * .06f;
+                }
         }
         paint.setTextSize(side * .62f); paint.setAlpha(255);
         canvas.save(); canvas.translate(getWidth() / 2f, getHeight() / 2f + lift);

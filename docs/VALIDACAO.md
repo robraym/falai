@@ -269,3 +269,16 @@ Contato automático passou a usar o e-mail da agenda correspondente à conta Goo
 - Grade compartilhada por largura: duas colunas em celulares a partir de 304dp, três em telas largas e uma apenas em larguras muito pequenas. A escala de fonte não força mais uma única coluna; os nomes podem usar duas linhas.
 - Prévia de cores em uma linha, sem o rótulo duplicado, com menor padding. Paleta e toques padrão usam células de no mínimo 48dp, margens menores e alinhamento por linha. Sons personalizados mantêm largura inteira, exclusão confirmada e divisores.
 - Card de volume mais compacto, mantendo a área de toque de 48dp, importação, reprodução, seleção e gravação existentes. Revisão dos arquivos e diff sem erros de formatação; sem novo build ou execução em aparelho para este ajuste visual localizado.
+### Remoção dos cards de agrupamento (24/11/2026)
+
+- Configurações, perfil, recado, paleta, sons, prazo, tamanho do texto, entrada, cadastro e avisos apresentam conteúdo diretamente sobre o fundo, usando seções transparentes compartilhadas. Removidos fundo arredondado e margens laterais dos antigos cards; padding interno reduzido para 8dp.
+- Opções de prazo não selecionadas também ficaram transparentes. Retirado o fundo do bloco de versão no perfil de contatos. Divisores, botões, campos de entrada, destaques de seleção e balões de conversa preservam suas funções visuais.
+- Validação desta alteração: revisão dos arquivos e de todas as referências aos componentes substituídos, além de git diff --check. Antes da publicação, compilação Java debug, 18 testes unitários e lintDebug passaram. Sem gerar APK, execução ou captura em Android.
+
+### Catálogo e abas de emojis (24/11/2026)
+
+- Seletor de mensagens com abas Emojis e Animados, recentes em duas linhas com rolagem horizontal e atalhos para nove categorias. A aba escolhida e até 24 recentes são persistidos por conta.
+- Catálogo Unicode 18.0 integrado ao app, incluindo tons de pele, bandeiras e sequências compostas. O seletor filtra glifos indisponíveis no Android do aparelho; não baixa fontes nem mídia. Fonte: https://www.unicode.org/Public/emoji/latest/emoji-test.txt; licença em app/src/main/assets/licenses/UNICODE.txt.
+- Todos os emojis do catálogo podem receber movimentos locais quando enviados sozinhos. Preservados os efeitos específicos dos 12 anteriores; os demais compartilham movimentos leves de balanço, pulso e salto. São animações dos glifos, sem GIFs ou expressões faciais desenhadas quadro a quadro.
+- Grade reciclável limita as prévias à região visível. Reações continuam como texto Unicode, sem prévia animada. Mensagens com vários emojis ou texto misturado mantêm apresentação normal.
+- Validação: 18 testes unitários passaram e lintDebug concluiu sem erros. Nenhum APK gerado, instalação ou execução em Android; aparência, disponibilidade dos glifos e fluidez ainda precisam de conferência em aparelho.

@@ -33,8 +33,7 @@ final class ContactProfileDialog {
         phrase.setTextColor(context.getColor(R.color.text_secondary)); phrase.setGravity(Gravity.CENTER);
         phrase.bind(uid, ""); content.addView(phrase, new LinearLayout.LayoutParams(-1, -2));
         AppVersionView version = new AppVersionView(context, uid); version.setGravity(Gravity.CENTER); version.setTextSize(12);
-        version.setPadding(Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12));
-        version.setBackground(Ui.shape(context, R.color.input_background, 14));
+        version.setPadding(0, Ui.dp(context, 8), 0, Ui.dp(context, 8));
         LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(-1, -2);
         versionParams.topMargin = Ui.dp(context, 22); content.addView(version, versionParams);
         ScrollView scroll = new ScrollView(context); scroll.setVerticalScrollBarEnabled(false); scroll.addView(content);

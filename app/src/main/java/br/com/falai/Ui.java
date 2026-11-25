@@ -101,11 +101,11 @@ final class Ui {
         });
         return header;
     }
-    static LinearLayout card(Context c) {
-        LinearLayout v = column(c); v.setPadding(dp(c, 16), dp(c, 18), dp(c, 16), dp(c, 18)); v.setBackground(shape(c, R.color.card, 20));
+    /** Flat content group with shared page alignment and compact section spacing. */
+    static LinearLayout section(Context c) {
+        LinearLayout v = column(c); v.setPadding(dp(c, 8), dp(c, 8), dp(c, 8), dp(c, 8));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        int side = c.getResources().getDimensionPixelSize(R.dimen.screen_card_inset);
-        lp.setMargins(side, c.getResources().getDimensionPixelSize(R.dimen.screen_header_content_gap), side, c.getResources().getDimensionPixelSize(R.dimen.screen_card_gap));
+        lp.setMargins(0, dp(c, 4), 0, dp(c, 8));
         v.setLayoutParams(lp); return v;
     }
     static void gap(LinearLayout parent, int height) { parent.addView(new View(parent.getContext()), new LinearLayout.LayoutParams(1, dp(parent.getContext(), height))); }

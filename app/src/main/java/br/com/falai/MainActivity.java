@@ -140,14 +140,14 @@ public final class MainActivity extends FalaiActivity {
         LinearLayout contents = Ui.column(this); scroll.addView(contents); body.addView(scroll, new LinearLayout.LayoutParams(-1, -1)); return contents;
     }
     private LinearLayout info(int title, int summary) {
-        LinearLayout card = Ui.card(this); card.addView(Ui.text(this, getString(title), 19, true)); Ui.gap(card, 8);
+        LinearLayout card = Ui.section(this); card.addView(Ui.text(this, getString(title), 19, true)); Ui.gap(card, 8);
         card.addView(Ui.text(this, getString(summary), 14, false)); body.addView(card); return card;
     }
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
     private void showLogin() {
         stopDefaultTimer();
         home = false; profileLoaded = false; page(getString(R.string.app_name));
-        LinearLayout card = Ui.card(this); scrollBody().addView(card);
+        LinearLayout card = Ui.section(this); scrollBody().addView(card);
         card.addView(Ui.text(this, getString(R.string.welcome), 21, true)); Ui.gap(card, 8);
         card.addView(Ui.text(this, getString(R.string.login_intro), 14, false));
         card.addView(Ui.button(this, R.string.sign_in_google, v -> {
@@ -244,7 +244,7 @@ public final class MainActivity extends FalaiActivity {
         conversationsSplash = null;
     }
     private void showProfileForm() {
-        page(getString(R.string.profile_title)); LinearLayout card = Ui.card(this); scrollBody().addView(card);
+        page(getString(R.string.profile_title)); LinearLayout card = Ui.section(this); scrollBody().addView(card);
         card.addView(Ui.text(this, getString(R.string.profile_intro), 15, false)); EditText name = Ui.input(this, R.string.name_hint); name.setText(Backend.auth().getCurrentUser().getDisplayName()); card.addView(name);
         card.addView(Ui.button(this, R.string.continue_label, v -> saveName(name, () -> loadProfile(), card)));
     }
@@ -546,7 +546,7 @@ public final class MainActivity extends FalaiActivity {
         });
     }
     private void showSettings() {
-        LinearLayout contents = SettingsPage.panel(this); scrollBody().addView(contents);
+        LinearLayout contents = Ui.section(this); scrollBody().addView(contents);
         LinearLayout profileRow = Ui.optionRow(this, R.drawable.ic_profile, getString(R.string.profile), profileName, false,
                 v -> startActivity(new Intent(this, ProfileActivity.class)));
         LinearLayout profileLabels = (LinearLayout) profileRow.getChildAt(1);
@@ -651,7 +651,7 @@ public final class MainActivity extends FalaiActivity {
         SettingsPage page = new SettingsPage(this, R.string.text_size);
         int initialPercent = Appearance.percent(this);
         LinearLayout content = Ui.column(this);
-        LinearLayout controls = SettingsPage.panel(this); content.addView(controls);
+        LinearLayout controls = Ui.section(this); content.addView(controls);
         LinearLayout summary = Ui.row(this);
         summary.addView(Ui.text(this, getString(R.string.settings_text_scale), 14, true), new LinearLayout.LayoutParams(0, -2, 1));
         TextView value = Ui.text(this, getString(R.string.text_size_value, Appearance.percent(this)), 22, true);
@@ -663,7 +663,7 @@ public final class MainActivity extends FalaiActivity {
         LinearLayout limits = Ui.row(this);
         limits.addView(Ui.text(this, getString(R.string.text_size_value, 70), 12, false), new LinearLayout.LayoutParams(0, -2, 1));
         limits.addView(Ui.text(this, getString(R.string.text_size_value, 150), 12, false)); controls.addView(limits);
-        LinearLayout sample = SettingsPage.panel(this); content.addView(sample);
+        LinearLayout sample = Ui.section(this); content.addView(sample);
         sample.addView(Ui.text(this, getString(R.string.settings_preview), 13, true)); Ui.gap(sample, 16);
         TextView preview = Ui.text(this, getString(R.string.text_size_preview), 16, false);
         preview.setTextColor(getColor(R.color.text_primary));
