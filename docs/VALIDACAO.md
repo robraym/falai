@@ -269,6 +269,24 @@ Contato automático passou a usar o e-mail da agenda correspondente à conta Goo
 - Grade compartilhada por largura: duas colunas em celulares a partir de 304dp, três em telas largas e uma apenas em larguras muito pequenas. A escala de fonte não força mais uma única coluna; os nomes podem usar duas linhas.
 - Prévia de cores em uma linha, sem o rótulo duplicado, com menor padding. Paleta e toques padrão usam células de no mínimo 48dp, margens menores e alinhamento por linha. Sons personalizados mantêm largura inteira, exclusão confirmada e divisores.
 - Card de volume mais compacto, mantendo a área de toque de 48dp, importação, reprodução, seleção e gravação existentes. Revisão dos arquivos e diff sem erros de formatação; sem novo build ou execução em aparelho para este ajuste visual localizado.
+### Aviso automático de nova versão (24/11/2026)
+
+- GitHub Releases envia eventos ao endpoint /hooks/github/releases. O Worker verifica HMAC-SHA256 sobre o corpo original com segredo privado, limita o tamanho e aceita somente publicação estável do repositório robraym/falai com APK, tag, tamanho e SHA-256 válidos. Eventos repetidos ou versões anteriores não geram novo aviso.
+- Metadados públicos ficam em appUpdates/latest; uma fila com lease e tentativa posterior envia aviso FCM ao tópico falai-updates-v1. A tarefa agendada existente recupera falhas. Conclusão de um envio antigo não sobrescreve uma publicação mais nova.
+- Clientes novos inscrevem o token no tópico ao registrar o aparelho. A notificação tem canal próprio, ignora versões já instaladas, evita avisar duas vezes pela mesma versão e abre a tela de atualização. O download começa somente ao tocar em Baixar atualização e preserva a verificação de integridade, pacote, versão e certificado existente. URLs nunca são aceitas do payload: o app as monta para o repositório fixo.
+- Ao abrir o app, uma consulta autenticada ao Worker recupera publicações anteriores à instalação ou avisos perdidos, com intervalo local de 15 minutos. Não consulta a API do GitHub. A opção manual permanece quando não há oferta conhecida.
+- scripts/configure-release-webhook.ps1 configura o segredo no Worker e o webhook no GitHub sem gravar credenciais no projeto. Sem parâmetros só verifica acesso; -Configure cria/atualiza a configuração; -Verify consulta as entregas recentes.
+- Configuração externa concluída: Worker publicado, segredo configurado e webhook de release ativo. O ping mais recente recebeu HTTP 200; o primeiro ping recebeu 503 durante a configuração. Endpoint sem assinatura respondeu 401; health confirmou banco e validação FCM. Nenhum aviso real de atualização foi disparado para teste.
+- Validação: 26 testes unitários Android, 30 testes Node, compilação Java debug, lintDebug e empacotamento dry-run do Worker passaram. Testes cobrem HMAC, metadados inválidos, deduplicação, fila, falha de envio e publicação concorrente. Não houve geração de APK, instalação ou execução em Android. Entrega e navegação reais precisam de conferência após instalar a primeira versão compatível; Android pode atrasar notificações e exige permissão para exibi-las.
+
+### Proteção da consulta de atualizações (24/11/2026)
+
+- Cada aparelho reserva cinco minutos entre tentativas de consulta, incluindo falhas de conexão. O prazo é salvo no armazenamento privado antes da conexão e permanece após reabrir o app; consultas simultâneas compartilham a mesma tarefa.
+- Respostas 403/429 e cota esgotada respeitam x-ratelimit-reset e Retry-After em segundos, com compensação pelo cabeçalho Date. Cota zerada sem horário válido usa uma hora de espera. A tela mostra o horário para tentar novamente, distinguindo intervalo local de limitação do serviço.
+- A consulta continua sem credenciais embutidas. A proteção é por aparelho, não uma coordenação global entre todos os clientes de um IP. Alterar a rede não apaga o intervalo local.
+- Referência de cabeçalhos e espera: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api.
+- Validação: compilação Java debug, 23 testes unitários e lintDebug passaram. Os cinco casos novos cobrem intervalo, relógio do servidor, combinação dos prazos, cabeçalhos inválidos e última resposta bem-sucedida com cota zerada. Sem gerar APK ou executar em Android; nenhuma consulta real adicional à API foi usada nos testes.
+
 ### Remoção dos cards de agrupamento (24/11/2026)
 
 - Configurações, perfil, recado, paleta, sons, prazo, tamanho do texto, entrada, cadastro e avisos apresentam conteúdo diretamente sobre o fundo, usando seções transparentes compartilhadas. Removidos fundo arredondado e margens laterais dos antigos cards; padding interno reduzido para 8dp.

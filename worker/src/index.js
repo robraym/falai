@@ -6,6 +6,7 @@ import {dispatchJob, drainOutbox, sendPush} from "./push.js";
 import {changeMessage, deleteConversation, clearConversation, setMessageReaction} from "./mutations.js";
 import {setDefaultTimer, setChatTimer, expireMessages} from "./timers.js";
 import {archiveConversation} from "./archives.js";
+import {receiveRelease, getAppUpdate, drainRelease} from "./releases.js";
 
 const VERSION = "falai-worker-1";
 let lastHealth;
@@ -38,10 +39,16 @@ export default {
     try {
       const url = new URL(request.url);
       const db = new Firestore(env);
+      if (request.method === "POST" && url.pathname === "/hooks/github/releases") {
+        const result = await receiveRelease(request, env, db);
+        if (result.accepted && request.headers.get("x-github-event") === "release")
+          context.waitUntil(drainRelease(db, env).catch(() => console.warn("release_push_pending")));
+        return response(result);
+      }
       if (request.method === "GET" && url.pathname === "/health") return response(await health(env, db));
       if (request.method !== "POST" || !url.pathname.startsWith("/v1/")) return response({error: "not-found"}, 404);
       const action = url.pathname.slice(4);
-      const handlers = {registerProfile, discoverContacts, openChat, registerDevice, unregisterDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge,
+      const handlers = {registerProfile, discoverContacts, openChat, registerDevice, unregisterDevice, acknowledgeMessages, updateProfilePhoto, updateProfileAbout, sendNudge, getAppUpdate,
         editMessage: (db, user, data) => changeMessage(db, user, data, true), deleteMessage: changeMessage,
         deleteConversation, clearConversation, archiveConversation, setMessageReaction, setDefaultTimer, setChatTimer};
       if (!(Object.hasOwn(handlers, action) || action === "sendMessage")) return response({error: "not-found"}, 404);
@@ -68,6 +75,7 @@ export default {
       const db = new Firestore(env);
       await drainOutbox(db, env).catch(() => console.warn("outbox_retry_failed"));
       await expireMessages(db).catch(() => console.warn("message_expiry_failed"));
+      await drainRelease(db, env).catch(() => console.warn("release_push_pending"));
     })());
   }
 };

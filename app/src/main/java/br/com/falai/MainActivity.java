@@ -230,6 +230,7 @@ public final class MainActivity extends FalaiActivity {
             }, CONVERSATIONS_SPLASH_TIMEOUT_MS);
         }
         openNotificationIntent(getIntent());
+        UpdateNotice.refresh(this);
         if (Build.VERSION.SDK_INT >= 33 && !getPreferences(MODE_PRIVATE).getBoolean("notification_prompted", false)) {
             getPreferences(MODE_PRIVATE).edit().putBoolean("notification_prompted", true).apply();
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);
@@ -569,15 +570,22 @@ public final class MainActivity extends FalaiActivity {
         general.addView(Ui.optionRow(this, R.drawable.ic_settings, getString(R.string.app_update),
                 installedApkSummary(),
                 true, view -> showAppUpdate()));
-        SettingsPage.separateRows(general); SettingsPage.separateRows(contents);
     }
     private void showAppUpdate() {
         if (appUpdates.openExisting()) return;
         AppUpdateDialog about = new AppUpdateDialog(this);
         about.setInstalledDetails(installedApkDetails());
-        about.setMessage("");
+        AppUpdate announced = UpdateNotice.available(this);
+        about.setMessage(announced == null ? "" : getString(R.string.apk_update_notification_title));
         about.getButton(AlertDialog.BUTTON_NEGATIVE).setVisibility(View.GONE);
-        about.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> checkAppUpdate(about));
+        if (announced != null) {
+            about.setAvailableDetails(availableApkDetails(announced));
+            about.getButton(AlertDialog.BUTTON_POSITIVE).setText(R.string.apk_update_download);
+        }
+        about.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            if (announced == null) checkAppUpdate(about);
+            else { appUpdates.download(announced); about.dismiss(); }
+        });
         about.show();
     }
     private void checkAppUpdate(AppUpdateDialog about) {
@@ -585,12 +593,17 @@ public final class MainActivity extends FalaiActivity {
         check.setEnabled(false);
         about.setMessage(getString(R.string.checking_apk_update));
         about.setProgressState(true, 0, "");
-        AppUpdate.check().addOnCompleteListener(task -> {
+        AppUpdate.check(this).addOnCompleteListener(task -> {
             if (isFinishing() || isDestroyed() || !about.isShowing()) return;
             check.setEnabled(true);
             about.hideProgress();
             if (!task.isSuccessful()) {
-                about.setMessage(getString(R.string.apk_update_check_failed));
+                Exception failure = task.getException();
+                if (failure instanceof AppUpdate.CheckWait) {
+                    AppUpdate.CheckWait wait = (AppUpdate.CheckWait) failure;
+                    String time = android.text.format.DateFormat.getTimeFormat(this).format(new java.util.Date(wait.until));
+                    about.setMessage(getString(wait.serverLimit ? R.string.apk_update_rate_limited : R.string.apk_update_check_wait, time));
+                } else about.setMessage(getString(R.string.apk_update_check_failed));
                 return;
             }
             AppUpdate update = task.getResult();
@@ -687,6 +700,9 @@ public final class MainActivity extends FalaiActivity {
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); if (profileLoaded) openNotificationIntent(intent); }
     private void openNotificationIntent(Intent intent) {
+        if (intent.getBooleanExtra("appUpdate", false)) {
+            intent.removeExtra("appUpdate"); showHome(2); showAppUpdate(); return;
+        }
         String id = intent.getStringExtra("chatId"), recipient = intent.getStringExtra("recipientId"); intent.removeExtra("chatId"); intent.removeExtra("recipientId");
         if (id != null && id.matches("[a-f0-9]{64}") && Backend.uid().equals(recipient)) ChatActivity.open(this, id, getString(R.string.app_name));
     }

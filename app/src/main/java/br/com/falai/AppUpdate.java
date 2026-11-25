@@ -15,6 +15,14 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 final class AppUpdate {
+    private static Task<AppUpdate> pendingCheck;
+    static final class CheckWait extends IOException {
+        final long until;
+        final boolean serverLimit;
+        CheckWait(long until, boolean serverLimit) {
+            super("Update check available at " + until); this.until = until; this.serverLimit = serverLimit;
+        }
+    }
     private static final String REPOSITORY = "robraym/falai";
     private static final String APK_NAME = "Falai.apk";
     private static final Pattern VERSION_TAG = Pattern.compile("v([0-9]+(?:\\.[0-9]+){1,3})-apk\\.([1-9][0-9]{0,9})");
@@ -43,9 +51,23 @@ final class AppUpdate {
         if (installed == 0) return versionCode > BuildConfig.VERSION_CODE;
         return offered > installed;
     }
+    static AppUpdate fromMetadata(UpdateMetadata value) {
+        if (value == null) return null;
+        Uri url = Uri.parse("https://github.com/" + REPOSITORY + "/releases/download/")
+                .buildUpon().appendPath(value.tag).appendPath(value.asset).build();
+        return new AppUpdate(value.versionName, value.versionCode, url, value.size, ApkUpdatePolicy.normalizeDigest(value.digest));
+    }
 
-    static Task<AppUpdate> check() {
-        return Tasks.call(ContactsRepository.IO, () -> {
+    static synchronized Task<AppUpdate> check(android.content.Context context) {
+        if (pendingCheck != null && !pendingCheck.isComplete()) return pendingCheck;
+        android.content.Context app = context.getApplicationContext();
+        pendingCheck = Tasks.call(ContactsRepository.IO, () -> {
+            android.content.SharedPreferences gate = app.getSharedPreferences("update_checks", android.content.Context.MODE_PRIVATE);
+            long now = System.currentTimeMillis(), next = gate.getLong("next_allowed", 0);
+            if (now < next) throw new CheckWait(next, gate.getBoolean("server_limit", false));
+            // Reserve the interval before any network IO, including failed requests.
+            if (!gate.edit().putLong("next_allowed", now + UpdateCheckPolicy.INTERVAL_MS).putBoolean("server_limit", false).commit())
+                throw new IOException("Unable to persist update check interval");
             URL endpoint = new URL("https://api.github.com/repos/" + REPOSITORY + "/releases/latest");
             HttpURLConnection connection = (HttpURLConnection) endpoint.openConnection();
             try {
@@ -55,6 +77,15 @@ final class AppUpdate {
                 connection.setRequestProperty("Accept", "application/vnd.github+json");
                 connection.setRequestProperty("User-Agent", "Falai/" + BuildConfig.VERSION_NAME);
                 int status = connection.getResponseCode();
+                long received = System.currentTimeMillis();
+                String remaining = connection.getHeaderField("x-ratelimit-remaining");
+                boolean limited = UpdateCheckPolicy.limited(status, remaining);
+                long allowed = UpdateCheckPolicy.nextAllowed(received, status, remaining,
+                        connection.getHeaderField("x-ratelimit-reset"), connection.getHeaderField("retry-after"),
+                        connection.getHeaderFieldDate("Date", 0));
+                if (!gate.edit().putLong("next_allowed", allowed).putBoolean("server_limit", limited).commit())
+                    throw new IOException("Unable to persist update check backoff");
+                if (status == 403 || status == 429) throw new CheckWait(allowed, true);
                 if (status == HttpURLConnection.HTTP_NOT_FOUND) return null;
                 if (status != HttpURLConnection.HTTP_OK) throw new IOException("GitHub release status " + status);
                 try (InputStream input = connection.getInputStream()) {
@@ -70,6 +101,7 @@ final class AppUpdate {
                 connection.disconnect();
             }
         });
+        return pendingCheck;
     }
 
     private static AppUpdate readRelease(JSONObject release) {

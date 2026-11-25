@@ -223,8 +223,13 @@
     <string name="apk_build_date">Gerado em %1$s</string>
     <string name="apk_version_with_build_date">%1$s (gerada em %2$s)</string>
     <string name="check_apk_update">Verificar atualização</string>
+    <string name="apk_update_notification_title">Nova versão disponível</string>
+    <string name="apk_update_notification_body">Falai %1$s disponível. Toque para atualizar.</string>
+    <string name="apk_update_download">Baixar atualização</string>
     <string name="checking_apk_update">Verificando atualizações…</string>
     <string name="apk_update_check_failed">Não foi possível verificar a atualização. Tente novamente.</string>
+    <string name="apk_update_check_wait">Uma verificação foi feita há pouco. Você pode verificar novamente às %1$s.</string>
+    <string name="apk_update_rate_limited">O serviço de atualizações está temporariamente limitado. Você pode tentar novamente às %1$s.</string>
     <string name="apk_update_unpublished">Nenhum APK foi disponibilizado para download.</string>
     <string name="apk_up_to_date">Seu aplicativo está atualizado.</string>
     <string name="app_version_title">%1$s %2$s</string>

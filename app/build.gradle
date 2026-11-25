@@ -41,7 +41,7 @@ android {
         targetSdk 36
         versionCode(apkVersionCode.intValue())
         // Public versions use major.minor only (for example, 1.2 or 1.3).
-        versionName '1.5'
+        versionName '2.0'
         buildConfigField 'long', 'APK_BUILD_EPOCH_SECONDS', "${apkBuildEpochSeconds}L"
         buildConfigField 'int', 'APK_FIRST_DATED_CODE', "${apkFirstDatedCode}"
         buildConfigField 'String', 'WORKER_URL', '"https://falai-notificacoes.robraym-studio.workers.dev"'

@@ -54,6 +54,7 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
     }
     @Override public void onMessageReceived(@NonNull RemoteMessage message) {
         if (!Backend.ready() || Backend.uid().isEmpty()) return;
+        if ("app-update".equals(message.getData().get("event"))) { UpdateNotice.accept(this, message.getData()); return; }
         String chatId = message.getData().get("chatId"), recipient = message.getData().get("recipientId");
         String messageId = message.getData().get("messageId");
         if (chatId == null || !chatId.matches("[a-f0-9]{64}") || !Backend.uid().equals(recipient)) return;

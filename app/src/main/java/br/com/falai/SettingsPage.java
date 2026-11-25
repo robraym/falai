@@ -56,13 +56,6 @@ class SettingsPage extends Dialog {
         int available = context.getResources().getConfiguration().screenWidthDp - 64;
         return available >= 540 ? 3 : available >= 240 ? 2 : 1;
     }
-    static void separateRows(LinearLayout parent) {
-        for (int i = parent.getChildCount() - 1; i > 0; i--) {
-            android.view.View line = new android.view.View(parent.getContext());
-            line.setBackgroundColor(parent.getContext().getColor(R.color.divider));
-            parent.addView(line, i, new LinearLayout.LayoutParams(-1, Ui.dp(parent.getContext(), 1)));
-        }
-    }
     static void recreateAfterExit(FalaiActivity activity) {
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             if (!activity.isFinishing() && !activity.isDestroyed()) activity.recreate();
