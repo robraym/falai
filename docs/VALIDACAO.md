@@ -263,3 +263,9 @@ Contato automático passou a usar o e-mail da agenda correspondente à conta Goo
 - Ajuste posterior no tamanho dos textos: removidos Salvar/Cancelar. O valor escolhido é persistido automaticamente ao alterar o controle, a prévia usa a escala inicial da tela e a interface é recriada após sair pela seta/voltar, respeitando a transição. Revisão localizada de código e diff, sem novo build ou execução em aparelho.
 
 - Correções finais pelas capturas: a explicação de mensagens temporárias voltou para cima das opções. Na Atualização, restaurados o logo maior centralizado, brilho ao fundo e botão em formato de cápsula, sem card/título Versão instalada. Mantidos cabeçalho completo, transições e texto branco do botão principal. O tamanho dos textos salva automaticamente ao configurar e sair.
+
+### Aproveitamento de tela em Cores e Sons (24/11/2026)
+
+- Grade compartilhada por largura: duas colunas em celulares a partir de 304dp, três em telas largas e uma apenas em larguras muito pequenas. A escala de fonte não força mais uma única coluna; os nomes podem usar duas linhas.
+- Prévia de cores em uma linha, sem o rótulo duplicado, com menor padding. Paleta e toques padrão usam células de no mínimo 48dp, margens menores e alinhamento por linha. Sons personalizados mantêm largura inteira, exclusão confirmada e divisores.
+- Card de volume mais compacto, mantendo a área de toque de 48dp, importação, reprodução, seleção e gravação existentes. Revisão dos arquivos e diff sem erros de formatação; sem novo build ou execução em aparelho para este ajuste visual localizado.

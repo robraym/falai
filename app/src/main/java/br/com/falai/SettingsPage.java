@@ -60,6 +60,10 @@ class SettingsPage extends Dialog {
         params.setMargins(Ui.dp(context, 8), Ui.dp(context, 6), Ui.dp(context, 8), Ui.dp(context, 10));
         panel.setLayoutParams(params); return panel;
     }
+    static int optionColumns(android.content.Context context) {
+        int available = context.getResources().getConfiguration().screenWidthDp - 64;
+        return available >= 540 ? 3 : available >= 240 ? 2 : 1;
+    }
     static void separateRows(LinearLayout parent) {
         for (int i = parent.getChildCount() - 1; i > 0; i--) {
             android.view.View line = new android.view.View(parent.getContext());

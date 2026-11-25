@@ -61,11 +61,11 @@ final class ProfileController {
         photo.addView(avatar, new FrameLayout.LayoutParams(Ui.dp(activity, 112), Ui.dp(activity, 112), Gravity.TOP | Gravity.CENTER_HORIZONTAL));
         ImageButton editPhoto = new ImageButton(activity); editPhoto.setImageResource(R.drawable.ic_edit);
         editPhoto.setContentDescription(activity.getString(R.string.choose_photo)); editPhoto.setEnabled(!busy); editPhoto.setAlpha(busy ? .6f : 1f);
-        editPhoto.setImageTintList(android.content.res.ColorStateList.valueOf(activity.getColor(R.color.text_secondary)));
+        editPhoto.setImageTintList(android.content.res.ColorStateList.valueOf(Appearance.primary(activity)));
         editPhoto.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 16), Ui.dp(activity, 16), Ui.dp(activity, 16));
-        android.graphics.drawable.GradientDrawable badge = Ui.shape(activity, R.color.card, 16);
-        badge.setStroke(Ui.dp(activity, 1), activity.getColor(R.color.divider));
-        editPhoto.setBackground(new android.graphics.drawable.InsetDrawable(badge, Ui.dp(activity, 8)));
+        editPhoto.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Appearance.ripple(activity)), null,
+                Ui.shape(activity, R.color.card, 24)));
         editPhoto.setOnClickListener(v -> photoActions());
         photo.addView(editPhoto, new FrameLayout.LayoutParams(Ui.dp(activity, 48), Ui.dp(activity, 48), Gravity.BOTTOM | Gravity.END));
         identity.addView(photo, new LinearLayout.LayoutParams(Ui.dp(activity, 120), Ui.dp(activity, 120)));

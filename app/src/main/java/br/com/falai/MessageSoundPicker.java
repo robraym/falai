@@ -62,8 +62,9 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
         ScrollView scroll = new ScrollView(activity); options = Ui.column(activity); options.setPadding(0, 0, 0, dp(6)); scroll.addView(options);
         content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1)); renderOptions();
         LinearLayout volumeCard = SettingsPage.panel(activity);
+        volumeCard.setPadding(dp(16), dp(10), dp(16), dp(10));
         volumeCard.addView(Ui.text(activity, activity.getString(R.string.sound_preview_volume), 13, true));
-        LinearLayout bar = Ui.row(activity); bar.setPadding(0, dp(8), 0, 0);
+        LinearLayout bar = Ui.row(activity);
         ImageView speaker = new ImageView(activity); speaker.setImageResource(R.drawable.ic_volume_preview); speaker.setImageTintList(android.content.res.ColorStateList.valueOf(Appearance.primary(activity)));
         speaker.setPadding(dp(10), dp(10), dp(10), dp(10)); speaker.setContentDescription(activity.getString(R.string.sound_listen));
         speaker.setOnClickListener(view -> play(MessageSounds.selected(activity))); speaker.setFocusable(true);
@@ -98,9 +99,16 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
     }
     private void group(int title, String[] keys) {
         LinearLayout card = SettingsPage.panel(activity); card.addView(section(title));
+        card.setPadding(dp(10), dp(8), dp(10), dp(8));
+        int columns = SettingsPage.optionColumns(activity);
+        GridLayout grid = new GridLayout(activity); grid.setColumnCount(columns); grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
         for (int i = 0; i < keys.length; i++) {
-            if (i > 0) divider(card); card.addView(option(keys[i], false));
+            GridLayout.LayoutParams params = new GridLayout.LayoutParams(); params.width = 0; params.height = -2;
+            params.columnSpec = GridLayout.spec(i % columns, 1, 1f); params.rowSpec = GridLayout.spec(i / columns, GridLayout.FILL);
+            params.setMargins(dp(2), dp(2), dp(2), dp(2));
+            grid.addView(option(keys[i], false), params);
         }
+        card.addView(grid);
         options.addView(card);
     }
     private void divider(LinearLayout card) {
@@ -110,15 +118,15 @@ final class MessageSoundPicker implements DefaultLifecycleObserver {
     }
     private LinearLayout option(String key, boolean custom) {
         boolean selected = key.equals(MessageSounds.selected(activity));
-        LinearLayout row = Ui.row(activity); row.setMinimumHeight(dp(56)); row.setPadding(dp(8), dp(8), dp(8), dp(8));
+        LinearLayout row = Ui.row(activity); row.setMinimumHeight(dp(48)); row.setPadding(dp(6), dp(6), dp(6), dp(6));
         row.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(activity)), selected ? Ui.shape(activity, R.color.action_green_soft, 16) : null, Ui.shape(activity, R.color.card, 16)));
         FrameLayout radio = new FrameLayout(activity);
         View ring = new View(activity); GradientDrawable outline = new GradientDrawable(); outline.setShape(GradientDrawable.OVAL); outline.setColor(Color.TRANSPARENT); outline.setStroke(dp(2), selected ? Appearance.primary(activity) : activity.getColor(R.color.text_secondary)); ring.setBackground(outline);
         FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER_VERTICAL | Gravity.START); radio.addView(ring, ringParams);
         View dot = new View(activity); GradientDrawable fill = new GradientDrawable(); fill.setShape(GradientDrawable.OVAL); fill.setColor(Appearance.primary(activity)); dot.setBackground(fill); dot.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
         FrameLayout.LayoutParams dotParams = new FrameLayout.LayoutParams(dp(8), dp(8), Gravity.CENTER_VERTICAL | Gravity.START); dotParams.leftMargin = dp(6); radio.addView(dot, dotParams);
-        radio.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); row.addView(radio, new LinearLayout.LayoutParams(dp(32), dp(36)));
-        TextView label = Ui.text(activity, MessageSounds.label(activity, key), 15, selected); label.setTextColor(activity.getColor(R.color.text_primary)); label.setMaxLines(2); label.setEllipsize(android.text.TextUtils.TruncateAt.END); row.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
+        radio.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); row.addView(radio, new LinearLayout.LayoutParams(dp(28), dp(32)));
+        TextView label = Ui.text(activity, MessageSounds.label(activity, key), 14, selected); label.setTextColor(activity.getColor(R.color.text_primary)); label.setMaxLines(2); row.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
         row.setSelected(selected); row.setFocusable(true); row.setContentDescription(MessageSounds.label(activity, key) + (selected ? activity.getString(R.string.sound_selected) : ""));
         row.setOnClickListener(view -> { MessageSounds.select(activity, key); renderOptions(); changed.run(); play(key); });
         if (custom) {
