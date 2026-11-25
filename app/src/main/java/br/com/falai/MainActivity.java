@@ -561,11 +561,11 @@ public final class MainActivity extends FalaiActivity {
         contents.addView(Ui.optionRow(this, R.drawable.ic_palette, getString(R.string.app_color), getString(Appearance.LABELS[Appearance.selected(this)]), false, v -> chooseColor()));
         contents.addView(Ui.optionRow(this, R.drawable.ic_font, getString(R.string.text_size), getString(R.string.text_size_value, Appearance.percent(this)), false, v -> chooseTextSize()));
         LinearLayout general = Ui.column(this); contents.addView(general);
-        LinearLayout soundRow = Ui.optionRow(this, R.drawable.ic_volume_preview, getString(R.string.message_sounds), MessageSounds.label(this, MessageSounds.selected(this)), true, null);
-        messageSoundSummary = (TextView) ((LinearLayout) soundRow.getChildAt(1)).getChildAt(1);
-        soundRow.setOnClickListener(view -> messageSounds.show(() -> {
+        LinearLayout soundRow = Ui.optionRow(this, R.drawable.ic_volume_preview, getString(R.string.message_sounds), MessageSounds.label(this, MessageSounds.selected(this)), true, view -> messageSounds.show(() -> {
             if (messageSoundSummary != null) messageSoundSummary.setText(MessageSounds.label(this, MessageSounds.selected(this)));
-        })); soundRow.setFocusable(true); general.addView(soundRow);
+        }));
+        messageSoundSummary = (TextView) ((LinearLayout) soundRow.getChildAt(1)).getChildAt(1);
+        general.addView(soundRow);
         general.addView(Ui.optionRow(this, R.drawable.ic_settings, getString(R.string.app_update),
                 installedApkSummary(),
                 true, view -> showAppUpdate()));
