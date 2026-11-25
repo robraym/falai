@@ -20,6 +20,21 @@ final class UpdateNotice {
     static final String TOPIC = "falai-updates-v1";
     private static final String CHANNEL = "app_updates_v1";
     private static SharedPreferences prefs(Context context) { return context.getSharedPreferences("update_notices", Context.MODE_PRIVATE); }
+    static boolean enabled(Context context) { return prefs(context).getBoolean("enabled", false); }
+    static synchronized void setEnabled(Context context, boolean enabled) {
+        SharedPreferences.Editor settings = prefs(context).edit().putBoolean("enabled", enabled);
+        if (enabled) settings.putLong("last_refresh", 0);
+        settings.apply();
+        if (!enabled) NotificationManagerCompat.from(context).cancel("app-update", 0);
+        syncTopic(context).addOnFailureListener(error -> DeviceRegistrationWorker.schedule());
+        if (enabled && Backend.ready() && !Backend.uid().isEmpty()) refresh(context);
+    }
+    static com.google.android.gms.tasks.Task<Void> syncTopic(Context context) {
+        Context app = context.getApplicationContext(); boolean wanted = enabled(app);
+        com.google.firebase.messaging.FirebaseMessaging messaging = com.google.firebase.messaging.FirebaseMessaging.getInstance();
+        return (wanted ? messaging.subscribeToTopic(TOPIC) : messaging.unsubscribeFromTopic(TOPIC)).onSuccessTask(ignored ->
+                wanted == enabled(app) ? com.google.android.gms.tasks.Tasks.forResult(null) : syncTopic(app));
+    }
     static AppUpdate available(Context context) {
         try {
             JSONObject json = new JSONObject(prefs(context).getString("offer", "{}"));
@@ -31,6 +46,7 @@ final class UpdateNotice {
         NotificationManagerCompat.from(context).cancel("app-update", 0); return null;
     }
     static synchronized void accept(Context context, Map<String, ?> values) {
+        if (!enabled(context)) return;
         UpdateMetadata metadata = UpdateMetadata.parse(values); if (metadata == null) return;
         AppUpdate current = available(context), offer = AppUpdate.fromMetadata(metadata);
         if (!offer.isNewerThanInstalled() || (current != null && current.versionCode > offer.versionCode)) return;
@@ -38,6 +54,7 @@ final class UpdateNotice {
         notifyAvailable(context, offer);
     }
     static void refresh(Context context) {
+        if (!enabled(context)) return;
         Context app = context.getApplicationContext();
         AppUpdate cached = available(app); if (cached != null) notifyAvailable(app, cached);
         SharedPreferences settings = prefs(app); long now = System.currentTimeMillis();
@@ -53,6 +70,7 @@ final class UpdateNotice {
         });
     }
     private static synchronized void notifyAvailable(Context context, AppUpdate offer) {
+        if (!enabled(context)) return;
         if (prefs(context).getLong("notified", 0) >= offer.versionCode) return;
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
         NotificationManagerCompat notices = NotificationManagerCompat.from(context); if (!notices.areNotificationsEnabled()) return;

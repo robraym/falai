@@ -32,7 +32,7 @@ public final class DeviceRegistrationWorker extends Worker {
         try {
             String token = Tasks.await(FirebaseMessaging.getInstance().getToken(), 30, TimeUnit.SECONDS);
             Tasks.await(Backend.call("registerDevice", Backend.deviceData(token)), 60, TimeUnit.SECONDS);
-            Tasks.await(FirebaseMessaging.getInstance().subscribeToTopic(UpdateNotice.TOPIC), 30, TimeUnit.SECONDS);
+            Tasks.await(UpdateNotice.syncTopic(getApplicationContext()), 30, TimeUnit.SECONDS);
             return Result.success();
         } catch (Exception error) { return Result.retry(); }
     }

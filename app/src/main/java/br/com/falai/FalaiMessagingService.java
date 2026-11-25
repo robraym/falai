@@ -101,6 +101,7 @@ public final class FalaiMessagingService extends FirebaseMessagingService {
         String senderId = message.getData().get("senderId");
         if (sender == null || sender.trim().isEmpty()) sender = getString(R.string.app_name);
         if (text == null || text.isEmpty()) text = getString(R.string.new_message);
+        text = GifCatalog.preview(this, text);
         if (nudge) {
             text = getString(R.string.nudge_received); NudgeFeedback.shake(sender);
             if (chatId.equals(ChatActivity.visibleChat)) {

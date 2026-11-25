@@ -37,6 +37,8 @@ public final class ChatActivity extends FalaiActivity {
     private ChatViewModel model;
     private EditText composer;
     private LinearLayout composerRow, retryRow, replyPreview;
+    private LinearLayout emojiPanelHost;
+    private android.widget.ImageButton emojiButton;
     private TextView status, title, searchSummary;
     private EditText messageSearch;
     private String messageQuery = "";
@@ -160,7 +162,7 @@ public final class ChatActivity extends FalaiActivity {
         LinearLayout inputBar = Ui.row(this); inputBar.setGravity(Gravity.BOTTOM); inputBar.setBaselineAligned(false);
         inputBar.setBackground(Ui.shape(this, R.color.card, 24));
         composerRow.addView(inputBar, new LinearLayout.LayoutParams(0, -2, 1));
-        android.widget.ImageButton emojiButton = Ui.icon(this, R.drawable.ic_emoji, R.string.emoji, v -> emoji());
+        emojiButton = Ui.icon(this, R.drawable.ic_emoji, R.string.emoji, v -> emoji());
         emojiButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.text_secondary)));
         emojiButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.card, 24), null));
         inputBar.addView(emojiButton);
@@ -179,6 +181,9 @@ public final class ChatActivity extends FalaiActivity {
         sendButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33000000), Ui.shape(this, R.color.action_green, 24), null));
         LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)); sendParams.leftMargin = Ui.dp(this, 8);
         composerRow.addView(sendButton, sendParams); root.addView(composerRow);
+        emojiPanelHost = Ui.column(this); emojiPanelHost.setVisibility(View.GONE);
+        root.addView(emojiPanelHost, new LinearLayout.LayoutParams(-1, -2));
+        composer.setOnClickListener(view -> closeEmojiPanel());
         composer.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             public void onTextChanged(CharSequence s, int start, int before, int count) { model.draft = s.toString(); presence.changed(s.length() > 0); }
@@ -374,7 +379,7 @@ public final class ChatActivity extends FalaiActivity {
         if (HistoryRetention.expired(doc)) return;
         boolean mine = Backend.uid().equals(doc.getString("senderId"));
         boolean deleted = Boolean.TRUE.equals(doc.getBoolean("deletedForAll"));
-        boolean nudge = "nudge".equals(doc.getString("kind"));
+        boolean nonEditable = "nudge".equals(doc.getString("kind")) || GifCatalog.index(doc.getString("text")) >= 0;
         if (!mine && deleted) return;
         AlertDialog.Builder menuBuilder = new AlertDialog.Builder(this);
         LinearLayout picker = Ui.row(this);
@@ -391,7 +396,7 @@ public final class ChatActivity extends FalaiActivity {
         java.util.List<String> choices = new ArrayList<>();
         if (!deleted) choices.add(getString(R.string.reply_message));
         if (mine) {
-            if (!deleted && !nudge) choices.add(getString(R.string.edit_message));
+            if (!deleted && !nonEditable) choices.add(getString(R.string.edit_message));
             if (!deleted) choices.add(getString(R.string.delete_for_all));
             choices.add(getString(R.string.delete_for_me));
             choices.add(getString(R.string.cancel));
@@ -400,7 +405,7 @@ public final class ChatActivity extends FalaiActivity {
             if (!deleted && item == 0) { beginReply(doc); return; }
             if (item == choices.size() - 1) return;
             int selected = deleted ? item : item - 1;
-            if (!deleted && !nudge && selected == 0) {
+            if (!deleted && !nonEditable && selected == 0) {
                 EditText field = Ui.input(this, R.string.message_hint); field.setSingleLine(false); field.setText(doc.getString("text"));
                 AlertDialog edit = new AlertDialog.Builder(this).setTitle(R.string.edit_message).setView(field).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create();
                 edit.setOnShowListener(ignored -> edit.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
@@ -410,7 +415,7 @@ public final class ChatActivity extends FalaiActivity {
                     });
                 })); edit.show();
             } else {
-                String scope = !deleted && selected == (nudge ? 0 : 1) ? "all" : "self";
+                String scope = !deleted && selected == (nonEditable ? 0 : 1) ? "all" : "self";
                 new AlertDialog.Builder(this).setMessage(R.string.delete_message_question).setNegativeButton(R.string.cancel, null).setPositiveButton("all".equals(scope) ? R.string.delete_for_all : R.string.delete_for_me, (confirm, button) ->
                     Backend.call("deleteMessage", Backend.data("chatId", chatId, "messageId", doc.getId(), "scope", scope)).addOnCompleteListener(this, task -> {
                         if (!task.isSuccessful()) Toast.makeText(this, Backend.error(this, task.getException()), Toast.LENGTH_LONG).show();
@@ -542,6 +547,7 @@ public final class ChatActivity extends FalaiActivity {
     private void updateSendState() {
         if (model.nudgeNotice != 0) { toast(model.nudgeNotice); model.nudgeNotice = 0; }
         Ui.enable(composerRow, !model.busy && model.pendingId == null); retryRow.setVisibility(model.failed ? View.VISIBLE : View.GONE);
+        Ui.enable(emojiPanelHost, !model.busy && model.pendingId == null);
         if (!composer.getText().toString().equals(model.draft)) composer.setText(model.draft);
         renderReplyPreview();
         if (model.busy) { status.setVisibility(View.VISIBLE); status.setText(R.string.sending); }
@@ -549,12 +555,35 @@ public final class ChatActivity extends FalaiActivity {
         else { status.setVisibility(loaded.isEmpty() ? View.VISIBLE : View.GONE); status.setText(R.string.new_conversation); }
     }
     private void emoji() {
-        EmojiPicker.show(this, true, value -> {
+        if (emojiPanelHost.getVisibility() == View.VISIBLE) {
+            closeEmojiPanel(); composer.requestFocus();
+            ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(composer, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            return;
+        }
+        ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(composer.getWindowToken(), 0);
+        emojiPanelHost.removeAllViews();
+        emojiPanelHost.addView(EmojiPicker.inline(this, value -> {
+            int gif = GifCatalog.index(value);
+            if (gif >= 0) {
+                LinearLayout preview = Ui.column(this); preview.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
+                preview.addView(new LocalGifView(this, gif), new LinearLayout.LayoutParams(-1, Ui.dp(this, 180)));
+                new AlertDialog.Builder(this).setView(preview).setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(R.string.send, (dialog, which) -> { presence.stopTyping(); model.sendGif(value); }).show();
+                return;
+            }
             int start = Math.max(0, composer.getSelectionStart()), end = Math.max(start, composer.getSelectionEnd());
             composer.getText().replace(start, end, value);
-        });
+        }, this::closeEmojiPanel));
+        emojiPanelHost.setVisibility(View.VISIBLE);
+        emojiButton.setImageResource(R.drawable.ic_keyboard); emojiButton.setContentDescription(getString(R.string.keyboard));
+    }
+    private void closeEmojiPanel() {
+        if (emojiPanelHost == null || emojiPanelHost.getVisibility() != View.VISIBLE) return;
+        emojiPanelHost.setVisibility(View.GONE); emojiPanelHost.removeAllViews();
+        emojiButton.setImageResource(R.drawable.ic_emoji); emojiButton.setContentDescription(getString(R.string.emoji));
     }
     private void leave() {
+        if (emojiPanelHost != null && emojiPanelHost.getVisibility() == View.VISIBLE) { closeEmojiPanel(); return; }
         if (messageSearch != null && messageSearch.getVisibility() == View.VISIBLE) {
             ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
                     .hideSoftInputFromWindow(messageSearch.getWindowToken(), 0);

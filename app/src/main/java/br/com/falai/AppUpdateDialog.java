@@ -1,11 +1,7 @@
 package br.com.falai;
 
 import android.content.res.ColorStateList;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.RadialGradient;
-import android.graphics.Shader;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
@@ -22,7 +18,7 @@ final class AppUpdateDialog extends SettingsPage {
     final TextView message, detail;
     final ProgressBar progress;
     private final FalaiActivity activity;
-    private final TextView available, percentage, transferSize;
+    private final TextView available, percentage, transferSize, lastCheck;
     private final AppVersionArtwork artwork;
     private final LinearLayout progressGroup;
     private final Button primary, close, cancel;
@@ -35,17 +31,7 @@ final class AppUpdateDialog extends SettingsPage {
         ScrollView scroll = new ScrollView(activity);
         scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
-        LinearLayout hero = new LinearLayout(activity) {
-            private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-            @Override protected void dispatchDraw(Canvas canvas) {
-                float radius = Math.min(getWidth() * .65f, Ui.dp(activity, 260));
-                int accent = Appearance.primary(activity);
-                glow.setShader(new RadialGradient(getWidth() / 2f, getHeight() * .48f, radius,
-                        new int[]{androidx.core.graphics.ColorUtils.setAlphaComponent(accent, Appearance.dark(activity) ? 35 : 24), Color.TRANSPARENT}, null, Shader.TileMode.CLAMP));
-                canvas.drawRect(0, 0, getWidth(), getHeight(), glow);
-                super.dispatchDraw(canvas);
-            }
-        };
+        LinearLayout hero = Ui.column(activity);
         hero.setOrientation(LinearLayout.VERTICAL); hero.setGravity(Gravity.CENTER);
         hero.setPadding(Ui.dp(activity, 28), Ui.dp(activity, 32), Ui.dp(activity, 28), Ui.dp(activity, 32));
         artwork = new AppVersionArtwork(activity);
@@ -53,6 +39,8 @@ final class AppUpdateDialog extends SettingsPage {
         message = centered(18, false);
         message.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         message.setPadding(0, Ui.dp(activity, 14), 0, 0); hero.addView(message);
+        lastCheck = centered(12, false); lastCheck.setPadding(0, Ui.dp(activity, 8), 0, 0);
+        hero.addView(lastCheck); refreshLastCheck();
         available = centered(13, false); available.setPadding(0, Ui.dp(activity, 10), 0, 0);
         available.setVisibility(View.GONE); hero.addView(available);
         progressGroup = Ui.column(activity); progressGroup.setPadding(0, Ui.dp(activity, 24), 0, 0);
@@ -84,6 +72,16 @@ final class AppUpdateDialog extends SettingsPage {
     }
     private TextView centered(int size, boolean bold) {
         TextView text = Ui.text(activity, "", size, bold); text.setGravity(Gravity.CENTER); return text;
+    }
+    void refreshLastCheck() {
+        long checked = AppUpdate.lastChecked(activity);
+        lastCheck.setVisibility(checked > 0 ? View.VISIBLE : View.GONE);
+        if (checked > 0) {
+            java.util.Date date = new java.util.Date(checked);
+            String formatted = android.text.format.DateFormat.getDateFormat(activity).format(date) + " "
+                    + android.text.format.DateFormat.getTimeFormat(activity).format(date);
+            lastCheck.setText(activity.getString(R.string.apk_update_last_checked, formatted));
+        }
     }
     private Button action(int label, boolean filled) {
         Button button = new androidx.appcompat.widget.AppCompatButton(activity);

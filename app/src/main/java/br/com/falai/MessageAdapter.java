@@ -76,6 +76,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
     static final class Holder extends RecyclerView.ViewHolder {
         android.view.View bubble, reactions;
         AnimatedEmojiView animated;
+        LocalGifView gif;
         Holder(LinearLayout root) { super(root); }
         void setReplyOffset(float offset, boolean animate) {
             move(bubble, offset, animate);
@@ -99,6 +100,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         holder.bubble = null;
         holder.reactions = null;
         holder.animated = null;
+        holder.gif = null;
         Item item = items.get(position);
         if (item.notice != null) { bindNotice(root, item.notice); return; }
         DocumentSnapshot doc = item.message; boolean mine = uid.equals(doc.getString("senderId"));
@@ -138,7 +140,13 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         if (!deleted && doc.getTimestamp("editedAt") != null) time = c.getString(R.string.message_edited) + " · " + time;
         android.text.SpannableString text = new android.text.SpannableString(content + "  \uFFFC");
         int status = mine ? doc.getTimestamp("readAt") != null ? 3 : doc.getTimestamp("deliveredAt") != null ? 2 : 1 : 0;
-        if (!deleted && !"nudge".equals(doc.getString("kind")) && AnimatedEmoji.index(content) >= 0) {
+        if (!deleted && GifCatalog.index(content) >= 0) {
+            LocalGifView gif = new LocalGifView(c, GifCatalog.index(content)); holder.gif = gif;
+            int size = Math.min(Ui.dp(c, 176), c.getResources().getDisplayMetrics().widthPixels - Ui.dp(c, 96));
+            bubble.addView(gif, new LinearLayout.LayoutParams(size, size));
+            gif.setOnLongClickListener(view -> { actions.accept(doc); return true; });
+            content = GifCatalog.preview(c, content); text = new android.text.SpannableString("\uFFFC"); message.setGravity(Gravity.END);
+        } else if (!deleted && !"nudge".equals(doc.getString("kind")) && AnimatedEmoji.index(content) >= 0) {
             AnimatedEmojiView animated = new AnimatedEmojiView(c, content);
             holder.animated = animated;
             animated.setImportantForAccessibility(android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO);
@@ -191,7 +199,7 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
             return context.getString(R.string.reply_unavailable);
         }
         if ("nudge".equals(kind)) return context.getString(mine ? R.string.nudge_sent : R.string.nudge_received);
-        return text == null || text.isEmpty() ? context.getString(R.string.reply_unavailable) : text;
+        return text == null || text.isEmpty() ? context.getString(R.string.reply_unavailable) : GifCatalog.preview(context, text);
     }
     static LinearLayout quoteView(android.content.Context context, String author, String excerpt) {
         LinearLayout quote = Ui.row(context);
@@ -252,13 +260,16 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
     @Override public void onViewAttachedToWindow(@NonNull Holder holder) {
         super.onViewAttachedToWindow(holder);
         if (holder.animated != null) holder.animated.setPlaybackAllowed(true);
+        if (holder.gif != null) holder.gif.setPlaybackAllowed(true);
     }
     @Override public void onViewDetachedFromWindow(@NonNull Holder holder) {
         if (holder.animated != null) holder.animated.setPlaybackAllowed(false);
+        if (holder.gif != null) holder.gif.setPlaybackAllowed(false);
         super.onViewDetachedFromWindow(holder);
     }
     @Override public void onViewRecycled(@NonNull Holder holder) {
         if (holder.animated != null) holder.animated.setPlaybackAllowed(false);
+        if (holder.gif != null) holder.gif.setPlaybackAllowed(false);
         super.onViewRecycled(holder);
     }
     boolean scrollToMessage(RecyclerView list, String id) {

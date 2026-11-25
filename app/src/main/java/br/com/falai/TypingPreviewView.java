@@ -23,7 +23,7 @@ final class TypingPreviewView extends AppCompatTextView {
     void setChecks(View view) { checks = view; checks.setVisibility(typing ? GONE : VISIBLE); }
     private void showTyping(boolean active) {
         typing = active;
-        setText(active ? getContext().getString(R.string.typing) : preview);
+        setText(active ? getContext().getString(R.string.typing) : GifCatalog.preview(getContext(), preview));
         setTextColor(active ? Appearance.primary(getContext()) : getContext().getColor(R.color.text_secondary));
         if (checks != null) checks.setVisibility(active ? GONE : VISIBLE);
     }

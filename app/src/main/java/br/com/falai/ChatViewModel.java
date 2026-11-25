@@ -24,6 +24,10 @@ public final class ChatViewModel extends AndroidViewModel {
         pendingId = UUID.randomUUID().toString(); pendingText = draft.trim(); send();
     }
     void retry() { if (!busy && pendingId != null) send(); }
+    void sendGif(String value) {
+        if (busy || pendingId != null || GifCatalog.index(value) < 0) return;
+        pendingId = UUID.randomUUID().toString(); pendingText = value; send();
+    }
     private void send() {
         if (!owner.equals(Backend.uid())) { failed = true; changed(); return; }
         busy = true; failed = false; changed();
@@ -32,7 +36,7 @@ public final class ChatViewModel extends AndroidViewModel {
         Backend.call("sendMessage", data)
                 .addOnCompleteListener(task -> {
                     busy = false;
-                    if (task.isSuccessful()) { draft = ""; reply = null; discard(); }
+                    if (task.isSuccessful()) { if (GifCatalog.index(pendingText) < 0) draft = ""; reply = null; discard(); }
                     else { failed = true; changed(); }
                 });
     }

@@ -15,7 +15,7 @@ public final class ProfileActivity extends FalaiActivity {
         if (!Backend.ready() || Backend.uid().isEmpty()) { finish(); return; }
         LinearLayout root = Ui.root(this);
         NavigationSurface.attachCard(root);
-        root.setBackgroundColor(getColor(R.color.background));
+        root.setBackground(new SoftGlowBackground(this));
         root.addView(Ui.backHeading(this, getString(R.string.profile), view -> finish()));
         LinearLayout body = Ui.column(this);
         root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));

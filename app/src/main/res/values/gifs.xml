@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gif_heart">Coração</string>
+    <string name="gif_laugh">Risada</string>
+    <string name="gif_party">Festa</string>
+    <string name="gif_sleep">Sono</string>
+    <string name="gif_coffee">Café</string>
+    <string name="gif_applause">Palmas</string>
+    <string name="gif_smile">Sorriso</string>
+    <string name="gif_happy">Muito feliz</string>
+    <string name="gif_rofl">Morrendo de rir</string>
+    <string name="gif_wink">Piscadinha</string>
+    <string name="gif_cool">De boa</string>
+    <string name="gif_thinking">Pensando</string>
+    <string name="gif_surprised">Surpresa</string>
+    <string name="gif_sad">Triste</string>
+    <string name="gif_crying">Chorando</string>
+    <string name="gif_angry">Bravo</string>
+    <string name="gif_shocked">Chocado</string>
+    <string name="gif_melting">Derretendo</string>
+    <string name="gif_eyeroll">Revirando os olhos</string>
+    <string name="gif_shy">Sem graça</string>
+    <string name="gif_silly">Brincadeira</string>
+    <string name="gif_tired">Cansaço</string>
+    <string name="gif_pleading">Por favor</string>
+    <string name="gif_shush">Segredinho</string>
+    <string name="gif_kiss">Beijinho</string>
+    <string name="gif_loving">Apaixonado</string>
+    <string name="gif_heart_eyes">Olhos de coração</string>
+    <string name="gif_hug">Abraço</string>
+    <string name="gif_beating_heart">Coração batendo</string>
+    <string name="gif_sparkling_heart">Coração brilhante</string>
+    <string name="gif_two_hearts">Dois corações</string>
+    <string name="gif_love_letter">Carta de amor</string>
+    <string name="gif_broken_heart">Coração partido</string>
+    <string name="gif_mending_heart">Coração se curando</string>
+    <string name="gif_heart_hands">Coração com as mãos</string>
+    <string name="gif_thumbs_up">Legal</string>
+    <string name="gif_thumbs_down">Não gostei</string>
+    <string name="gif_wave">Olá</string>
+    <string name="gif_thanks">Obrigado</string>
+    <string name="gif_victory">Vitória</string>
+    <string name="gif_strong">Força</string>
+    <string name="gif_fingers_crossed">Na torcida</string>
+    <string name="gif_handshake">Combinado</string>
+    <string name="gif_love_you">Te amo</string>
+    <string name="gif_confetti">Confete</string>
+    <string name="gif_cake">Aniversário</string>
+    <string name="gif_cheers">Brinde</string>
+    <string name="gif_champagne">Comemorar</string>
+    <string name="gif_dancing">Dançando</string>
+    <string name="gif_star_struck">Maravilhado</string>
+    <string name="gif_hundred">Nota cem</string>
+    <string name="gif_cat">Gatinho</string>
+    <string name="gif_dog">Cachorrinho</string>
+    <string name="gif_panda">Panda</string>
+    <string name="gif_bear">Ursinho</string>
+    <string name="gif_rabbit">Coelhinho</string>
+    <string name="gif_frog">Sapinho</string>
+    <string name="gif_penguin">Pinguim</string>
+    <string name="gif_chick">Pintinho</string>
+    <string name="gif_fox">Raposa</string>
+    <string name="gif_unicorn">Unicórnio</string>
+    <string name="gif_tea">Chá</string>
+    <string name="gif_alarm">Despertador</string>
+    <string name="gif_rocket">Foguete</string>
+    <string name="gif_eyes">De olho</string>
+    <string name="gif_music">Música</string>
+    <string name="gif_sun">Sol</string>
+    <string name="gif_moon">Lua</string>
+    <string name="gif_rainbow">Arco-íris</string>
+    <string name="gif_rain">Chuva</string>
+    <string name="gif_fire">Fogo</string>
+    <string name="gif_butterfly">Borboleta</string>
+    <string-array name="gif_categories">
+        <item>Reações</item>
+        <item>Carinho</item>
+        <item>Gestos</item>
+        <item>Comemorações</item>
+        <item>Animais</item>
+        <item>Dia a dia</item>
+        <item>Natureza</item>
+    </string-array>
+</resources>

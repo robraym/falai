@@ -1,0 +1,24 @@
+package br.com.falai;
+
+/** Bundled Microsoft Fluent GIFs (MIT); see assets/licenses/FLUENT-EMOJI-ANIMATED.txt. Only this small identifier is sent, never an uploaded file or URL. */
+final class GifCatalog {
+    static final String[] IDS = {"heart", "laugh", "party", "sleep", "coffee", "applause", "smile", "happy", "rofl", "wink", "cool", "thinking", "surprised", "sad", "crying", "angry", "shocked", "melting", "eyeroll", "shy", "silly", "tired", "pleading", "shush", "kiss", "loving", "heart_eyes", "hug", "beating_heart", "sparkling_heart", "two_hearts", "love_letter", "broken_heart", "mending_heart", "heart_hands", "thumbs_up", "thumbs_down", "wave", "thanks", "victory", "strong", "fingers_crossed", "handshake", "love_you", "confetti", "cake", "cheers", "champagne", "dancing", "star_struck", "hundred", "cat", "dog", "panda", "bear", "rabbit", "frog", "penguin", "chick", "fox", "unicorn", "tea", "alarm", "rocket", "eyes", "music", "sun", "moon", "rainbow", "rain", "fire", "butterfly"};
+    static final int[] FILES = {R.raw.gif_heart, R.raw.gif_laugh, R.raw.gif_party, R.raw.gif_sleep, R.raw.gif_coffee, R.raw.gif_applause, R.raw.gif_smile, R.raw.gif_happy, R.raw.gif_rofl, R.raw.gif_wink, R.raw.gif_cool, R.raw.gif_thinking, R.raw.gif_surprised, R.raw.gif_sad, R.raw.gif_crying, R.raw.gif_angry, R.raw.gif_shocked, R.raw.gif_melting, R.raw.gif_eyeroll, R.raw.gif_shy, R.raw.gif_silly, R.raw.gif_tired, R.raw.gif_pleading, R.raw.gif_shush, R.raw.gif_kiss, R.raw.gif_loving, R.raw.gif_heart_eyes, R.raw.gif_hug, R.raw.gif_beating_heart, R.raw.gif_sparkling_heart, R.raw.gif_two_hearts, R.raw.gif_love_letter, R.raw.gif_broken_heart, R.raw.gif_mending_heart, R.raw.gif_heart_hands, R.raw.gif_thumbs_up, R.raw.gif_thumbs_down, R.raw.gif_wave, R.raw.gif_thanks, R.raw.gif_victory, R.raw.gif_strong, R.raw.gif_fingers_crossed, R.raw.gif_handshake, R.raw.gif_love_you, R.raw.gif_confetti, R.raw.gif_cake, R.raw.gif_cheers, R.raw.gif_champagne, R.raw.gif_dancing, R.raw.gif_star_struck, R.raw.gif_hundred, R.raw.gif_cat, R.raw.gif_dog, R.raw.gif_panda, R.raw.gif_bear, R.raw.gif_rabbit, R.raw.gif_frog, R.raw.gif_penguin, R.raw.gif_chick, R.raw.gif_fox, R.raw.gif_unicorn, R.raw.gif_tea, R.raw.gif_alarm, R.raw.gif_rocket, R.raw.gif_eyes, R.raw.gif_music, R.raw.gif_sun, R.raw.gif_moon, R.raw.gif_rainbow, R.raw.gif_rain, R.raw.gif_fire, R.raw.gif_butterfly};
+    static final int[] LABELS = {R.string.gif_heart, R.string.gif_laugh, R.string.gif_party, R.string.gif_sleep, R.string.gif_coffee, R.string.gif_applause, R.string.gif_smile, R.string.gif_happy, R.string.gif_rofl, R.string.gif_wink, R.string.gif_cool, R.string.gif_thinking, R.string.gif_surprised, R.string.gif_sad, R.string.gif_crying, R.string.gif_angry, R.string.gif_shocked, R.string.gif_melting, R.string.gif_eyeroll, R.string.gif_shy, R.string.gif_silly, R.string.gif_tired, R.string.gif_pleading, R.string.gif_shush, R.string.gif_kiss, R.string.gif_loving, R.string.gif_heart_eyes, R.string.gif_hug, R.string.gif_beating_heart, R.string.gif_sparkling_heart, R.string.gif_two_hearts, R.string.gif_love_letter, R.string.gif_broken_heart, R.string.gif_mending_heart, R.string.gif_heart_hands, R.string.gif_thumbs_up, R.string.gif_thumbs_down, R.string.gif_wave, R.string.gif_thanks, R.string.gif_victory, R.string.gif_strong, R.string.gif_fingers_crossed, R.string.gif_handshake, R.string.gif_love_you, R.string.gif_confetti, R.string.gif_cake, R.string.gif_cheers, R.string.gif_champagne, R.string.gif_dancing, R.string.gif_star_struck, R.string.gif_hundred, R.string.gif_cat, R.string.gif_dog, R.string.gif_panda, R.string.gif_bear, R.string.gif_rabbit, R.string.gif_frog, R.string.gif_penguin, R.string.gif_chick, R.string.gif_fox, R.string.gif_unicorn, R.string.gif_tea, R.string.gif_alarm, R.string.gif_rocket, R.string.gif_eyes, R.string.gif_music, R.string.gif_sun, R.string.gif_moon, R.string.gif_rainbow, R.string.gif_rain, R.string.gif_fire, R.string.gif_butterfly};
+    static final int[] GROUPS = {1, 0, 3, 0, 5, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6};
+    static String message(int index) { return "[GIF:" + IDS[index] + "]"; }
+    private static final java.util.Map<String, Integer> INDEX;
+    static {
+        java.util.Map<String, Integer> entries = new java.util.HashMap<>();
+        for (int i = 0; i < IDS.length; i++) entries.put(message(i), i);
+        INDEX = java.util.Collections.unmodifiableMap(entries);
+    }
+    static int index(String text) {
+        if (text == null) return -1;
+        return INDEX.getOrDefault(text.trim(), -1);
+    }
+    static String preview(android.content.Context context, String text) {
+        int index = index(text); return index < 0 ? text : "GIF · " + context.getString(LABELS[index]);
+    }
+    private GifCatalog() { }
+}

@@ -58,6 +58,12 @@ final class AppUpdate {
         return new AppUpdate(value.versionName, value.versionCode, url, value.size, ApkUpdatePolicy.normalizeDigest(value.digest));
     }
 
+    static long lastChecked(android.content.Context context) {
+        return context.getSharedPreferences("update_checks", android.content.Context.MODE_PRIVATE).getLong("last_checked", 0);
+    }
+    private static void rememberCheck(android.content.SharedPreferences settings) {
+        settings.edit().putLong("last_checked", System.currentTimeMillis()).apply();
+    }
     static synchronized Task<AppUpdate> check(android.content.Context context) {
         if (pendingCheck != null && !pendingCheck.isComplete()) return pendingCheck;
         android.content.Context app = context.getApplicationContext();
@@ -86,7 +92,7 @@ final class AppUpdate {
                 if (!gate.edit().putLong("next_allowed", allowed).putBoolean("server_limit", limited).commit())
                     throw new IOException("Unable to persist update check backoff");
                 if (status == 403 || status == 429) throw new CheckWait(allowed, true);
-                if (status == HttpURLConnection.HTTP_NOT_FOUND) return null;
+                if (status == HttpURLConnection.HTTP_NOT_FOUND) { rememberCheck(gate); return null; }
                 if (status != HttpURLConnection.HTTP_OK) throw new IOException("GitHub release status " + status);
                 try (InputStream input = connection.getInputStream()) {
                     ByteArrayOutputStream body = new ByteArrayOutputStream();
@@ -95,7 +101,8 @@ final class AppUpdate {
                         if (body.size() + count > 262144) throw new IOException("GitHub release response too large");
                         body.write(bytes, 0, count);
                     }
-                    return readRelease(new JSONObject(new String(body.toByteArray(), StandardCharsets.UTF_8)));
+                    AppUpdate update = readRelease(new JSONObject(new String(body.toByteArray(), StandardCharsets.UTF_8)));
+                    rememberCheck(gate); return update;
                 }
             } finally {
                 connection.disconnect();

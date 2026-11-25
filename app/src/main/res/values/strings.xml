@@ -202,6 +202,9 @@
     <string name="typing">digitando…</string>
     <string name="emoji_recent">Recentes</string>
     <string name="emoji_animated">Animados</string>
+    <string name="gifs">GIFs</string>
+    <string name="keyboard">Teclado</string>
+    <string name="picker_recent_empty">Ainda não há recentes.</string>
     <string name="emoji_tab_standard">Emojis</string>
     <string name="emoji_load_error">Não foi possível carregar os emojis. Feche e tente novamente.</string>
     <string name="emoji_recent_empty">Seus emojis usados aparecerão aqui.</string>
@@ -224,6 +227,8 @@
     <string name="apk_version_with_build_date">%1$s (gerada em %2$s)</string>
     <string name="check_apk_update">Verificar atualização</string>
     <string name="apk_update_notification_title">Nova versão disponível</string>
+    <string name="apk_update_notifications">Avisos de atualização</string>
+    <string name="apk_update_notifications_summary">Receber uma notificação quando houver uma nova versão.</string>
     <string name="apk_update_notification_body">Falai %1$s disponível. Toque para atualizar.</string>
     <string name="apk_update_download">Baixar atualização</string>
     <string name="checking_apk_update">Verificando atualizações…</string>
@@ -232,6 +237,7 @@
     <string name="apk_update_rate_limited">O serviço de atualizações está temporariamente limitado. Você pode tentar novamente às %1$s.</string>
     <string name="apk_update_unpublished">Nenhum APK foi disponibilizado para download.</string>
     <string name="apk_up_to_date">Seu aplicativo está atualizado.</string>
+    <string name="apk_update_last_checked">Última verificação: %1$s</string>
     <string name="app_version_title">%1$s %2$s</string>
     <string name="apk_update_subtitle">Mantenha seu Falai atualizado</string>
     <string name="apk_update_intro">Confira se há uma nova versão</string>

@@ -22,7 +22,7 @@ class SettingsPage extends Dialog {
         super(activity, Appearance.theme(activity));
         this.activity = activity;
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        root = Ui.column(activity); root.setBackgroundColor(activity.getColor(R.color.background));
+        root = Ui.column(activity); root.setBackground(new SoftGlowBackground(activity));
         root.addView(Ui.backHeading(activity, activity.getString(title), view -> dismiss()));
         body = Ui.column(activity); root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root); setCanceledOnTouchOutside(false);

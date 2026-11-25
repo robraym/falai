@@ -303,7 +303,7 @@ public final class MainActivity extends FalaiActivity {
             nav.addView(item, new LinearLayout.LayoutParams(0, -1, 1)); if (i == selected) selectedView = item;
         }
         root.addView(nav, new LinearLayout.LayoutParams(-1, Ui.dp(this, 86))); NavigationSurface.attach(root, nav, selectedView);
-        if (selected == 2) root.setBackgroundColor(getColor(R.color.background)); else root.setBackground(new SoftGlowBackground(this));
+        root.setBackground(new SoftGlowBackground(this));
         if (selected == 0) showChats(); else if (selected == 1) showContacts(); else showSettings();
     }
     private RecyclerView list(LinearLayout parent, RowsAdapter adapter) {
@@ -570,6 +570,23 @@ public final class MainActivity extends FalaiActivity {
         general.addView(Ui.optionRow(this, R.drawable.ic_settings, getString(R.string.app_update),
                 installedApkSummary(),
                 true, view -> showAppUpdate()));
+        androidx.appcompat.widget.SwitchCompat updates = new androidx.appcompat.widget.SwitchCompat(this);
+        updates.setChecked(UpdateNotice.enabled(this)); updates.setMinHeight(Ui.dp(this, 48));
+        updates.setThumbTintList(new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                new int[]{Appearance.primary(this), getColor(R.color.text_secondary)}));
+        updates.setContentDescription(getString(R.string.apk_update_notifications));
+        LinearLayout updateNotices = Ui.optionRow(this, R.drawable.ic_app_update, getString(R.string.apk_update_notifications),
+                getString(R.string.apk_update_notifications_summary), false, null);
+        LinearLayout updateLabels = (LinearLayout) updateNotices.getChildAt(1);
+        for (int i = 0; i < updateLabels.getChildCount(); i++) {
+            TextView label = (TextView) updateLabels.getChildAt(i);
+            label.setMaxLines(Integer.MAX_VALUE);
+            label.setEllipsize(null);
+        }
+        updateNotices.addView(updates, new LinearLayout.LayoutParams(-2, Ui.dp(this, 48)));
+        updates.setOnCheckedChangeListener((button, checked) -> UpdateNotice.setEnabled(this, checked));
+        updateNotices.setOnClickListener(view -> updates.setChecked(!updates.isChecked()));
+        general.addView(updateNotices);
     }
     private void showAppUpdate() {
         if (appUpdates.openExisting()) return;
@@ -595,8 +612,9 @@ public final class MainActivity extends FalaiActivity {
         about.setProgressState(true, 0, "");
         AppUpdate.check(this).addOnCompleteListener(task -> {
             if (isFinishing() || isDestroyed() || !about.isShowing()) return;
-            check.setEnabled(true);
+            check.setVisibility(View.GONE);
             about.hideProgress();
+            about.refreshLastCheck();
             if (!task.isSuccessful()) {
                 Exception failure = task.getException();
                 if (failure instanceof AppUpdate.CheckWait) {

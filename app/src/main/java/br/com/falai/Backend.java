@@ -84,7 +84,7 @@ final class Backend {
         return FirebaseMessaging.getInstance().getToken().onSuccessTask(Backend::registerDevice);
     }
     static Task<Void> registerDevice(String token) {
-        Task<Void> task = call("registerDevice", deviceData(token)).onSuccessTask(ignored -> FirebaseMessaging.getInstance().subscribeToTopic(UpdateNotice.TOPIC));
+        Task<Void> task = call("registerDevice", deviceData(token)).onSuccessTask(ignored -> UpdateNotice.syncTopic(FalaiApplication.instance));
         task.addOnFailureListener(error -> DeviceRegistrationWorker.schedule()); return task;
     }
     static Map<String, Object> deviceData(String token) {
