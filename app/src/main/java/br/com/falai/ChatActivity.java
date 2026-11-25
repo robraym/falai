@@ -53,6 +53,9 @@ public final class ChatActivity extends FalaiActivity {
     private LinearLayoutManager layoutManager;
     private MessageAdapter adapter;
     private ActivityResultLauncher<String> photoPicker;
+    private ActivityResultLauncher<android.net.Uri> cameraCapture;
+    private ActivityResultLauncher<String> cameraPermission;
+    private android.net.Uri pendingCameraUri;
     private ListenerRegistration listener;
     private ListenerRegistration chatListener;
     private final Map<String, DocumentSnapshot> loaded = new HashMap<>();
@@ -77,6 +80,13 @@ public final class ChatActivity extends FalaiActivity {
         photoPicker = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
             if (uri != null && model != null) model.preparePhoto(uri);
         });
+        cameraCapture = registerForActivityResult(new ActivityResultContracts.TakePicture(), captured -> {
+            android.net.Uri uri = pendingCameraUri; pendingCameraUri = null;
+            if (captured && uri != null && model != null) model.preparePhoto(uri);
+        });
+        cameraPermission = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+            if (granted) launchCamera(); else toast(R.string.camera_permission_denied);
+        });
         chatId = getIntent().getStringExtra("chatId"); name = getIntent().getStringExtra("name");
         if (!Backend.ready() || Backend.uid().isEmpty() || chatId == null || !chatId.matches("[a-f0-9]{64}")) { finish(); return; }
         if (name == null) name = getString(R.string.app_name);
@@ -86,6 +96,12 @@ public final class ChatActivity extends FalaiActivity {
             model.draft = state.getString("draft", ""); model.pendingId = state.getString("pendingId");
             model.pendingText = state.getString("pendingText"); model.pendingKind = state.getString("pendingKind"); model.failed = model.pendingId != null;
             model.reply = state.getBundle("reply");
+            String cameraUri = state.getString("pendingCameraUri");
+            if (cameraUri != null) pendingCameraUri = android.net.Uri.parse(cameraUri);
+        }
+        if (state != null && pendingCameraUri == null) {
+            String cameraUri = state.getString("pendingCameraUri");
+            if (cameraUri != null) pendingCameraUri = android.net.Uri.parse(cameraUri);
         }
         LinearLayout root = Ui.root(this);
         root.setClipToPadding(false);
@@ -175,6 +191,12 @@ public final class ChatActivity extends FalaiActivity {
                 android.content.res.ColorStateList.valueOf(Appearance.ripple(this)),
                 new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), null));
         inputBar.addView(photoButton);
+        android.widget.ImageButton cameraButton = Ui.icon(this, R.drawable.ic_camera, R.string.take_photo, v -> takePhoto());
+        cameraButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.text_secondary)));
+        cameraButton.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Appearance.ripple(this)),
+                new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), null));
+        inputBar.addView(cameraButton);
         emojiButton = Ui.icon(this, R.drawable.ic_emoji, R.string.emoji, v -> emoji());
         emojiButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.text_secondary)));
         emojiButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.card, 24), null));
@@ -584,6 +606,20 @@ public final class ChatActivity extends FalaiActivity {
         closeEmojiPanel();
         photoPicker.launch("image/*");
     }
+    private void takePhoto() {
+        if (!chatReady || model.busy || model.pendingId != null) { toast(R.string.photo_wait); return; }
+        closeEmojiPanel();
+        if (checkSelfPermission(android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) launchCamera();
+        else cameraPermission.launch(android.Manifest.permission.CAMERA);
+    }
+    private void launchCamera() {
+        if (isFinishing() || isDestroyed() || model == null || model.busy || model.pendingId != null) return;
+        java.io.File folder = new java.io.File(getCacheDir(), "camera");
+        if (!folder.exists() && !folder.mkdirs()) { toast(R.string.photo_error); return; }
+        java.io.File file = new java.io.File(folder, "photo-" + java.util.UUID.randomUUID() + ".jpg");
+        pendingCameraUri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".chatmedia", file);
+        cameraCapture.launch(pendingCameraUri);
+    }
     private void openPhoto(DocumentSnapshot doc) {
         String id = doc.getString("mediaId");
         if (id == null) return;
@@ -665,6 +701,7 @@ public final class ChatActivity extends FalaiActivity {
         super.onSaveInstanceState(out); if (model == null) return;
         out.putString("messageQuery", messageQuery); out.putString("draft", model.draft); out.putString("pendingId", model.pendingId); out.putString("pendingText", model.pendingText);
         out.putString("pendingKind", model.pendingKind);
+        if (pendingCameraUri != null) out.putString("pendingCameraUri", pendingCameraUri.toString());
         out.putBundle("reply", model.reply);
         out.putBoolean("messageSearchOpen", messageSearch != null && messageSearch.getVisibility() == View.VISIBLE);
     }

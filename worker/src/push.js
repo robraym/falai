@@ -14,10 +14,10 @@ export function notificationPreview(text) {
 
 export async function sendPush(env, token, job, validateOnly = false) {
   const accessToken = await googleAccessToken(env);
-  const message = validateOnly ? {topic: "falai-configuration-check", notification: {title: "Falai", body: "Verificação de configuração"}}
+  const message = validateOnly ? {topic: "falai-configuration-check", notification: {title: "Falaí", body: "Verificação de configuração"}}
     : {token,
       data: {chatId: job.chatId, messageId: job.messageId, recipientId: job.recipientId,
-        senderId: job.senderId || "", senderName: job.senderName || "Falai", text: notificationPreview(job.text || ""), event: job.event || "message",
+        senderId: job.senderId || "", senderName: job.senderName || "Falaí", text: notificationPreview(job.text || ""), event: job.event || "message",
         ...(job.silent ? {silent: "true"} : {}),
         ...(job.replySenderId ? {replySenderId: job.replySenderId} : {}),
         ...(job.createdAt instanceof Date ? {createdAt: String(job.createdAt.getTime())} : {}),
@@ -65,7 +65,7 @@ export async function dispatchJob(db, env, path, push = sendPush) {
     claimed.silent = !shouldNotifyArchived(chat?.data, claimed.recipientId, message?.data);
     claimed.replySenderId = message?.data.reply?.senderId || "";
     const sender = claimed.senderId ? await db.get(`users/${claimed.senderId}`) : null;
-    claimed.senderName = sender?.data.name || chat?.data.names?.[claimed.senderId] || "Falai";
+    claimed.senderName = sender?.data.name || chat?.data.names?.[claimed.senderId] || "Falaí";
     // Collection is indexed by uid; fixed limit bounds reads and Worker subrequests.
     const devices = await db.query("devices", [["uid", "EQUAL", claimed.recipientId]], undefined, 100);
     const pending = devices.filter(device => !acknowledged.has(device.path));

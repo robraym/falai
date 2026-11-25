@@ -144,7 +144,9 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
         if (!deleted && doc.getTimestamp("editedAt") != null) time = c.getString(R.string.message_edited) + " · " + time;
         android.text.SpannableString text = new android.text.SpannableString((content.isEmpty() ? "" : content + "  ") + "\uFFFC");
         int status = mine ? doc.getTimestamp("readAt") != null ? 3 : doc.getTimestamp("deliveredAt") != null ? 2 : 1 : 0;
+        boolean largeMedia = false;
         if (imageMessage) {
+            largeMedia = true;
             android.widget.ImageView photo = new android.widget.ImageView(c);
             int size = Math.min(Ui.dp(c, 224), c.getResources().getDisplayMetrics().widthPixels - Ui.dp(c, 100));
             photo.setLayoutParams(new LinearLayout.LayoutParams(size, Ui.dp(c, 224)));
@@ -161,18 +163,15 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
             photo.setOnClickListener(view -> openPhoto.accept(doc));
             photo.setOnLongClickListener(view -> { actions.accept(doc); return true; });
             bubble.addView(photo);
-            String checks = status == 0 ? "" : status == 1 ? " ✓" : " ✓✓";
-            TextView footer = Ui.text(c, time + checks, 11, false);
-            footer.setGravity(Gravity.END); footer.setPadding(0, Ui.dp(c, 3), Ui.dp(c, 2), 0);
-            footer.setTextColor(c.getColor(status == 3 ? R.color.check_read : R.color.text_secondary));
-            bubble.addView(footer, new LinearLayout.LayoutParams(-1, -2));
         } else if (!deleted && GifCatalog.index(content) >= 0) {
+            largeMedia = true;
             LocalGifView gif = new LocalGifView(c, GifCatalog.index(content)); holder.gif = gif;
             int size = Math.min(Ui.dp(c, 176), c.getResources().getDisplayMetrics().widthPixels - Ui.dp(c, 96));
             bubble.addView(gif, new LinearLayout.LayoutParams(size, size));
             gif.setOnLongClickListener(view -> { actions.accept(doc); return true; });
             content = GifCatalog.preview(c, content); text = new android.text.SpannableString("\uFFFC"); message.setGravity(Gravity.END);
         } else if (!deleted && !"nudge".equals(doc.getString("kind")) && AnimatedEmoji.index(content) >= 0) {
+            largeMedia = true;
             AnimatedEmojiView animated = new AnimatedEmojiView(c, content);
             holder.animated = animated;
             animated.setImportantForAccessibility(android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO);
@@ -182,7 +181,8 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
             text = new android.text.SpannableString("\uFFFC");
             message.setGravity(Gravity.END);
         }
-        if (!imageMessage) {
+        if (largeMedia) addMediaFooter(bubble, c, time, status);
+        else {
             text.setSpan(new MessageMetaSpan(c, time, status), text.length() - 1, text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             message.setText(text); bubble.addView(message);
         }
@@ -222,6 +222,13 @@ final class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.Holder> {
                 root.addView(badge, badgeParams);
             }
         }
+    }
+    private static void addMediaFooter(LinearLayout bubble, android.content.Context context, String time, int status) {
+        String checks = status == 0 ? "" : status == 1 ? " ✓" : " ✓✓";
+        TextView footer = Ui.text(context, time + checks, 11, false);
+        footer.setGravity(Gravity.END); footer.setPadding(0, Ui.dp(context, 3), Ui.dp(context, 2), 0);
+        footer.setTextColor(context.getColor(status == 3 ? R.color.check_read : R.color.text_secondary));
+        bubble.addView(footer, new LinearLayout.LayoutParams(-1, -2));
     }
     static String quoteText(android.content.Context context, String kind, String text, boolean mine, DocumentSnapshot original) {
         if (original != null && (HistoryRetention.expired(original) || Boolean.TRUE.equals(original.getBoolean("deletedForAll")))) {

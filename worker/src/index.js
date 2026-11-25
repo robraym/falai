@@ -42,7 +42,7 @@ async function health(env, db) {
   // Tests real OAuth, Firestore permission and readiness of the outbox composite index.
   await db.query("notificationOutbox", [["status", "EQUAL", "pending"], ["nextAttemptAt", "LESS_THAN_OR_EQUAL", new Date()]], "nextAttemptAt", 1);
   await sendPush(env, null, null, true); // validate_only: nothing is delivered to any device or topic.
-  const value = {service: "Falai", version: VERSION, database: "ok", fcmValidation: "ok"};
+  const value = {service: "Falaí", version: VERSION, database: "ok", fcmValidation: "ok"};
   lastHealth = {until: Date.now() + 300000, value}; return value;
 }
 export default {
