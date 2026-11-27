@@ -18,10 +18,8 @@ import java.util.List;
 final class AppearanceColorPicker {
     static void show(MainActivity activity) {
         int initial = Appearance.selected(activity);
-        android.app.Dialog dialog = new android.app.Dialog(activity);
-        LinearLayout content = Ui.column(activity);
-        content.setPadding(Ui.dp(activity, 20), Ui.dp(activity, 18), Ui.dp(activity, 20), Ui.dp(activity, 12));
-        content.setBackground(Ui.shape(activity, R.color.card, 20));
+        SettingsPage dialog = new SettingsPage(activity, R.string.app_color);
+        LinearLayout content = dialog.body;
         LinearLayout preview = Ui.section(activity); content.addView(preview);
         preview.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 12), Ui.dp(activity, 16), Ui.dp(activity, 12));
         preview.setBackground(Ui.shape(activity, R.color.input_background, 12));
@@ -43,18 +41,12 @@ final class AppearanceColorPicker {
         ScrollView scroll = new ScrollView(activity); scroll.addView(list); scroll.setClipToPadding(false);
         scroll.setPadding(0, 0, 0, Ui.dp(activity, 12));
         content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        TextView close = Ui.text(activity, activity.getString(R.string.close), 14, false);
-        close.setTextColor(Appearance.primary(activity)); close.setGravity(Gravity.CENTER);
-        close.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 12), Ui.dp(activity, 16), Ui.dp(activity, 12));
-        close.setOnClickListener(view -> dialog.dismiss());
-        LinearLayout actions = Ui.row(activity); actions.setGravity(Gravity.END); actions.addView(close); content.addView(actions);
         List<TextView> options = new ArrayList<>();
         Runnable update = () -> {
             int selected = Appearance.selected(activity), primary = Appearance.primary(activity), soft = Appearance.soft(activity);
             title.setTextColor(primary); action.setTextColor(primary);
             action.setBackground(background(soft, Ui.dp(activity, 18)));
             indicator.setBackground(background(primary, Ui.dp(activity, 4)));
-            close.setTextColor(primary);
             for (int i = 0; i < options.size(); i++) {
                 TextView option = options.get(i); boolean active = i == selected;
                 option.setSelected(active); option.setTextColor(active ? Appearance.primary(activity, i) : activity.getColor(R.color.text_primary));
@@ -84,14 +76,7 @@ final class AppearanceColorPicker {
             activity.getLifecycle().removeObserver(observer);
             if (initial != Appearance.selected(activity) && !activity.isFinishing() && !activity.isDestroyed()) SettingsPage.recreateAfterExit(activity);
         });
-        dialog.setContentView(content);
         update.run(); dialog.show();
-        android.view.Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawableResource(android.R.color.transparent);
-            window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT);
-        }
     }
     private static GradientDrawable background(int color, int radius) {
         GradientDrawable shape = new GradientDrawable(); shape.setColor(color); shape.setCornerRadius(radius); return shape;
