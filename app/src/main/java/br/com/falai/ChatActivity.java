@@ -181,7 +181,7 @@ public final class ChatActivity extends FalaiActivity {
         replyPreview.setVisibility(View.GONE);
         root.addView(replyPreview);
         composerRow = Ui.row(this); composerRow.setGravity(Gravity.BOTTOM); composerRow.setBaselineAligned(false);
-        composerRow.setPadding(Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 8));
+        composerRow.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 8));
         LinearLayout inputBar = Ui.row(this); inputBar.setGravity(Gravity.BOTTOM); inputBar.setBaselineAligned(false);
         inputBar.setBackground(Ui.shape(this, R.color.card, 24));
         composerRow.addView(inputBar, new LinearLayout.LayoutParams(0, -2, 1));
@@ -190,21 +190,24 @@ public final class ChatActivity extends FalaiActivity {
         photoButton.setBackground(new android.graphics.drawable.RippleDrawable(
                 android.content.res.ColorStateList.valueOf(Appearance.ripple(this)),
                 new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), null));
+        compactComposerIcon(photoButton);
         inputBar.addView(photoButton);
         android.widget.ImageButton cameraButton = Ui.icon(this, R.drawable.ic_camera, R.string.take_photo, v -> takePhoto());
         cameraButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.text_secondary)));
         cameraButton.setBackground(new android.graphics.drawable.RippleDrawable(
                 android.content.res.ColorStateList.valueOf(Appearance.ripple(this)),
                 new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT), null));
+        compactComposerIcon(cameraButton);
         inputBar.addView(cameraButton);
         emojiButton = Ui.icon(this, R.drawable.ic_emoji, R.string.emoji, v -> emoji());
         emojiButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.text_secondary)));
         emojiButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(Appearance.ripple(this)), Ui.shape(this, R.color.card, 24), null));
+        compactComposerIcon(emojiButton);
         inputBar.addView(emojiButton);
         composer = Ui.input(this, R.string.message_hint); composer.setSingleLine(false); composer.setMaxLines(5);
         composer.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         composer.setBackgroundColor(android.graphics.Color.TRANSPARENT); composer.setMinHeight(Ui.dp(this, 48));
-        composer.setGravity(Gravity.TOP | Gravity.START); composer.setPadding(0, Ui.dp(this, 12), Ui.dp(this, 12), Ui.dp(this, 12));
+        composer.setGravity(Gravity.TOP | Gravity.START); composer.setPadding(Ui.dp(this, 2), Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12));
         composer.setText(model.draft); inputBar.addView(composer, new LinearLayout.LayoutParams(0, -2, 1));
         android.widget.ImageButton sendButton = Ui.icon(this, R.drawable.ic_send, R.string.send, v -> {
             model.draft = composer.getText().toString();
@@ -214,7 +217,7 @@ public final class ChatActivity extends FalaiActivity {
         });
         sendButton.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.background)));
         sendButton.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33000000), Ui.shape(this, R.color.action_green, 24), null));
-        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)); sendParams.leftMargin = Ui.dp(this, 8);
+        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)); sendParams.leftMargin = Ui.dp(this, 4);
         composerRow.addView(sendButton, sendParams); root.addView(composerRow);
         emojiPanelHost = Ui.column(this); emojiPanelHost.setVisibility(View.GONE);
         root.addView(emojiPanelHost, new LinearLayout.LayoutParams(-1, -2));
@@ -238,6 +241,11 @@ public final class ChatActivity extends FalaiActivity {
             search.setText(state.getString("messageQuery", ""));
             if (state.getBoolean("messageSearchOpen", false) || !messageQuery.isEmpty()) messageSearch.setVisibility(View.VISIBLE);
         }
+    }
+    private void compactComposerIcon(android.widget.ImageButton button) {
+        button.setMinimumWidth(0);
+        button.setPadding(Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12));
+        button.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(this, 36), Ui.dp(this, 48)));
     }
     @Override protected void onStart() {
         super.onStart(); if (model == null) return;
@@ -625,13 +633,7 @@ public final class ChatActivity extends FalaiActivity {
         if (id == null) return;
         java.io.File local = ChatMedia.file(this, id);
         if (local != null && local.isFile()) {
-            android.graphics.Bitmap bitmap = ChatMedia.preview(this, id, 1600);
-            if (bitmap == null) { local.delete(); openPhoto(doc); return; }
-            android.widget.ImageView image = new android.widget.ImageView(this); image.setImageBitmap(bitmap);
-            image.setAdjustViewBounds(true); image.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-            image.setMaxHeight(getResources().getDisplayMetrics().heightPixels - Ui.dp(this, 96));
-            AlertDialog dialog = new AlertDialog.Builder(this).setView(image).setPositiveButton(R.string.close, null).create();
-            dialog.setOnDismissListener(ignored -> bitmap.recycle()); dialog.show(); return;
+            PhotoViewerActivity.open(this, id); return;
         }
         if (Backend.uid().equals(doc.getString("senderId"))) { toast(R.string.photo_expired); return; }
         downloadPhoto(doc, true);

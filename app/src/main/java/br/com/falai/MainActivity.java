@@ -264,6 +264,10 @@ public final class MainActivity extends FalaiActivity {
         home = true; tab = selectingContact ? 1 : selected;
         if (selected != 0) showingArchived = false;
         page(getString(selectingContact ? R.string.contacts : showingArchived ? R.string.archived_chats : selected == 0 ? R.string.conversations : selected == 1 ? R.string.contacts : R.string.settings));
+        if (!selectingContact && selected == 2) {
+            View heading = root.getChildAt(0);
+            heading.setPadding(heading.getPaddingLeft(), Ui.dp(this, 6), heading.getPaddingRight(), heading.getPaddingBottom());
+        }
         root.setBackground(new SoftGlowBackground(this));
         if (!selectingContact && showingArchived) {
             archiveBack.setEnabled(true);
@@ -590,13 +594,13 @@ public final class MainActivity extends FalaiActivity {
         row.setPadding(0, Ui.dp(this, 6), 0, Ui.dp(this, 6));
         LinearLayout labels = (LinearLayout) row.getChildAt(1);
         TextView title = (TextView) labels.getChildAt(0); title.setTextSize(16);
-        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL);
         title.setTextColor(getColor(R.color.text_primary));
         TextView summary = (TextView) labels.getChildAt(1); summary.setTextSize(12);
     }
     private void addProfileSummary(LinearLayout contents) {
         LinearLayout profile = Ui.column(this); profile.setGravity(Gravity.CENTER_HORIZONTAL);
-        profile.setPadding(Ui.dp(this, 8), Ui.dp(this, 16), Ui.dp(this, 8), Ui.dp(this, 20));
+        profile.setPadding(Ui.dp(this, 8), Ui.dp(this, 28), Ui.dp(this, 8), Ui.dp(this, 6));
         AvatarView avatar = new AvatarView(this); avatar.load(Backend.uid(), profileName);
         profile.addView(avatar, new LinearLayout.LayoutParams(Ui.dp(this, 82), Ui.dp(this, 82)));
         ProfileNameView name = new ProfileNameView(this); name.setTextSize(22); name.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
